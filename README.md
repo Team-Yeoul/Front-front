@@ -4,7 +4,7 @@
 
 ```
 
-git clone http://
+git clone https://github.com/Team-Yeoul/Front-front.git
 yarn
 yarn start
 
