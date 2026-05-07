@@ -5,8 +5,9 @@
 ```
 
 git clone https://github.com/Team-Yeoul/Front-front.git
+cd meta-me
 yarn
-yarn start
+yarn dev
 
 ```
 
