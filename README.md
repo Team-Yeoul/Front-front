@@ -13,23 +13,46 @@ yarn start
 ### 폴더 구조
 
 ```
-└─ src
- ├─ components
- ├─ assets 
- ├─ hooks (= hoc)
- ├─ pages
- ├─ constants
- ├─ config
- ├─ lib
- ├─ axios
- ├─ utils
- ├─ recoil
- │  ├─ atoms
- │  ├─ selectors
- │  └─ actions
- ├─ common
- ├─ App.ts
- └─ index.ts
+metame/
+├── src/
+│   ├── app/                          # Next.js App Router
+│   │   ├── (auth)/                   # 로그인 전 영역 (URL에 포함 안 됨)
+│   │   │   ├── login/
+│   │   │   │   └── page.tsx
+│   │   │   └── signup/
+│   │   │       └── page.tsx
+│   │   ├── (dashboard)/              # 로그인 후 메인 영역
+│   │   │   ├── layout.tsx            # 사이드바, 헤더 포함
+│   │   │   ├── diary/
+│   │   │   │   └── page.tsx          # 나의 첫 문장 / 데일리 질문 다이어리
+│   │   │   ├── report/
+│   │   │   │   └── page.tsx          # 리포트 미
+│   │   │   └── objectify/
+│   │   │       └── page.tsx          # 객관화 도감
+│   │   ├── api/                      # Route Handler
+│   │   │   ├── diary/
+│   │   │   │   └── route.ts
+│   │   │   └── ai/
+│   │   │       └── route.ts          # FastAPI 연동 프록시
+│   │   ├── layout.tsx                # 루트 레이아웃 (font, metadata)
+│   │   └── page.tsx                  # 랜딩 페이지
+│   ├── components/
+│   │   ├── ui/                       # Button, Input, Card 등 공통 UI
+│   │   ├── diary/                    # DiaryCard, QuestionBlock 등
+│   │   └── layout/                   # Sidebar, Header, Footer
+│   ├── lib/
+│   │   ├── api.ts                    # fetch wrapper / axios 인스턴스
+│   │   └── auth.ts                   # NextAuth 설정
+│   ├── hooks/
+│   │   ├── useDiary.ts
+│   │   └── useAI.ts
+│   ├── store/                        # Zustand 전역 상태
+│   ├── types/                        # TypeScript 타입 정의
+│   └── styles/                       # 전역 스타일
+├── next.config.ts
+├── tailwind.config.ts
+├── tsconfig.json
+└── .env.local
 ```
 
 ### 커밋컨벤션
