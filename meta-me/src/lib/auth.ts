@@ -38,3 +38,4 @@ export const authConfig: NextAuthConfig = {
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
+// 뭔가 해야함. 그런데 게으름이 문제다.
