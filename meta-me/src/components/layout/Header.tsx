@@ -2,8 +2,8 @@
 
 export function Header() {
   return (
-    <header className="border-b px-6 py-4">
-      <h1 className="text-lg font-semibold">MetaMe</h1>
+    <header className="px-6 py-4 border-b border-gray-100 bg-white">
+      <h1 className="text-[17px] font-semibold text-gray-900">MetaMe</h1>
     </header>
   );
 }
