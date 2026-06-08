@@ -1,3 +1,30 @@
+export interface AuthResponse {
+  access_token: string;
+  refresh_token: string;
+  user_id: string;
+  role: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface SignupRequest {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface OnboardingRequest {
+  description: string;
+}
+
+export interface OnboardingResponse {
+  accuracy_percent: number;
+  ai_first_sentence: string;
+}
+
 export interface DiaryEntry {
   id: string;
   content: string;

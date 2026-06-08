@@ -3,21 +3,36 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { login } from '@/lib/api';
+import { useAuthStore } from '@/store';
 
 export default function LoginPage() {
   const router = useRouter();
+  const setAuth = useAuthStore((s) => s.setAuth);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const emailValid = email.includes('@') && email.includes('.');
   const canSubmit = emailValid && password.length >= 6;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit) return;
-    router.push('/diary');
+    if (!canSubmit || loading) return;
+    setError('');
+    setLoading(true);
+    try {
+      const res = await login({ email, password });
+      setAuth(res.access_token, res.refresh_token, res.user_id);
+      router.push('/diary');
+    } catch {
+      setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -73,6 +88,9 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Error */}
+          {error && <p className="text-sm text-red-500">{error}</p>}
+
           {/* Remember / Forgot */}
           <div className="flex items-center justify-between">
             <button type="button" onClick={() => setRemember(!remember)} className="flex items-center gap-2">
@@ -90,10 +108,10 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={!canSubmit}
-            className={`mt-2 w-full h-14 rounded-2xl text-base font-semibold text-white transition-colors ${canSubmit ? 'bg-gray-900' : 'bg-gray-300'}`}
+            disabled={!canSubmit || loading}
+            className={`mt-2 w-full h-14 rounded-2xl text-base font-semibold text-white transition-colors ${canSubmit && !loading ? 'bg-gray-900' : 'bg-gray-300'}`}
           >
-            시작하기
+            {loading ? '로그인 중...' : '시작하기'}
           </button>
         </form>
 

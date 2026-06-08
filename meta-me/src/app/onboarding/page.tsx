@@ -2,14 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { submitOnboarding } from '@/lib/api';
+import { useAuthStore } from '@/store';
 
 type Step = 'notification' | 'description' | 'done' | 'day0';
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const accessToken = useAuthStore((s) => s.accessToken);
   const [step, setStep] = useState<Step>('notification');
   const [description, setDescription] = useState('');
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+  const [aiSentence, setAiSentence] = useState('');
+  const [loading, setLoading] = useState(false);
   const hasText = description.trim().length > 0;
 
   useEffect(() => {
@@ -17,6 +22,23 @@ export default function OnboardingPage() {
     const t = setTimeout(() => setStep('day0'), 2200);
     return () => clearTimeout(t);
   }, [step]);
+
+  const handleDescriptionSubmit = async () => {
+    if (!hasText || loading) return;
+    setLoading(true);
+    try {
+      const res = await submitOnboarding(
+        { description },
+        accessToken ?? '',
+      );
+      setAiSentence(res.ai_first_sentence);
+    } catch {
+      // 실패해도 다음 단계로 진행
+    } finally {
+      setLoading(false);
+      setStep('done');
+    }
+  };
 
   // ── 알림 권한 ──
   if (step === 'notification') {
@@ -135,10 +157,11 @@ export default function OnboardingPage() {
 
         <div className="px-6 pb-14 flex flex-col gap-4">
           <button
-            onClick={() => hasText && setStep('done')}
-            className={`w-full h-14 rounded-2xl text-base font-semibold text-white transition-colors focus:outline-none ${hasText ? 'bg-gray-900' : 'bg-gray-300 cursor-default'}`}
+            onClick={handleDescriptionSubmit}
+            disabled={loading}
+            className={`w-full h-14 rounded-2xl text-base font-semibold text-white transition-colors focus:outline-none ${hasText && !loading ? 'bg-gray-900' : 'bg-gray-300 cursor-default'}`}
           >
-            입력완료
+            {loading ? '분석 중...' : '입력완료'}
           </button>
           <button
             onClick={() => setStep('done')}
@@ -159,9 +182,13 @@ export default function OnboardingPage() {
           당신보다 우리는 스스로를 정확히 알 수도 있어요
         </p>
         <h2 className="text-[22px] font-bold text-gray-900 leading-[1.55]">
-          그래서 이 앱이 존재해요.<br />
-          당신을 더 잘 이해할 수<br />
-          있도록 도와줄게요.
+          {aiSentence || (
+            <>
+              그래서 이 앱이 존재해요.<br />
+              당신을 더 잘 이해할 수<br />
+              있도록 도와줄게요.
+            </>
+          )}
         </h2>
         <p className="text-gray-300 mt-6">;</p>
       </div>
