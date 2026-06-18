@@ -1,6 +1,22 @@
 import { create } from 'zustand';
 import type { DiaryEntry, User } from '@/types';
 
+interface AuthStore {
+  accessToken: string | null;
+  refreshToken: string | null;
+  userId: string | null;
+  setAuth: (accessToken: string, refreshToken: string, userId: string) => void;
+  clearAuth: () => void;
+}
+
+export const useAuthStore = create<AuthStore>((set) => ({
+  accessToken: null,
+  refreshToken: null,
+  userId: null,
+  setAuth: (accessToken, refreshToken, userId) => set({ accessToken, refreshToken, userId }),
+  clearAuth: () => set({ accessToken: null, refreshToken: null, userId: null }),
+}));
+
 interface DiaryStore {
   entries: DiaryEntry[];
   setEntries: (entries: DiaryEntry[]) => void;
