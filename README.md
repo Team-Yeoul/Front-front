@@ -87,3 +87,12 @@ ex. 로그인 기능 개발
 ex2. 로그인 기능 버그 수정
 - hotfix/login
 ```
+
+### 브랜치 업데이트
+```
+git checkout main
+git pull origin main
+npm install         
+npm run dev
+```
+
