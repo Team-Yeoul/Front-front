@@ -6,9 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "api:types": "openapi-typescript ./Metame_api명세서.json -o src/shared/api/schema.gen.ts"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.2",
     "@zxing/browser": "^0.1.5",
     "@zxing/library": "^0.21.3",
     "next": "16.2.5",
@@ -24,6 +26,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.5",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

@@ -47,7 +47,7 @@ export default function ObjectifyPage() {
   }, [step]);
 
   return (
-    <div className="relative mx-auto max-w-sm w-full h-full bg-[#F2F3F8] text-[#111111] flex flex-col font-sans overflow-hidden select-none">
+    <div className="relative w-full h-full bg-[#F2F3F8] text-[#111111] flex flex-col font-sans overflow-hidden select-none">
 
       {/* 상단 앱바 */}
       <header className="p-5 pt-8 bg-transparent flex justify-between items-center">
