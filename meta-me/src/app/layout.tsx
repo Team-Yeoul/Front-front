@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { QueryProvider } from '@/shared/api';
 import '../styles/globals.css';
 
 export const metadata: Metadata = {
@@ -9,8 +10,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body className="bg-white md:bg-[#0d0d1a] min-h-screen md:flex md:items-center md:justify-center">
-        <div className="relative w-full h-screen md:w-[393px] md:h-[852px]">
+      <body className="bg-white md:bg-[#0d0d1a] min-h-dvh md:flex md:items-center md:justify-center">
+        <div className="relative w-full h-dvh md:w-[430px] md:h-[932px]">
 
           {/* 다크 네이비 베젤 - 데스크톱 전용 */}
           <div className="hidden md:block absolute -inset-[14px] rounded-[60px] bg-[#1c1c2e] shadow-[0_0_0_2px_#2e2e5c,0_0_0_5px_#151525,0_50px_100px_rgba(0,0,0,0.85)]" />
@@ -47,7 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
             {/* 페이지 콘텐츠 */}
             <div className="flex-1 overflow-y-auto">
-              {children}
+              <QueryProvider>{children}</QueryProvider>
             </div>
 
             {/* 홈 인디케이터 - 데스크톱 전용 */}

@@ -5,7 +5,7 @@ export default function SplashPage() {
     <main className="flex flex-col h-full bg-white px-6">
       <div className="flex-1 flex flex-col items-center justify-center gap-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/로고.png" alt="MetaMe" className="w-40 h-40 rounded-3xl object-cover" />
+        <img src="/logo.png" alt="MetaMe" className="h-20 w-auto" />
         <span className="text-[36px] font-bold text-gray-900">MetaMe</span>
       </div>
 
