@@ -113,17 +113,26 @@ export default function MyPage() {
       {/* ======================================================== */}
       {view === 'settings' && (
         <div className="flex-1 overflow-y-auto pt-4 px-6 pb-6 space-y-5 animate-fadeIn">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setView('main')}
+              className="w-8 h-8 flex items-center justify-center shrink-0"
+            >
+              <svg width="16" height="25" viewBox="0 0 16 25">
+                <path
+                  d="M13 3 L3 12.5 L13 22 Z"
+                  fill="black"
+                  stroke="black"
+                  strokeWidth="3"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
             <div>
               <h1 className="text-[22px] font-normal text-gray-900 tracking-tight">마이 페이지 - 설정</h1>
               <p className="text-[13px] text-gray-400 font-light mt-0.5">내 면 - 설정</p>
             </div>
-            <button
-              onClick={() => setView('main')}
-              className="px-3 py-1.5 rounded-full bg-white border border-gray-200 text-[12px] font-light text-gray-500 active:bg-gray-50"
-            >
-              &lt;
-            </button>
           </div>
 
           <div className="bg-white rounded-[24px] p-5 shadow-sm space-y-6">
@@ -153,17 +162,26 @@ export default function MyPage() {
       {view === 'inquiry' && (
         <div className="flex-1 flex flex-col pt-4 px-6 pb-12 justify-between animate-fadeIn">
           <div className="space-y-5">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setView('main')}
+                className="w-8 h-8 flex items-center justify-center shrink-0"
+              >
+                <svg width="16" height="25" viewBox="0 0 16 25">
+                <path
+                  d="M13 3 L3 12.5 L13 22 Z"
+                  fill="black"
+                  stroke="black"
+                  strokeWidth="3"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </svg>
+              </button>
               <div>
                 <h1 className="text-[22px] font-normal text-gray-900 tracking-tight">마이 페이지 - 문의하기</h1>
                 <p className="text-[13px] text-gray-400 font-light mt-0.5">내 면 - 문의하기</p>
               </div>
-              <button
-                onClick={() => setView('main')}
-                className="px-3 py-1.5 rounded-full bg-white border border-gray-200 text-[12px] font-light text-gray-500 active:bg-gray-50"
-              >
-                &lt;
-              </button>
             </div>
 
             <div className="bg-white rounded-[24px] p-6 shadow-sm space-y-4">
