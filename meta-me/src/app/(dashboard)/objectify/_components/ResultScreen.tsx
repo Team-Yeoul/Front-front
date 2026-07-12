@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { MY_RECORD_TEXT, MIRROR_TEXT, truncateText } from "./data";
 
 // [화면 2] 결과 화면
@@ -44,7 +45,9 @@ export function ResultScreen({
           onClick={onOpenMonsterGrowth}
         >
           <div className="flex flex-col items-center flex-shrink-0">
-            <div className="w-14 h-14 bg-[#E2F5E1] rounded-full flex items-center justify-center text-2xl">😐</div>
+            <div className="h-14">
+              <Image src="/남탓_군주.png" alt="남탓대마왕" width={50} height={56} className="object-contain h-14 w-auto" />
+            </div>
             <span className="text-[11px] text-gray-500 mt-1 font-medium">성장하는 현우 x2</span>
           </div>
           <div className="flex-1 min-w-0 space-y-1.5 text-[11px] text-gray-600">
@@ -59,7 +62,9 @@ export function ResultScreen({
           onClick={onOpenMonsterGrowth}
         >
           <div className="flex flex-col items-center flex-shrink-0">
-            <div className="w-14 h-14 bg-[#FEE2E2] rounded-full flex items-center justify-center text-2xl">😡</div>
+            <div className="h-14">
+              <Image src="/자책_인피니티.png" alt="자책 인피니티" width={50} height={56} className="object-contain h-14 w-auto" />
+            </div>
             <span className="text-[11px] text-gray-500 mt-1 font-medium">성장하는 현우 x2</span>
           </div>
           <div className="flex-1 min-w-0 space-y-1.5 text-[11px] text-gray-600">

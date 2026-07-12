@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { User, Lock, Bell, ChevronRight, Settings, HelpCircle, LogOut } from 'lucide-react';
 import { useAuthStore } from '@/store';
 
@@ -32,14 +33,8 @@ export default function MyPage() {
           <div className="bg-white rounded-[24px] shadow-sm overflow-hidden">
             {/* 상단: 프로필 정보 */}
             <div className="p-5 flex items-center gap-4">
-              {/* 임시 캐릭터 플레이스홀더 */}
-              <div className="w-[72px] h-[72px] bg-gradient-to-b from-[#FAD3D3] to-[#FBB2B2] rounded-full flex flex-col items-center justify-center relative shrink-0">
-                <div className="absolute -top-1 w-2 h-2 bg-[#FBB2B2] rounded-full" />
-                <div className="flex gap-2 mb-1">
-                  <span className="text-[9px] text-[#5D3B3B] font-bold">＞</span>
-                  <span className="text-[9px] text-[#5D3B3B] font-bold">＜</span>
-                </div>
-                <div className="w-3 h-0.5 bg-[#5D3B3B]" />
+              <div className="relative w-[72px] h-[72px] flex items-center justify-center shrink-0">
+                <Image src="/자책_인피니티.png" alt="자책 인피니티" fill className="object-contain" />
               </div>
               <div>
                 <h2 className="text-[18px] font-normal text-gray-900 tracking-tight">권기범</h2>

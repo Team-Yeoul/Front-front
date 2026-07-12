@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { MONSTER_DATA } from "./data";
 
 // [화면 5] 몬스터 도감 상세 바텀시트
@@ -11,7 +12,9 @@ export function MonsterDetailSheet({ open, onClose }: { open: boolean; onClose: 
         <div className="flex justify-between items-start relative">
           <div className="w-full flex flex-col items-center pt-2">
             <h3 className="text-[24px] font-medium tracking-tight">{MONSTER_DATA.namtat.name}</h3>
-            <div className="w-20 h-20 bg-[#E2F5E1] rounded-full flex items-center justify-center text-4xl my-3 shadow-sm">😐</div>
+            <div className="h-20 my-3">
+              <Image src="/남탓_군주.png" alt={MONSTER_DATA.namtat.name} width={72} height={80} className="object-contain h-20 w-auto" />
+            </div>
             <p className="text-[14px] font-normal text-gray-500">{MONSTER_DATA.namtat.category}</p>
             <p className="text-[13px] text-gray-400 font-mono tracking-wider">{MONSTER_DATA.namtat.tier}</p>
           </div>
@@ -20,7 +23,9 @@ export function MonsterDetailSheet({ open, onClose }: { open: boolean; onClose: 
 
         {/* 도감 히스토리 카드 목록 */}
         <div className="flex justify-center space-x-2.5">
-          <div className="w-14 h-14 bg-white border border-gray-200 rounded-2xl flex items-center justify-center text-xl shadow-sm">😐</div>
+          <div className="w-14 h-14 bg-white border border-gray-200 rounded-2xl flex items-center justify-center shadow-sm">
+            <Image src="/남탓_군주.png" alt={MONSTER_DATA.namtat.name} width={28} height={31} className="object-contain w-[28px] h-[31px]" />
+          </div>
           <div className="w-14 h-14 bg-[#EAECEF] rounded-2xl flex items-center justify-center text-xl text-gray-400 font-medium">?</div>
           <div className="w-14 h-14 bg-[#EAECEF] rounded-2xl flex items-center justify-center text-xl text-gray-400 font-medium">?</div>
           <div className="w-14 h-14 bg-[#EAECEF] rounded-2xl flex items-center justify-center text-xl text-gray-400 font-medium">?</div>

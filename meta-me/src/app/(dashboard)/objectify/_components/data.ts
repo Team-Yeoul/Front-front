@@ -31,7 +31,7 @@ export const MONSTER_CATEGORIES = ["전체", "사고/인지", "감정 반응", "
 
 // 도감 그리드용 몬스터 목록 (카테고리 필터링에 사용, 추후 API 연동)
 export const MONSTER_LIST = [
-  { name: "남탓대마왕", emoji: "😐", count: 20, category: "사고/인지" },
-  { name: "자책 인피니티", emoji: "😡", count: 16, category: "감정 반응" },
-  { name: "돋보기", emoji: "🔍", count: 12, category: "행동" },
+  { name: "남탓대마왕", image: "/남탓_군주.png", count: 20, category: "사고/인지" },
+  { name: "자책 인피니티", image: "/자책_인피니티.png", count: 16, category: "감정 반응" },
+  { name: "돋보기", image: "/돋보기.png", count: 12, category: "행동" },
 ];

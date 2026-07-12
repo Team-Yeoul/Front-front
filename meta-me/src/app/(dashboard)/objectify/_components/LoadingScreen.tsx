@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 // [화면 1] 첫 진입 (로딩 화면)
 export function LoadingScreen({ progress }: { progress: number }) {
   const filledCount = Math.floor(progress / 10);
@@ -13,9 +15,8 @@ export function LoadingScreen({ progress }: { progress: number }) {
         </h2>
       </div>
 
-      {/* 원형 그래디언트 캐릭터 임시 에어리어 */}
-      <div className="w-36 h-36 bg-gradient-to-b from-[#E2F5E1] to-[#C9EAC7] rounded-full flex items-center justify-center text-4xl shadow-sm">
-        😐
+      <div className="h-36">
+        <Image src="/남탓_군주.png" alt="남탓대마왕" width={129} height={144} className="object-contain h-36 w-auto" />
       </div>
 
       {/* 텍스트 형태의 프로그레스 바 */}

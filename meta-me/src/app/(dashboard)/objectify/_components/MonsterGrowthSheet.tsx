@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 // 발견한 몬스터 성장 상세 바텀시트
 export function MonsterGrowthSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
@@ -8,7 +10,9 @@ export function MonsterGrowthSheet({ open, onClose }: { open: boolean; onClose: 
       <div className="bg-white rounded-t-[28px] p-6 relative z-10 space-y-6 shadow-xl max-h-[82%] overflow-y-auto">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-2.5">
-            <div className="w-10 h-10 bg-[#E2F5E1] rounded-full flex items-center justify-center text-xl">😐</div>
+            <div className="h-10">
+              <Image src="/남탓_군주.png" alt="남탓대마왕" width={36} height={40} className="object-contain h-10 w-auto" />
+            </div>
             <h3 className="text-[18px] font-medium">성장하는 현우 x2</h3>
           </div>
           <button onClick={onClose} className="text-xl text-gray-400 p-1">✕</button>
