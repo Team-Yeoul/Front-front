@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { MONSTER_DATA } from "./data";
 
 // [화면 3] 야생의 몬스터 발견
@@ -6,8 +7,8 @@ export function MonsterDiscoveryScreen({ onGoToDogam }: { onGoToDogam: () => voi
     <div className="flex flex-col items-center text-center pt-4 space-y-5">
       <h2 className="text-[20px] font-medium text-gray-900 tracking-tight">!야생의 몬스터 발견!</h2>
 
-      <div className="w-32 h-32 bg-[#E2F5E1] rounded-full flex items-center justify-center text-5xl shadow-sm">
-        😐
+      <div className="h-32">
+        <Image src="/남탓_군주.png" alt={MONSTER_DATA.namtat.name} width={115} height={128} className="object-contain h-32 w-auto" />
       </div>
 
       <div className="space-y-1">
