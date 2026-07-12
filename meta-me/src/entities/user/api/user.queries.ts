@@ -1,0 +1,113 @@
+'use client';
+
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as userApi from './user.http';
+import type {
+  CreateNicknameRequest,
+  ListMyNicknamesParams,
+  LoginRequest,
+  NotificationSetting,
+  OnboardingRequest,
+  PasswordResetConfirmRequest,
+  PasswordResetRequest,
+  RefreshTokenRequest,
+  SignUpRequest,
+  UpdateAccountRequest,
+} from '../model/types';
+
+export const userKeys = {
+  all: ['user'] as const,
+  account: () => [...userKeys.all, 'account'] as const,
+  profile: () => [...userKeys.all, 'profile'] as const,
+  accuracy: () => [...userKeys.all, 'accuracy'] as const,
+  onboardingResult: () => [...userKeys.all, 'onboarding-result'] as const,
+  nicknames: (params?: ListMyNicknamesParams) => [...userKeys.all, 'nicknames', params] as const,
+  notificationSettings: () => [...userKeys.all, 'notification-settings'] as const,
+  terms: () => [...userKeys.all, 'terms'] as const,
+};
+
+export const useLogin = () => useMutation({ mutationFn: (body: LoginRequest) => userApi.login(body) });
+
+export const useSignup = () => useMutation({ mutationFn: (body: SignUpRequest) => userApi.signup(body) });
+
+export const useLogout = () => useMutation({ mutationFn: userApi.logout });
+
+export const useRefreshToken = () =>
+  useMutation({ mutationFn: (body: RefreshTokenRequest) => userApi.refreshToken(body) });
+
+export const useRequestPasswordReset = () =>
+  useMutation({ mutationFn: (body: PasswordResetRequest) => userApi.requestPasswordReset(body) });
+
+export const useConfirmPasswordReset = () =>
+  useMutation({
+    mutationFn: (body: PasswordResetConfirmRequest) => userApi.confirmPasswordReset(body),
+  });
+
+export const useSubmitOnboarding = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: OnboardingRequest) => userApi.submitOnboarding(body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: userKeys.onboardingResult() }),
+  });
+};
+
+export const useGetOnboardingResult = (enabled = true) =>
+  useQuery({
+    queryKey: userKeys.onboardingResult(),
+    queryFn: userApi.getOnboardingResult,
+    enabled,
+  });
+
+export const useGetMyAccount = (enabled = true) =>
+  useQuery({ queryKey: userKeys.account(), queryFn: userApi.getMyAccount, enabled });
+
+export const useUpdateMyAccount = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: UpdateAccountRequest) => userApi.updateMyAccount(body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: userKeys.account() }),
+  });
+};
+
+export const useWithdrawAccount = () => useMutation({ mutationFn: userApi.withdrawAccount });
+
+export const useGetMyProfile = (enabled = true) =>
+  useQuery({ queryKey: userKeys.profile(), queryFn: userApi.getMyProfile, enabled });
+
+export const useGetMyAccuracy = (enabled = true) =>
+  useQuery({ queryKey: userKeys.accuracy(), queryFn: userApi.getMyAccuracy, enabled });
+
+export const useGetTerms = (enabled = true) =>
+  useQuery({ queryKey: userKeys.terms(), queryFn: userApi.getTerms, enabled });
+
+export const useListMyNicknames = (params?: ListMyNicknamesParams, enabled = true) =>
+  useQuery({
+    queryKey: userKeys.nicknames(params),
+    queryFn: () => userApi.listMyNicknames(params),
+    enabled,
+  });
+
+export const useCreateNickname = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, body }: { userId: string; body: CreateNicknameRequest }) =>
+      userApi.createNickname(userId, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: userKeys.all }),
+  });
+};
+
+export const useGetNotificationSettings = (enabled = true) =>
+  useQuery({
+    queryKey: userKeys.notificationSettings(),
+    queryFn: userApi.getNotificationSettings,
+    enabled,
+  });
+
+export const useUpdateNotificationSettings = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: NotificationSetting) => userApi.updateNotificationSettings(body),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: userKeys.notificationSettings() }),
+  });
+};
