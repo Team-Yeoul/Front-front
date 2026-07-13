@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store';
 import { useGetMyProfile } from '@/entities/user';
 import { useGetDailyRecord, useListDailyRecords } from '@/entities/diary';
@@ -90,23 +91,29 @@ function ChevronIcon({ size = 7 }: { size?: number }) {
 }
 
 function RecentEntryRow({ record }: { record: DailyRecord }) {
+  const router = useRouter();
   const { data } = useGetDailyRecord(record.record_id);
   const question = data?.questions[0];
-  const title = question?.scene_description || question?.emotion_tag || '기록 보기';
+  const rawTitle = question?.scene_description || question?.emotion_tag;
+  const title = rawTitle && /[가-힣]/.test(rawTitle) ? rawTitle : '기록 보기';
 
   return (
-    <div className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3.5">
+    <button
+      onClick={() => router.push('/objectify')}
+      className="w-full flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3.5 text-left"
+    >
       <span className="w-2 h-2 rounded-full bg-[#8287FF] shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-[14px] font-medium text-gray-900 truncate">{title}</p>
         <p className="text-[12px] text-gray-400 mt-0.5">{formatDotDate(record.created_at)}</p>
       </div>
       <ChevronIcon />
-    </div>
+    </button>
   );
 }
 
 export default function MainPage() {
+  const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
   const { data: profile } = useGetMyProfile(!!accessToken);
   const { data: recent } = useListDailyRecords({ size: 3 }, !!accessToken);
@@ -149,7 +156,10 @@ export default function MainPage() {
           </div>
 
           <div className="px-5 pb-5 pt-1">
-            <button className="w-full h-14 bg-gray-900 text-white rounded-2xl text-[15px] font-semibold">
+            <button
+              onClick={() => router.push('/diary')}
+              className="w-full h-14 bg-gray-900 text-white rounded-2xl text-[15px] font-semibold"
+            >
               기록 이어가기
             </button>
           </div>
@@ -188,17 +198,22 @@ export default function MainPage() {
           {hasRealRecent
             ? recent!.records.map((record) => <RecentEntryRow key={record.record_id} record={record} />)
             : MOCK_RECENT_ENTRIES.map((entry) => (
-                <div key={entry.id} className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3.5">
+                <button
+                  key={entry.id}
+                  onClick={() => router.push('/objectify')}
+                  className="w-full flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3.5 text-left"
+                >
                   <span className="w-2 h-2 rounded-full bg-[#8287FF] shrink-0" />
                   <div className="flex-1">
                     <p className="text-[14px] font-medium text-gray-900">{entry.title}</p>
                     <p className="text-[12px] text-gray-400 mt-0.5">{entry.date}</p>
                   </div>
                   <ChevronIcon />
-                </div>
+                </button>
               ))}
         </div>
       </div>
     </div>
   );
 }
+
