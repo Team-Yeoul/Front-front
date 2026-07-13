@@ -203,7 +203,7 @@ export default function OnboardingPage() {
       </div>
       <div className="px-6 pb-14">
         <button
-          onClick={() => router.push('/diary')}
+          onClick={() => router.push('/main')}
           className="w-full h-14 bg-gray-900 text-white rounded-2xl text-base font-semibold focus:outline-none"
         >
           시작하기
