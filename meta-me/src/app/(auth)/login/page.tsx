@@ -37,7 +37,7 @@ export default function LoginPage() {
     try {
       const res = await login({ email, password });
       setAuth(res.access_token, res.refresh_token, res.user_id);
-      router.push('/diary');
+      router.push('/main');
     } catch {
       setError('이메일 또는 비밀번호가 올바르지 않습니다.');
     } finally {
