@@ -105,7 +105,7 @@ export default function KeywordDetailPage() {
 
   return (
     <div className="flex flex-col h-full bg-white">
-      <DetailHeader title="흥미/무흥미 키워드" subtitle="이번 리포트에서 발견한 키워드 3가지" />
+      <DetailHeader title="흥미/무흥미 키워드" subtitle="이번 리포트에서 발견한 키워드 3가지" backHref="/report/summary" />
 
       <div className="flex-1 overflow-y-auto px-6 pt-5">
         <p className="text-[12px] font-semibold text-[#8287FF] mb-3">흥미 키워드</p>

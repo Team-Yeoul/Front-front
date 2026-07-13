@@ -50,7 +50,7 @@ export default function PersonaDetailPage() {
 
   return (
     <div className="flex flex-col h-full bg-white">
-      <DetailHeader title="나의 성향 지도" subtitle="최근 기록을 바탕으로 추론한 4가지 축이에요" />
+      <DetailHeader title="나의 성향 지도" subtitle="최근 기록을 바탕으로 추론한 4가지 축이에요" backHref="/report/summary" />
 
       <div className="flex-1 overflow-y-auto px-6 pt-5">
         <div className="bg-gray-50 rounded-2xl px-4 py-3.5 mb-6">
