@@ -83,7 +83,7 @@ export default function EmotionDetailPage() {
 
   return (
     <div className="flex flex-col h-full bg-white">
-      <DetailHeader title="감정/주의 패턴" subtitle="이번 리포트에서 발견한 패턴이에요" />
+      <DetailHeader title="감정/주의 패턴" subtitle="이번 리포트에서 발견한 패턴이에요" backHref="/report/summary" />
 
       <div className="flex-1 overflow-y-auto px-6 pt-5">
         {data.emotions.map((e, i) => (

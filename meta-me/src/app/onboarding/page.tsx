@@ -31,7 +31,9 @@ export default function OnboardingPage() {
         { description },
         accessToken ?? '',
       );
-      setAiSentence(res.ai_first_sentence);
+      if (res.ai_first_sentence && /[가-힣]/.test(res.ai_first_sentence)) {
+        setAiSentence(res.ai_first_sentence);
+      }
     } catch {
       // 실패해도 다음 단계로 진행
     } finally {

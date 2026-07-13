@@ -290,7 +290,7 @@ export default function DiaryPage() {
             className="w-full flex-1 border border-gray-200 rounded-2xl p-5 text-[15px] text-gray-900 outline-none placeholder:text-gray-300 resize-none"
           />
         )}
-        {isMyselfMoment === false && <div className="flex-1" />}
+        {!isMyselfMoment && <div className="flex-1" />}
 
         <StepFooter
           onPrev={() => setStep('scene')}
