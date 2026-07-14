@@ -1,8 +1,13 @@
-import Image from "next/image";
-import { MY_RECORD_TEXT, MIRROR_TEXT, truncateText } from "./data";
+import type { components } from "@/shared/api";
+import { truncateText } from "./data";
+
+type MonsterDetection = components["schemas"]["MonsterDetection"];
 
 // [화면 2] 결과 화면
 interface ResultScreenProps {
+  myRecordText: string;
+  mirrorFactText: string;
+  unlockedMonsters: MonsterDetection[];
   onOpenMyRecord: () => void;
   onOpenMirror: () => void;
   onOpenMonsterGrowth: () => void;
@@ -11,6 +16,9 @@ interface ResultScreenProps {
 }
 
 export function ResultScreen({
+  myRecordText,
+  mirrorFactText,
+  unlockedMonsters,
   onOpenMyRecord,
   onOpenMirror,
   onOpenMonsterGrowth,
@@ -23,7 +31,7 @@ export function ResultScreen({
       <section className="space-y-2 cursor-pointer" onClick={onOpenMyRecord}>
         <h3 className="text-[18px] font-medium text-gray-800 pl-1">내가 쓴 기록</h3>
         <div className="bg-white p-5 rounded-2xl shadow-sm text-[14px] text-gray-700 leading-relaxed">
-          {truncateText(MY_RECORD_TEXT, 80)}
+          {truncateText(myRecordText, 80)}
         </div>
       </section>
 
@@ -31,48 +39,48 @@ export function ResultScreen({
       <section className="space-y-2 cursor-pointer" onClick={onOpenMirror}>
         <h3 className="text-[18px] font-medium text-gray-800 pl-1">거울이 비춘 사실</h3>
         <div className="bg-white p-5 rounded-2xl shadow-sm text-[14px] text-gray-700 leading-relaxed">
-          {truncateText(MIRROR_TEXT, 80)}
+          {truncateText(mirrorFactText, 80)}
         </div>
       </section>
 
       {/* 발견한 몬스터 */}
-      <section className="space-y-3">
-        <h3 className="text-[18px] font-medium text-gray-800 pl-1">발견한 몬스터</h3>
+      {unlockedMonsters.length > 0 && (
+        <section className="space-y-3">
+          <h3 className="text-[18px] font-medium text-gray-800 pl-1">발견한 몬스터</h3>
 
-        {/* 캐릭터 카드 1 */}
-        <div
-          className="bg-white p-4 rounded-2xl shadow-sm flex items-center space-x-4 cursor-pointer"
-          onClick={onOpenMonsterGrowth}
-        >
-          <div className="flex flex-col items-center flex-shrink-0">
-            <div className="h-14">
-              <Image src="/남탓_군주.png" alt="남탓대마왕" width={50} height={56} className="object-contain h-14 w-auto" />
+          {unlockedMonsters.map((detection) => (
+            <div
+              key={detection.monster_detection_id}
+              className="bg-white p-4 rounded-2xl shadow-sm flex items-center space-x-4 cursor-pointer"
+              onClick={onOpenMonsterGrowth}
+            >
+              <div className="flex flex-col items-center flex-shrink-0">
+                <div className="h-14">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={detection.monster.icon_url}
+                    alt={detection.monster.eum_code}
+                    width={50}
+                    height={56}
+                    className="object-contain h-14 w-auto"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/남탓_군주.png";
+                    }}
+                  />
+                </div>
+                <span className="text-[11px] text-gray-500 mt-1 font-medium">
+                  x{detection.detected_monster_count}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0 space-y-1.5 text-[11px] text-gray-600">
+                <div className="bg-[#F2F3F8] p-2 rounded-xl break-words">
+                  {detection.monster.monster_description}
+                </div>
+              </div>
             </div>
-            <span className="text-[11px] text-gray-500 mt-1 font-medium">성장하는 현우 x2</span>
-          </div>
-          <div className="flex-1 min-w-0 space-y-1.5 text-[11px] text-gray-600">
-            <div className="bg-[#F2F3F8] p-2 rounded-xl break-words">위기 관리 및 문제 해결 능력의 성장 (개인적 측면)</div>
-            <div className="bg-[#F2F3F8] p-2 rounded-xl break-words">시스템적 안목과 대안 제시 능력의 성장 (조직·환경적 측면)</div>
-          </div>
-        </div>
-
-        {/* 캐릭터 카드 2 */}
-        <div
-          className="bg-white p-4 rounded-2xl shadow-sm flex items-center space-x-4 cursor-pointer"
-          onClick={onOpenMonsterGrowth}
-        >
-          <div className="flex flex-col items-center flex-shrink-0">
-            <div className="h-14">
-              <Image src="/자책_인피니티.png" alt="자책 인피니티" width={50} height={56} className="object-contain h-14 w-auto" />
-            </div>
-            <span className="text-[11px] text-gray-500 mt-1 font-medium">성장하는 현우 x2</span>
-          </div>
-          <div className="flex-1 min-w-0 space-y-1.5 text-[11px] text-gray-600">
-            <div className="bg-[#F2F3F8] p-2 rounded-xl break-words">위기 관리 및 문제 해결 능력의 성장 (개인적 측면)</div>
-            <div className="bg-[#F2F3F8] p-2 rounded-xl break-words">시스템적 안목과 대안 제시 능력의 성장 (조직·환경적 측면)</div>
-          </div>
-        </div>
-      </section>
+          ))}
+        </section>
+      )}
 
       {/* 하단 제어 버튼 */}
       <div className="grid grid-cols-2 gap-4 pt-2 mb-6">
@@ -84,7 +92,8 @@ export function ResultScreen({
         </button>
         <button
           onClick={onViewMonster}
-          className="bg-black text-white py-3.5 rounded-2xl text-[16px] font-medium shadow-sm active:opacity-80 transition"
+          disabled={unlockedMonsters.length === 0}
+          className="bg-black text-white py-3.5 rounded-2xl text-[16px] font-medium shadow-sm active:opacity-80 transition disabled:opacity-40"
         >
           몬스터 보기
         </button>

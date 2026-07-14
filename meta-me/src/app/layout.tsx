@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import { SessionProvider } from 'next-auth/react';
 import { QueryProvider } from '@/shared/api';
+import { AuthBridge } from '@/components/auth/AuthBridge';
 import '../styles/globals.css';
 
 export const metadata: Metadata = {
@@ -48,7 +50,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
             {/* 페이지 콘텐츠 */}
             <div className="flex-1 overflow-y-auto">
-              <QueryProvider>{children}</QueryProvider>
+              <SessionProvider>
+                <QueryProvider>
+                  <AuthBridge />
+                  {children}
+                </QueryProvider>
+              </SessionProvider>
             </div>
 
             {/* 홈 인디케이터 - 데스크톱 전용 */}

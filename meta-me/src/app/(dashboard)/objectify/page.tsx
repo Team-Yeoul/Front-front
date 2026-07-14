@@ -1,6 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useListDailyRecords, useGetDailyRecord } from "@/entities/diary";
+import { useCreateObjectiveMirror } from "@/entities/objective";
+import type { UserMonster } from "@/entities/collection";
+import { userKeys } from "@/entities/user";
 import { LoadingScreen } from "./_components/LoadingScreen";
 import { ResultScreen } from "./_components/ResultScreen";
 import { MonsterDiscoveryScreen } from "./_components/MonsterDiscoveryScreen";
@@ -9,6 +14,7 @@ import { MyRecordSheet } from "./_components/MyRecordSheet";
 import { MirrorSheet } from "./_components/MirrorSheet";
 import { MonsterGrowthSheet } from "./_components/MonsterGrowthSheet";
 import { MonsterDetailSheet } from "./_components/MonsterDetailSheet";
+import { MY_RECORD_TEXT, MIRROR_TEXT } from "./_components/data";
 
 type Step = "loading" | "result" | "monster_discovery" | "dogam";
 
@@ -23,10 +29,20 @@ export default function ObjectifyPage() {
   const [isMyRecordOpen, setIsMyRecordOpen] = useState(false);
   const [isMirrorOpen, setIsMirrorOpen] = useState(false);
   const [isMonsterGrowthOpen, setIsMonsterGrowthOpen] = useState(false);
-  const [selectedMonsterDetail, setSelectedMonsterDetail] = useState(false);
+  const [selectedMonster, setSelectedMonster] = useState<UserMonster | null>(null);
 
   // 도감 화면 카테고리 필터 선택 상태
   const [selectedCategory, setSelectedCategory] = useState("전체");
+
+  // 객관화 대상으로 쓸 가장 최근 일일 기록
+  const { data: recentRecords } = useListDailyRecords({ size: 1 });
+  const latestRecordId = recentRecords?.records[0]?.record_id;
+  const { data: recordDetail } = useGetDailyRecord(latestRecordId ?? "", !!latestRecordId);
+  const originalEmotion =
+    recordDetail?.questions[0]?.scene_description || recordDetail?.questions[0]?.user_answer;
+
+  const createMirror = useCreateObjectiveMirror();
+  const queryClient = useQueryClient();
 
   // 첫 진입 로딩 애니메이션 구현 (100% 도달 시 결과창으로 자동 이동)
   useEffect(() => {
@@ -46,6 +62,34 @@ export default function ObjectifyPage() {
     }
   }, [step]);
 
+  // 로딩 화면에 진입하면 실제 객관화 미러 생성 요청
+  useEffect(() => {
+    if (step === "loading" && latestRecordId && originalEmotion) {
+      createMirror.mutate(
+        { record_id: latestRecordId, original_emotion: originalEmotion },
+        {
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: userKeys.profile() });
+            queryClient.invalidateQueries({ queryKey: userKeys.accuracy() });
+          },
+        },
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, latestRecordId, originalEmotion]);
+
+  const isKorean = (text?: string) => !!text && /[가-힣]/.test(text);
+
+  const mirror = createMirror.data?.mirror;
+  const unlockedMonsters = createMirror.data?.unlocked_monsters ?? [];
+  const myRecordText = isKorean(mirror?.original_emotion) ? mirror!.original_emotion : MY_RECORD_TEXT;
+  const mirrorFactText = isKorean(mirror?.objective_fact) ? mirror!.objective_fact : MIRROR_TEXT;
+
+  const handleRetry = () => {
+    createMirror.reset();
+    setStep("loading");
+  };
+
   return (
     <div className="relative w-full h-full bg-[#F2F3F8] text-[#111111] flex flex-col font-sans overflow-hidden select-none">
 
@@ -57,7 +101,9 @@ export default function ObjectifyPage() {
           {step === "dogam" && "객관화 도감"}
         </h1>
         {step === "result" && (
-          <span className="text-[15px] text-gray-500 font-normal">2026.06.30</span>
+          <span className="text-[15px] text-gray-500 font-normal">
+            {new Date(mirror?.created_at ?? Date.now()).toLocaleDateString("sv-SE").replaceAll("-", ".")}
+          </span>
         )}
       </header>
 
@@ -67,32 +113,38 @@ export default function ObjectifyPage() {
 
         {step === "result" && (
           <ResultScreen
+            myRecordText={myRecordText}
+            mirrorFactText={mirrorFactText}
+            unlockedMonsters={unlockedMonsters}
             onOpenMyRecord={() => setIsMyRecordOpen(true)}
             onOpenMirror={() => setIsMirrorOpen(true)}
             onOpenMonsterGrowth={() => setIsMonsterGrowthOpen(true)}
-            onRetry={() => setStep("loading")}
+            onRetry={handleRetry}
             onViewMonster={() => setStep("monster_discovery")}
           />
         )}
 
         {step === "monster_discovery" && (
-          <MonsterDiscoveryScreen onGoToDogam={() => setStep("dogam")} />
+          <MonsterDiscoveryScreen
+            monster={unlockedMonsters[0]}
+            onGoToDogam={() => setStep("dogam")}
+          />
         )}
 
         {step === "dogam" && (
           <DogamScreen
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
-            onSelectMonster={() => setSelectedMonsterDetail(true)}
+            onSelectMonster={setSelectedMonster}
           />
         )}
       </main>
 
       {/* 바텀시트 모달 */}
-      <MyRecordSheet open={isMyRecordOpen} onClose={() => setIsMyRecordOpen(false)} />
+      <MyRecordSheet open={isMyRecordOpen} onClose={() => setIsMyRecordOpen(false)} text={myRecordText} />
       <MirrorSheet open={isMirrorOpen} onClose={() => setIsMirrorOpen(false)} />
       <MonsterGrowthSheet open={isMonsterGrowthOpen} onClose={() => setIsMonsterGrowthOpen(false)} />
-      <MonsterDetailSheet open={selectedMonsterDetail} onClose={() => setSelectedMonsterDetail(false)} />
+      <MonsterDetailSheet monster={selectedMonster} onClose={() => setSelectedMonster(null)} />
     </div>
   );
 }

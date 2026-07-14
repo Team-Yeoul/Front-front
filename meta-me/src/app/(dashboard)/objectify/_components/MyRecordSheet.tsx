@@ -1,7 +1,13 @@
-import { MY_RECORD_TEXT } from "./data";
-
 // 내가 쓴 기록 바텀시트
-export function MyRecordSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function MyRecordSheet({
+  open,
+  onClose,
+  text,
+}: {
+  open: boolean;
+  onClose: () => void;
+  text: string;
+}) {
   if (!open) return null;
 
   return (
@@ -14,7 +20,7 @@ export function MyRecordSheet({ open, onClose }: { open: boolean; onClose: () =>
         </div>
 
         <div className="space-y-6 text-[13px] leading-relaxed text-gray-700">
-          <p>{MY_RECORD_TEXT}</p>
+          <p>{text}</p>
         </div>
       </div>
     </div>

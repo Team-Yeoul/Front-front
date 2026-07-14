@@ -6,6 +6,13 @@ import Google from 'next-auth/providers/google';
 declare module 'next-auth' {
   interface Session {
     user: { id: string; name?: string | null; email?: string | null; image?: string | null };
+    accessToken?: string;
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT {
+    accessToken?: string;
   }
 }
 
@@ -30,8 +37,13 @@ export const authConfig: NextAuthConfig = {
       if (isOnDashboard && !isLoggedIn) return false;
       return true;
     },
+    jwt({ token, account }) {
+      if (account?.access_token) token.accessToken = account.access_token;
+      return token;
+    },
     session({ session, token }: { session: Session; token: JWT }) {
       if (token.sub && session.user) session.user.id = token.sub;
+      if (token.accessToken) session.accessToken = token.accessToken;
       return session;
     },
   },

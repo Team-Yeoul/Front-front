@@ -3,38 +3,53 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signup } from '@/lib/api';
+import { signIn } from 'next-auth/react';
+import { useSignup } from '@/entities/user';
 import { useAuthStore } from '@/store';
+
+function GoogleIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path d="M18.1 10.2c0-.6-.06-1.18-.16-1.74H10v3.3h4.55a3.9 3.9 0 0 1-1.69 2.56v2.12h2.73C17.1 14.96 18.1 12.76 18.1 10.2z" fill="#4285F4"/>
+      <path d="M10 18.4c2.29 0 4.21-.76 5.61-2.06l-2.73-2.12C12.13 14.83 11.15 15.1 10 15.1c-2.21 0-4.08-1.49-4.75-3.5H2.43v2.19C3.82 16.69 6.72 18.4 10 18.4z" fill="#34A853"/>
+      <path d="M5.25 11.6A5.4 5.4 0 0 1 4.97 10c0-.55.1-1.09.28-1.6V6.21H2.43A9.24 9.24 0 0 0 1.4 10c0 1.48.35 2.88.97 4.13l2.88-2.53z" fill="#FBBC05"/>
+      <path d="M10 4.9c1.25 0 2.37.43 3.25 1.27l2.44-2.44C14.21 2.36 12.29 1.6 10 1.6 6.72 1.6 3.82 3.31 2.43 6l2.82 2.19C5.92 6.39 7.79 4.9 10 4.9z" fill="#EA4335"/>
+    </svg>
+  );
+}
 
 export default function SignupPage() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
-  const [name, setName] = useState('');
+  const setNickname = useAuthStore((s) => s.setNickname);
+  const signup = useSignup();
+  const [nickname, setNicknameInput] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const nameValid = name.trim().length > 0;
+  const nicknameValid = nickname.trim().length > 0;
   const emailValid = email.includes('@') && email.includes('.');
-  const canSubmit = nameValid && emailValid && password.length >= 8 && termsAgreed;
+  const canSubmit = nicknameValid && !!birthDate && emailValid && password.length >= 8 && termsAgreed;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit || loading) return;
+    if (!canSubmit || signup.isPending) return;
     setError('');
-    setLoading(true);
-    try {
-      const res = await signup({ name, email, password });
-      setAuth(res.access_token, res.refresh_token, res.user_id);
-      router.push('/onboarding');
-    } catch {
-      setError('회원가입에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setLoading(false);
-    }
+    signup.mutate(
+      { email, password, birth_date: birthDate },
+      {
+        onSuccess: (res) => {
+          setAuth(res.access_token, res.refresh_token, res.user_id);
+          setNickname(nickname.trim());
+          router.push('/onboarding');
+        },
+        onError: () => setError('회원가입에 실패했습니다. 다시 시도해주세요.'),
+      },
+    );
   };
 
   return (
@@ -112,9 +127,28 @@ export default function SignupPage() {
               </svg>
               <input
                 type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
+                value={nickname}
+                onChange={e => setNicknameInput(e.target.value)}
                 placeholder="앱에서 사용할 이름"
+                className="flex-1 text-[15px] bg-transparent outline-none placeholder:text-gray-300"
+              />
+            </div>
+          </div>
+
+          {/* 생년월일 */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[13px] font-medium text-gray-700">생년월일</label>
+            <div className="flex items-center h-[52px] border border-gray-200 rounded-xl px-4 bg-gray-50 gap-3">
+              <svg width="18" height="19" viewBox="0 0 18 19" fill="none">
+                <rect x="0.75" y="2.75" width="16.5" height="15.5" rx="2" stroke="#9CA3AF" strokeWidth="1.5"/>
+                <path d="M0.75 7H17.25" stroke="#9CA3AF" strokeWidth="1.5"/>
+                <path d="M5 0.5V4M13 0.5V4" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              <input
+                type="date"
+                value={birthDate}
+                onChange={e => setBirthDate(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
                 className="flex-1 text-[15px] bg-transparent outline-none placeholder:text-gray-300"
               />
             </div>
@@ -146,14 +180,31 @@ export default function SignupPage() {
           {/* 가입하기 버튼 */}
           <button
             type="submit"
-            disabled={!canSubmit || loading}
+            disabled={!canSubmit || signup.isPending}
             className={`w-full h-[54px] rounded-2xl text-[15px] font-semibold transition-colors ${
-              canSubmit && !loading ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-400'
+              canSubmit && !signup.isPending ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-400'
             }`}
           >
-            {loading ? '가입 중...' : '가입하기'}
+            {signup.isPending ? '가입 중...' : '가입하기'}
           </button>
         </form>
+
+        {/* 구분선 */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-[12px] text-gray-400">또는 간편 가입</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        {/* 구글 회원가입 */}
+        <button
+          type="button"
+          onClick={() => signIn('google', { callbackUrl: '/onboarding' })}
+          className="w-full h-[54px] rounded-2xl bg-white border border-gray-200 flex items-center justify-center gap-2.5 font-semibold text-[15px] text-gray-800"
+        >
+          <GoogleIcon />
+          Google로 계속하기
+        </button>
 
         {/* 로그인 링크 */}
         <div className="text-center text-[13px] text-gray-400">

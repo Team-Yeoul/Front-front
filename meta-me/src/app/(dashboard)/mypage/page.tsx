@@ -5,15 +5,66 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { User, Lock, Bell, ChevronRight, Settings, HelpCircle, LogOut } from 'lucide-react';
 import { useAuthStore } from '@/store';
+import { useGetMyAccount, useLogout } from '@/entities/user';
+import { useListDailyRecords } from '@/entities/diary';
 
 type MyPageView = 'main' | 'settings' | 'inquiry';
 
+function computeStreaks(dateKeys: Set<string>) {
+  if (dateKeys.size === 0) return { current: 0, max: 0 };
+  const sorted = [...dateKeys].sort();
+
+  let max = 1;
+  let run = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    const diffDays = Math.round(
+      (new Date(sorted[i]).getTime() - new Date(sorted[i - 1]).getTime()) / 86400000,
+    );
+    run = diffDays === 1 ? run + 1 : 1;
+    max = Math.max(max, run);
+  }
+
+  let current = 0;
+  const cursor = new Date();
+  while (dateKeys.has(cursor.toLocaleDateString('sv-SE'))) {
+    current += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return { current, max };
+}
+
 export default function MyPage() {
   const router = useRouter();
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const nickname = useAuthStore((s) => s.nickname);
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const [view, setView] = useState<MyPageView>('main');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [inquiryType, setInquiryType] = useState('버그');
+
+  const { data: account } = useGetMyAccount(!!accessToken);
+  const { data: recordsData } = useListDailyRecords({ size: 200 }, !!accessToken);
+  const logout = useLogout();
+
+  const displayName = nickname || (account?.user.email ? account.user.email.split('@')[0] : '권기범');
+  const recordDates = new Set(
+    (recordsData?.records ?? []).map((r) => new Date(r.created_at).toLocaleDateString('sv-SE')),
+  );
+  const hasRecords = recordDates.size > 0;
+  const { current: currentStreak, max: maxStreak } = computeStreaks(recordDates);
+  const answeredCount = recordsData?.page_info.total_elements;
+
+  const handleLogout = async () => {
+    setShowLogoutModal(false);
+    try {
+      await logout.mutateAsync();
+    } catch {
+      // 세션 만료 등으로 실패해도 로컬 로그아웃은 진행
+    }
+    clearAuth();
+    router.push('/login');
+  };
 
   return (
     <div className="relative flex flex-col h-full bg-[#F3F3F6] font-sans select-none overflow-hidden">
@@ -37,7 +88,7 @@ export default function MyPage() {
                 <Image src="/자책_인피니티.png" alt="자책 인피니티" fill className="object-contain" />
               </div>
               <div>
-                <h2 className="text-[18px] font-normal text-gray-900 tracking-tight">권기범</h2>
+                <h2 className="text-[18px] font-normal text-gray-900 tracking-tight">{displayName}</h2>
                 <p className="text-[12px] text-gray-400 font-light mt-0.5">팀 여울의 CEO</p>
               </div>
             </div>
@@ -50,16 +101,20 @@ export default function MyPage() {
               {/* 현재 연속 로그인 */}
               <div className="flex flex-col items-center justify-center px-2">
                 <span className="text-[11px] text-[#A0A0A0] font-light tracking-tight mb-1">현재 연속 로그인</span>
-                <span className="text-[17px] font-normal text-gray-900 font-mono">D+5</span>
+                <span className="text-[17px] font-normal text-gray-900 font-mono">
+                  D+{hasRecords ? currentStreak : 0}
+                </span>
               </div>
-              
+
               {/* 세로 구분선 1 */}
               <div className="absolute left-1/3 top-1/4 bottom-1/4 w-[1px] bg-gray-200" />
 
               {/* 최대 연속 로그인 */}
               <div className="flex flex-col items-center justify-center px-2">
                 <span className="text-[11px] text-[#A0A0A0] font-light tracking-tight mb-1">최대 연속 로그인</span>
-                <span className="text-[17px] font-normal text-gray-900 font-mono">D+23</span>
+                <span className="text-[17px] font-normal text-gray-900 font-mono">
+                  D+{hasRecords ? maxStreak : 0}
+                </span>
               </div>
 
               {/* 세로 구분선 2 */}
@@ -68,7 +123,7 @@ export default function MyPage() {
               {/* 대답한 질문 */}
               <div className="flex flex-col items-center justify-center px-2">
                 <span className="text-[11px] text-[#A0A0A0] font-light tracking-tight mb-1">대답한 질문</span>
-                <span className="text-[17px] font-normal text-gray-900">209개</span>
+                <span className="text-[17px] font-normal text-gray-900">{answeredCount ?? 0}개</span>
               </div>
             </div>
           </div>
@@ -247,11 +302,7 @@ export default function MyPage() {
             
             <div className="flex gap-3">
               <button
-                onClick={() => {
-                  setShowLogoutModal(false);
-                  clearAuth();
-                  router.push('/login');
-                }}
+                onClick={handleLogout}
                 className="flex-1 h-[50px] rounded-[18px] bg-[#E32424] text-white text-[15px] font-normal tracking-tight active:opacity-95"
               >
                 예

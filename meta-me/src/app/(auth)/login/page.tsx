@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { login } from '@/lib/api';
 import { useAuthStore } from '@/store';
 
@@ -147,7 +148,11 @@ export default function LoginPage() {
 
       {/* 소셜 로그인 */}
       <div className="flex flex-col gap-3">
-        <button className="w-full h-[54px] rounded-2xl bg-white border border-gray-200 flex items-center justify-center gap-2.5 font-semibold text-[15px] text-gray-800">
+        <button
+          type="button"
+          onClick={() => signIn('google', { callbackUrl: '/main' })}
+          className="w-full h-[54px] rounded-2xl bg-white border border-gray-200 flex items-center justify-center gap-2.5 font-semibold text-[15px] text-gray-800"
+        >
           <GoogleIcon />
           Google로 계속하기
         </button>

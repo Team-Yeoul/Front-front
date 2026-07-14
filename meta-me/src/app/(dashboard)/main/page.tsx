@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store';
 import { useGetMyProfile } from '@/entities/user';
@@ -33,28 +34,49 @@ function getWeekRange(today: Date) {
 
 function useWeekFlow() {
   const accessToken = useAuthStore((s) => s.accessToken);
-  const today = new Date();
-  const { start, end } = getWeekRange(today);
 
-  const { data } = useListDailyRecords(
-    { start_date: toDateKey(start), end_date: toDateKey(end), size: 50 },
-    !!accessToken,
+  // `new Date()`를 렌더 중에 바로 계산하면 서버 렌더링 시점과 클라이언트
+  // 하이드레이션 시점의 값이 달라져 하이드레이션 불일치가 날 수 있다.
+  // 마운트 후(클라이언트 전용)에만 실제 날짜를 계산하도록 미룬다.
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+  }, []);
+
+  const placeholder = { statuses: WEEKDAYS.map(() => 'pending' as const), dayDates: WEEKDAYS.map(() => null) };
+
+  const { start, end } = now ? getWeekRange(now) : { start: null, end: null };
+  const dayDates = now && start
+    ? Array.from({ length: 7 }, (_, i) => {
+        const day = new Date(start);
+        day.setDate(start.getDate() + i);
+        return day;
+      })
+    : null;
+
+  const { data, isLoading } = useListDailyRecords(
+    now && start && end ? { start_date: toDateKey(start), end_date: toDateKey(end), size: 50 } : undefined,
+    !!now && !!accessToken,
   );
 
-  if (!accessToken || !data) return MOCK_WEEK_FLOW;
+  if (!now || !dayDates) return placeholder;
+  if (!accessToken) return { statuses: MOCK_WEEK_FLOW, dayDates };
+  if (isLoading || !data) {
+    // 아직 안 불러와진 상태를 임의의 완료/실패로 보여주면 혼동을 주니, 로딩 중엔 전부 대기 상태로 표시
+    return { statuses: dayDates.map(() => 'pending' as const), dayDates };
+  }
 
   const recordedDates = new Set(data.records.map((r) => toDateKey(new Date(r.created_at))));
-  const todayKey = toDateKey(today);
+  const todayKey = toDateKey(now);
 
-  return WEEKDAYS.map((_, i) => {
-    const day = new Date(start);
-    day.setDate(start.getDate() + i);
+  const statuses = dayDates.map((day) => {
     const dayKey = toDateKey(day);
-
     if (dayKey === todayKey) return 'today' as const;
-    if (day > today) return 'pending' as const;
+    if (day > now) return 'pending' as const;
     return recordedDates.has(dayKey) ? ('done' as const) : ('missed' as const);
   });
+
+  return { statuses, dayDates };
 }
 
 function DayStatusIcon({ status }: { status: DayStatus }) {
@@ -116,8 +138,8 @@ export default function MainPage() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
   const { data: profile } = useGetMyProfile(!!accessToken);
-  const { data: recent } = useListDailyRecords({ size: 3 }, !!accessToken);
-  const weekFlow = useWeekFlow();
+  const { data: recent, isLoading: recentLoading } = useListDailyRecords({ size: 3 }, !!accessToken);
+  const { statuses: weekFlow, dayDates } = useWeekFlow();
 
   const dDay = profile
     ? Math.floor((Date.now() - new Date(profile.user.created_at).getTime()) / 86400000)
@@ -125,6 +147,8 @@ export default function MainPage() {
   const accuracyPercent = profile?.latest_accuracy?.accuracy_percent ?? 0;
 
   const hasRealRecent = !!accessToken && !!recent && recent.records.length > 0;
+  const isRecentEmpty = !!accessToken && !recentLoading && !!recent && recent.records.length === 0;
+  const showMockRecent = !accessToken;
 
   return (
     <div className="flex flex-col h-full bg-[#F2F2F7] px-5 pb-6 gap-6 overflow-y-auto">
@@ -177,6 +201,7 @@ export default function MainPage() {
             <div key={day} className="flex flex-col items-center gap-1.5">
               <DayStatusIcon status={weekFlow[i]} />
               <span className="text-[12px] text-gray-500">{day}</span>
+              <span className="text-[10px] text-gray-300">{dayDates[i]?.getDate()}</span>
             </div>
           ))}
         </div>
@@ -195,22 +220,31 @@ export default function MainPage() {
           </span>
         </div>
         <div className="flex flex-col gap-2.5">
-          {hasRealRecent
-            ? recent!.records.map((record) => <RecentEntryRow key={record.record_id} record={record} />)
-            : MOCK_RECENT_ENTRIES.map((entry) => (
-                <button
-                  key={entry.id}
-                  onClick={() => router.push('/objectify')}
-                  className="w-full flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3.5 text-left"
-                >
-                  <span className="w-2 h-2 rounded-full bg-[#8287FF] shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-[14px] font-medium text-gray-900">{entry.title}</p>
-                    <p className="text-[12px] text-gray-400 mt-0.5">{entry.date}</p>
-                  </div>
-                  <ChevronIcon />
-                </button>
-              ))}
+          {hasRealRecent &&
+            recent!.records.map((record) => <RecentEntryRow key={record.record_id} record={record} />)}
+
+          {isRecentEmpty && (
+            <div className="bg-gray-50 rounded-2xl px-4 py-8 text-center">
+              <p className="text-[13px] text-gray-400">아직 기록이 없어요</p>
+              <p className="text-[12px] text-gray-300 mt-1">다이어리에서 오늘의 기록을 남겨보세요</p>
+            </div>
+          )}
+
+          {showMockRecent &&
+            MOCK_RECENT_ENTRIES.map((entry) => (
+              <button
+                key={entry.id}
+                onClick={() => router.push('/objectify')}
+                className="w-full flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3.5 text-left"
+              >
+                <span className="w-2 h-2 rounded-full bg-[#8287FF] shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[14px] font-medium text-gray-900">{entry.title}</p>
+                  <p className="text-[12px] text-gray-400 mt-0.5">{entry.date}</p>
+                </div>
+                <ChevronIcon />
+              </button>
+            ))}
         </div>
       </div>
     </div>

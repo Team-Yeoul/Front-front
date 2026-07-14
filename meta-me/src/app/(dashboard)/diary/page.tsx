@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCreateDailyRecord, useGetTodayDailyQuestion } from '@/entities/diary';
 import type { SubmitDailyRecordRequest } from '@/entities/diary';
+import { userKeys, useGetMyAccount } from '@/entities/user';
+import { useAuthStore } from '@/store';
 
 type Step = 'intro' | 'question' | 'emotion' | 'scene' | 'moment' | 'review' | 'complete';
 
@@ -67,8 +70,14 @@ function StepFooter({
 
 export default function DiaryPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const nickname = useAuthStore((s) => s.nickname);
+  const { data: account } = useGetMyAccount(!!accessToken);
   const { data: questionData } = useGetTodayDailyQuestion();
   const createRecord = useCreateDailyRecord();
+
+  const displayName = nickname || (account?.user.email ? account.user.email.split('@')[0] : '회원');
 
   const [step, setStep] = useState<Step>('intro');
   const [answerType, setAnswerType] = useState<'TEXT' | 'TAGS'>('TEXT');
@@ -81,7 +90,12 @@ export default function DiaryPage() {
   const [isMyselfMoment, setIsMyselfMoment] = useState<boolean | null>(null);
   const [myselfMomentDesc, setMyselfMomentDesc] = useState('');
 
-  const fetchedQuestion = questionData?.question.question_text;
+  // 실제 백엔드가 문서화된 스펙({ question: {...} })과 다르게 필드를 평평하게
+  // ({ question_text, ... }) 내려주는 경우가 있어 두 형태를 모두 지원한다.
+  const rawQuestion = questionData as
+    | { question?: { question_text?: string }; question_text?: string }
+    | undefined;
+  const fetchedQuestion = rawQuestion?.question?.question_text ?? rawQuestion?.question_text;
   const questionText = fetchedQuestion && /[가-힣]/.test(fetchedQuestion) ? fetchedQuestion : FALLBACK_QUESTION;
 
   const makeToggle = (setter: React.Dispatch<React.SetStateAction<string[]>>) => (tag: string) => {
@@ -103,7 +117,12 @@ export default function DiaryPage() {
       myself_moment_desc: isMyselfMoment ? myselfMomentDesc : undefined,
     };
     createRecord.mutate(body, {
-      onSuccess: () => setStep('complete'),
+      onSuccess: () => {
+        // 기록 깊이가 객관화 정확도(%)에 반영되므로 메인 페이지의 프로필/정확도 캐시도 갱신
+        queryClient.invalidateQueries({ queryKey: userKeys.profile() });
+        queryClient.invalidateQueries({ queryKey: userKeys.accuracy() });
+        setStep('complete');
+      },
       onError: () => setStep('complete'),
     });
   };
@@ -115,7 +134,7 @@ export default function DiaryPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/Group.png" alt="질문" width={72} height={66} className="mb-6" />
           <p className="text-[18px] font-bold text-gray-900 leading-snug">
-            안녕하세요, 여울님
+            안녕하세요, {displayName}님
             <br />
             오늘의 나를 기록해볼까요?
           </p>
@@ -354,7 +373,7 @@ export default function DiaryPage() {
         </div>
       </div>
 
-      <p className="text-[15px] font-semibold text-gray-900 mb-3">여울님의 오늘 하루는 이랬어요.</p>
+      <p className="text-[15px] font-semibold text-gray-900 mb-3">{displayName}님의 오늘 하루는 이랬어요.</p>
       <div className="flex-1 bg-gray-50 rounded-2xl p-5 overflow-y-auto mb-6">
         {daySummary ? (
           <p className="text-[14px] text-gray-700 leading-relaxed whitespace-pre-line">{daySummary}</p>
@@ -363,7 +382,22 @@ export default function DiaryPage() {
         )}
       </div>
 
-      <StepFooter onNext={() => router.push('/main')} nextLabel="완료하기" />
+      <div className="flex flex-col gap-2.5 pt-4">
+        <button
+          type="button"
+          onClick={() => router.push('/objectify')}
+          className="w-full h-14 rounded-2xl bg-[#8287FF] text-white text-[15px] font-semibold"
+        >
+          거울에 비춰보기
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push('/main')}
+          className="w-full h-14 rounded-2xl bg-gray-900 text-white text-[15px] font-semibold"
+        >
+          완료하기
+        </button>
+      </div>
     </div>
   );
 }

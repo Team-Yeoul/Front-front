@@ -2,20 +2,25 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { submitOnboarding } from '@/lib/api';
-import { useAuthStore } from '@/store';
+import { useSubmitOnboarding } from '@/entities/user';
 
 type Step = 'notification' | 'description' | 'done' | 'day0';
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const accessToken = useAuthStore((s) => s.accessToken);
+  const submitOnboarding = useSubmitOnboarding();
   const [step, setStep] = useState<Step>('notification');
-  const [description, setDescription] = useState('');
+  const [myOneSentence, setMyOneSentence] = useState('');
+  const [selfStrength, setSelfStrength] = useState('');
+  const [othersFeedback, setOthersFeedback] = useState('');
+  const [favoriteThing, setFavoriteThing] = useState('');
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [aiSentence, setAiSentence] = useState('');
-  const [loading, setLoading] = useState(false);
-  const hasText = description.trim().length > 0;
+  const hasText =
+    myOneSentence.trim().length > 0 &&
+    selfStrength.trim().length > 0 &&
+    othersFeedback.trim().length > 0 &&
+    favoriteThing.trim().length > 0;
 
   useEffect(() => {
     if (step !== 'done') return;
@@ -23,23 +28,25 @@ export default function OnboardingPage() {
     return () => clearTimeout(t);
   }, [step]);
 
-  const handleDescriptionSubmit = async () => {
-    if (!hasText || loading) return;
-    setLoading(true);
-    try {
-      const res = await submitOnboarding(
-        { description },
-        accessToken ?? '',
-      );
-      if (res.ai_first_sentence && /[가-힣]/.test(res.ai_first_sentence)) {
-        setAiSentence(res.ai_first_sentence);
-      }
-    } catch {
-      // 실패해도 다음 단계로 진행
-    } finally {
-      setLoading(false);
-      setStep('done');
-    }
+  const handleDescriptionSubmit = () => {
+    if (!hasText || submitOnboarding.isPending) return;
+    submitOnboarding.mutate(
+      {
+        my_one_sentence: myOneSentence,
+        self_strength: selfStrength,
+        others_feedback: othersFeedback,
+        favorite_thing: favoriteThing,
+      },
+      {
+        onSuccess: (res) => {
+          if (res.ai_first_sentence && /[가-힣]/.test(res.ai_first_sentence)) {
+            setAiSentence(res.ai_first_sentence);
+          }
+          setStep('done');
+        },
+        onError: () => setStep('done'),
+      },
+    );
   };
 
   // ── 알림 권한 ──
@@ -137,33 +144,73 @@ export default function OnboardingPage() {
           </svg>
         </button>
 
-        <div className="flex-1 px-6 pt-4">
+        <div className="flex-1 overflow-y-auto px-6 pt-4">
           <p className="text-[13px] text-gray-400 mb-5 leading-snug">
             생각보다 우리는 스스로를 정확히 모를 수도 있어요
           </p>
-          <h2 className="text-[24px] font-bold text-gray-900 leading-[1.4] mb-9">
+          <h2 className="text-[24px] font-bold text-gray-900 leading-[1.4] mb-7">
             당신은 스스로를<br />한 문장으로 설명할<br />수 있나요?
           </h2>
-          <input
-            type="text"
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder="내용을 입력하세요"
-            className={`w-full h-[52px] rounded-xl px-4 text-[15px] text-gray-900 outline-none placeholder:text-gray-300 transition-colors ${
-              hasText
-                ? 'bg-white border-2 border-gray-900'
-                : 'bg-gray-50 border border-gray-200'
-            }`}
-          />
+
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+                나를 한 문장으로 설명한다면?
+              </label>
+              <input
+                type="text"
+                value={myOneSentence}
+                onChange={e => setMyOneSentence(e.target.value)}
+                placeholder="나는 몰입할 때 가장 나다운 사람입니다"
+                className="w-full h-[52px] rounded-xl px-4 text-[15px] text-gray-900 outline-none placeholder:text-gray-300 bg-gray-50 border border-gray-200"
+              />
+            </div>
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+                내가 생각하는 나의 장점은?
+              </label>
+              <input
+                type="text"
+                value={selfStrength}
+                onChange={e => setSelfStrength(e.target.value)}
+                placeholder="새로운 것을 빨리 이해합니다"
+                className="w-full h-[52px] rounded-xl px-4 text-[15px] text-gray-900 outline-none placeholder:text-gray-300 bg-gray-50 border border-gray-200"
+              />
+            </div>
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+                남에게 자주 듣는 말은?
+              </label>
+              <input
+                type="text"
+                value={othersFeedback}
+                onChange={e => setOthersFeedback(e.target.value)}
+                placeholder="설명을 잘한다는 말을 들어요"
+                className="w-full h-[52px] rounded-xl px-4 text-[15px] text-gray-900 outline-none placeholder:text-gray-300 bg-gray-50 border border-gray-200"
+              />
+            </div>
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+                내가 좋아한다고 생각하는 것은?
+              </label>
+              <input
+                type="text"
+                value={favoriteThing}
+                onChange={e => setFavoriteThing(e.target.value)}
+                placeholder="프로그래밍과 문제 해결"
+                className="w-full h-[52px] rounded-xl px-4 text-[15px] text-gray-900 outline-none placeholder:text-gray-300 bg-gray-50 border border-gray-200"
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="px-6 pb-14 flex flex-col gap-4">
+        <div className="px-6 pb-14 pt-4 flex flex-col gap-4 shrink-0">
           <button
             onClick={handleDescriptionSubmit}
-            disabled={loading}
-            className={`w-full h-14 rounded-2xl text-base font-semibold text-white transition-colors focus:outline-none ${hasText && !loading ? 'bg-gray-900' : 'bg-gray-300 cursor-default'}`}
+            disabled={submitOnboarding.isPending}
+            className={`w-full h-14 rounded-2xl text-base font-semibold text-white transition-colors focus:outline-none ${hasText && !submitOnboarding.isPending ? 'bg-gray-900' : 'bg-gray-300 cursor-default'}`}
           >
-            {loading ? '분석 중...' : '입력완료'}
+            {submitOnboarding.isPending ? '분석 중...' : '입력완료'}
           </button>
           <button
             onClick={() => setStep('done')}
