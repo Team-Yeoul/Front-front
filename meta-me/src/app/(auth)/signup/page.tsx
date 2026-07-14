@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
@@ -30,6 +30,13 @@ export default function SignupPage() {
   const [showPw, setShowPw] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [error, setError] = useState('');
+
+  // new Date()를 렌더 중 바로 계산하면 서버 렌더링 시점과 클라이언트
+  // 하이드레이션 시점이 달라 하이드레이션 불일치가 날 수 있어 마운트 후로 미룬다.
+  const [maxBirthDate, setMaxBirthDate] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    setMaxBirthDate(new Date().toISOString().slice(0, 10));
+  }, []);
 
   const nicknameValid = nickname.trim().length > 0;
   const emailValid = email.includes('@') && email.includes('.');
@@ -148,7 +155,7 @@ export default function SignupPage() {
                 type="date"
                 value={birthDate}
                 onChange={e => setBirthDate(e.target.value)}
-                max={new Date().toISOString().slice(0, 10)}
+                max={maxBirthDate}
                 className="flex-1 text-[15px] bg-transparent outline-none placeholder:text-gray-300"
               />
             </div>
