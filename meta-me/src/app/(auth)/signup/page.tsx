@@ -95,6 +95,8 @@ export default function SignupPage() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="you@email.com"
+                autoComplete="email"
+                suppressHydrationWarning
                 className="flex-1 text-[15px] bg-transparent outline-none placeholder:text-gray-300"
               />
             </div>
@@ -113,6 +115,8 @@ export default function SignupPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="8자 이상 입력"
+                autoComplete="new-password"
+                suppressHydrationWarning
                 className="flex-1 text-[15px] bg-transparent outline-none placeholder:text-gray-300"
               />
               <button type="button" onClick={() => setShowPw(!showPw)} className="text-gray-300 shrink-0">
@@ -137,6 +141,8 @@ export default function SignupPage() {
                 value={nickname}
                 onChange={e => setNicknameInput(e.target.value)}
                 placeholder="앱에서 사용할 이름"
+                autoComplete="nickname"
+                suppressHydrationWarning
                 className="flex-1 text-[15px] bg-transparent outline-none placeholder:text-gray-300"
               />
             </div>

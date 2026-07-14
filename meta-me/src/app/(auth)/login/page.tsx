@@ -82,6 +82,8 @@ export default function LoginPage() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="you@email.com"
+              autoComplete="email"
+              suppressHydrationWarning
               className="flex-1 text-[15px] text-gray-900 bg-transparent outline-none placeholder:text-gray-300"
             />
           </div>
@@ -100,6 +102,8 @@ export default function LoginPage() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="비밀번호 입력"
+              autoComplete="current-password"
+              suppressHydrationWarning
               className="flex-1 text-[15px] text-gray-900 bg-transparent outline-none placeholder:text-gray-300"
             />
             <button type="button" onClick={() => setShowPw(!showPw)} className="text-gray-300 shrink-0">
