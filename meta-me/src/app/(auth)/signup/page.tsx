@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { useSignup } from '@/entities/user';
+import { ApiError } from '@/shared/api';
 import { useAuthStore } from '@/store';
 
 function GoogleIcon() {
@@ -54,7 +55,10 @@ export default function SignupPage() {
           setNickname(nickname.trim());
           router.push('/onboarding');
         },
-        onError: () => setError('회원가입에 실패했습니다. 다시 시도해주세요.'),
+        onError: (err) => {
+          const message = err instanceof ApiError ? err.message : '회원가입에 실패했습니다. 다시 시도해주세요.';
+          setError(message);
+        },
       },
     );
   };
