@@ -27,7 +27,7 @@ export function MonsterGrowthSheet({ open, onClose }: { open: boolean; onClose: 
 
           <div className="space-y-1">
             <h4 className="font-medium text-[14px] text-black">2. 시스템적 안목과 대안 제시 능력의 성장</h4>
-            <p className="text-gray-500"><span className="text-gray-700 font-medium">이유:</span> "돌멩이 4개와 회의하는 게 낫다", "교수님의 이상은 안드로메다로 갔다"며 현행 시스템의 한계를 명확히 인지하는 과정입니다.</p>
+            <p className="text-gray-500"><span className="text-gray-700 font-medium">이유:</span> &ldquo;돌멩이 4개와 회의하는 게 낫다&rdquo;, &ldquo;교수님의 이상은 안드로메다로 갔다&rdquo;며 현행 시스템의 한계를 명확히 인지하는 과정입니다.</p>
           </div>
 
           <div className="space-y-1 pt-2 border-t">
