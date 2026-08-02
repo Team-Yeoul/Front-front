@@ -89,6 +89,7 @@ export default function DiaryPage() {
   const [sceneDescription, setSceneDescription] = useState('');
   const [isMyselfMoment, setIsMyselfMoment] = useState<boolean | null>(null);
   const [myselfMomentDesc, setMyselfMomentDesc] = useState('');
+  const [submitError, setSubmitError] = useState('');
 
   // 실제 백엔드가 문서화된 스펙({ question: {...} })과 다르게 필드를 평평하게
   // ({ question_text, ... }) 내려주는 경우가 있어 두 형태를 모두 지원한다.
@@ -106,6 +107,7 @@ export default function DiaryPage() {
   const toggleCompanion = makeToggle(setSelectedCompanions);
 
   const handleSubmit = () => {
+    setSubmitError('');
     const body: SubmitDailyRecordRequest = {
       answer_type: answerType,
       user_answer: answerType === 'TEXT' ? userAnswer : undefined,
@@ -123,7 +125,7 @@ export default function DiaryPage() {
         queryClient.invalidateQueries({ queryKey: userKeys.accuracy() });
         setStep('complete');
       },
-      onError: () => setStep('complete'),
+      onError: () => setSubmitError('기록 저장에 실패했어요. 다시 시도해주세요.'),
     });
   };
 
@@ -339,6 +341,7 @@ export default function DiaryPage() {
             </>
           )}
         </div>
+        {submitError && <p className="text-[13px] text-red-500 mt-3">{submitError}</p>}
         <StepFooter
           onPrev={() => setStep('moment')}
           onNext={handleSubmit}

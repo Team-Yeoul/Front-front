@@ -16,6 +16,10 @@ const PAD_BOTTOM = 28;
 export function LineChart({ data, color = '#8287FF' }: LineChartProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
+  if (data.length === 0) {
+    return <div className="w-full h-[140px]" />;
+  }
+
   const values = data.map((d) => d.value);
   const min = Math.min(...values);
   const max = Math.max(...values);

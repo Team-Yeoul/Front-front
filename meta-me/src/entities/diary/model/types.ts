@@ -1,7 +1,5 @@
 import type { components } from '@/shared/api';
 
-export type MessageResponse = components['schemas']['MessageResponse'];
-
 export type DailyQuestion = components['schemas']['DailyQuestion'];
 export type DailyQuestionResponse = components['schemas']['DailyQuestionResponse'];
 

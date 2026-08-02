@@ -64,26 +64,6 @@ export const useCreateDailyRecord = () => {
   });
 };
 
-export const useUpdateDailyRecord = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ recordId, body }: { recordId: string; body: SubmitDailyRecordRequest }) =>
-      diaryApi.updateDailyRecord(recordId, body),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: diaryKeys.record(variables.recordId) });
-      queryClient.invalidateQueries({ queryKey: diaryKeys.records() });
-    },
-  });
-};
-
-export const useDeleteDailyRecord = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (recordId: string) => diaryApi.deleteDailyRecord(recordId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: diaryKeys.all }),
-  });
-};
-
 export const useCreateMetacogBetting = () =>
   useMutation({ mutationFn: (body: CreateBettingRequest) => diaryApi.createMetacogBetting(body) });
 

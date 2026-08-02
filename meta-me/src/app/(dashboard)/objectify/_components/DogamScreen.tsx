@@ -1,18 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { useListMyMonsters } from "@/entities/collection";
 import { useListMirrorMonsters } from "@/entities/dictionary";
 import type { UserMonster } from "@/entities/collection";
-import { MONSTER_CATEGORIES, MONSTER_LIST } from "./data";
-
-const CATEGORY_LABELS: Record<string, string> = {
-  COGNITIVE: "사고/인지",
-  EMOTIONAL: "감정 반응",
-  BEHAVIORAL: "행동",
-  RELATIONAL: "대인관계",
-  GROWTH: "성장",
-  SITUATIONAL: "상황",
-};
+import { CATEGORY_LABELS, MONSTER_CATEGORIES, MONSTER_LIST } from "./data";
 
 function MonsterCard({
   iconUrl,
@@ -64,6 +56,16 @@ export function DogamScreen({ selectedCategory, onSelectCategory, onSelectMonste
   const totalCount = allMonsters?.total_count ?? 32;
 
   const categoryOptions = hasRealData ? ["전체", ...Object.keys(CATEGORY_LABELS)] : MONSTER_CATEGORIES;
+
+  // 실데이터 로딩 전/후로 카테고리 값 체계(한글 라벨 vs 영문 enum)가 달라지므로,
+  // 목업→실데이터 전환 시 이전에 선택해둔 카테고리가 새 값 체계와 매칭되지 않을 수 있다.
+  useEffect(() => {
+    if (!categoryOptions.includes(selectedCategory)) {
+      onSelectCategory("전체");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasRealData]);
+
   const top3 = [...monsters].sort((a, b) => b.monster_count - a.monster_count).slice(0, 3);
 
   const filteredRealMonsters = monsters.filter(

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 import Image from 'next/image';
 import { User, Lock, Bell, ChevronRight, Settings, HelpCircle, LogOut } from 'lucide-react';
 import { useAuthStore } from '@/store';
@@ -47,7 +48,7 @@ export default function MyPage() {
   const { data: recordsData } = useListDailyRecords({ size: 200 }, !!accessToken);
   const logout = useLogout();
 
-  const displayName = nickname || (account?.user.email ? account.user.email.split('@')[0] : '권기범');
+  const displayName = nickname || (account?.user.email ? account.user.email.split('@')[0] : '회원');
   const recordDates = new Set(
     (recordsData?.records ?? []).map((r) => new Date(r.created_at).toLocaleDateString('sv-SE')),
   );
@@ -63,6 +64,7 @@ export default function MyPage() {
       // 세션 만료 등으로 실패해도 로컬 로그아웃은 진행
     }
     clearAuth();
+    await signOut({ redirect: false });
     router.push('/login');
   };
 
@@ -158,7 +160,7 @@ export default function MyPage() {
             className="w-full h-[56px] px-5 bg-white rounded-[24px] shadow-sm flex items-center gap-3 text-left active:bg-gray-50 transition-colors"
           >
             <LogOut size={18} className="text-gray-400" strokeWidth={1.5} />
-            <span className="text-[15px] font-light text-gray-900 tracking-tight">로그 아웃</span>
+            <span className="text-[15px] font-light text-gray-900 tracking-tight">로그아웃</span>
           </button>
         </div>
       )}
@@ -197,7 +199,7 @@ export default function MyPage() {
             </div>
             <div className="flex items-center gap-4 cursor-pointer group">
               <Lock size={20} className="text-gray-900" strokeWidth={1.5} />
-              <span className="text-[15px] font-light text-gray-900 tracking-tight group-hover:underline">비밀 번호 재설정</span>
+              <span className="text-[15px] font-light text-gray-900 tracking-tight group-hover:underline">비밀번호 재설정</span>
             </div>
             <div className="flex items-center gap-4 cursor-pointer group">
               <Bell size={20} className="text-gray-900" strokeWidth={1.5} />

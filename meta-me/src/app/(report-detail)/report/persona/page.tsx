@@ -1,15 +1,15 @@
 'use client';
 
-import Link from 'next/link';
 import { getPersonaDetail } from '@/lib/api';
 import { useReportData } from '@/hooks/useReportData';
 import { DetailHeader } from '@/components/report/DetailHeader';
 import { PersonaSlider } from '@/components/report/PersonaSlider';
+import { BackToSummaryButton } from '@/components/report/BackToSummaryButton';
 import type { PersonaDetail } from '@/types';
 
 const MOCK: PersonaDetail = {
   summary:
-    '이번보다 문제이론, 짧고 깊게 몰입하고, 감정은 흡수해며, 결정은 분석형에 가까워요.',
+    '이론보다 문제 해결형에 가깝고, 짧고 깊게 몰입하고, 감정은 흡수하며, 결정은 분석형에 가까워요.',
   axes: [
     {
       label: '학습 스타일',
@@ -92,13 +92,7 @@ export default function PersonaDetailPage() {
         <p className="text-[11px] text-gray-400 leading-relaxed mb-6">{data.note}</p>
       </div>
 
-      <div className="px-6 py-5">
-        <Link href="/report/summary">
-          <button className="w-full h-14 bg-gray-900 text-white rounded-2xl text-base font-semibold">
-            리포트로 돌아가기
-          </button>
-        </Link>
-      </div>
+      <BackToSummaryButton />
     </div>
   );
 }

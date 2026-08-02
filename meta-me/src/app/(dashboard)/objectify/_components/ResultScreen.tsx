@@ -10,7 +10,7 @@ interface ResultScreenProps {
   unlockedMonsters: MonsterDetection[];
   onOpenMyRecord: () => void;
   onOpenMirror: () => void;
-  onOpenMonsterGrowth: () => void;
+  onOpenMonsterGrowth: (detection: MonsterDetection) => void;
   onRetry: () => void;
   onViewMonster: () => void;
 }
@@ -52,7 +52,7 @@ export function ResultScreen({
             <div
               key={detection.monster_detection_id}
               className="bg-white p-4 rounded-2xl shadow-sm flex items-center space-x-4 cursor-pointer"
-              onClick={onOpenMonsterGrowth}
+              onClick={() => onOpenMonsterGrowth(detection)}
             >
               <div className="flex flex-col items-center flex-shrink-0">
                 <div className="h-14">

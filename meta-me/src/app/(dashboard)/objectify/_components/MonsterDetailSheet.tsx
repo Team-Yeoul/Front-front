@@ -1,13 +1,5 @@
 import type { UserMonster } from "@/entities/collection";
-
-const CATEGORY_LABELS: Record<string, string> = {
-  COGNITIVE: "사고/인지",
-  EMOTIONAL: "감정 반응",
-  BEHAVIORAL: "행동",
-  RELATIONAL: "대인관계",
-  GROWTH: "성장",
-  SITUATIONAL: "상황",
-};
+import { CATEGORY_LABELS } from "./data";
 
 // [화면 5] 몬스터 도감 상세 바텀시트
 export function MonsterDetailSheet({

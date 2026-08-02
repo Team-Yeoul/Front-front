@@ -23,11 +23,19 @@ export const MONSTER_DATA = {
     situations: ["조별과제", "피곤한 날", "역할 분배가 애매할 때"],
     records: ["[6/30 조별과제 기록]", "[6/21 친구와 대화]", "[6/13 화장실의 변비]"],
   },
-  jachaek: { name: "자책 인피니티", count: 16 },
-  돋보기: { name: "돋보기", count: 12 },
 };
 
 export const MONSTER_CATEGORIES = ["전체", "사고/인지", "감정 반응", "행동", "대인관계"];
+
+// 실데이터(백엔드) 몬스터의 영문 카테고리 enum → 한글 표시 라벨
+export const CATEGORY_LABELS: Record<string, string> = {
+  COGNITIVE: "사고/인지",
+  EMOTIONAL: "감정 반응",
+  BEHAVIORAL: "행동",
+  RELATIONAL: "대인관계",
+  GROWTH: "성장",
+  SITUATIONAL: "상황",
+};
 
 // 도감 그리드용 몬스터 목록 (카테고리 필터링에 사용, 추후 API 연동)
 export const MONSTER_LIST = [

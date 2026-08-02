@@ -4,7 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
-import { login } from '@/lib/api';
+import { useLogin } from '@/entities/user';
+import { ApiError } from '@/shared/api';
 import { useAuthStore } from '@/store';
 
 function GoogleIcon() {
@@ -21,29 +22,34 @@ function GoogleIcon() {
 export default function LoginPage() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const login = useLogin();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
   const emailValid = email.includes('@') && email.includes('.');
   const canSubmit = emailValid && password.length >= 6;
+  const loading = login.isPending;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit || loading) return;
     setError('');
-    setLoading(true);
-    try {
-      const res = await login({ email, password });
-      setAuth(res.access_token, res.refresh_token, res.user_id);
-      router.push('/main');
-    } catch {
-      setError('이메일 또는 비밀번호가 올바르지 않습니다.');
-    } finally {
-      setLoading(false);
-    }
+    login.mutate(
+      { email, password },
+      {
+        onSuccess: (res) => {
+          setAuth(res.access_token, res.refresh_token, res.user_id);
+          router.push('/main');
+        },
+        onError: (err) => {
+          const message =
+            err instanceof ApiError ? err.message : '이메일 또는 비밀번호가 올바르지 않습니다.';
+          setError(message);
+        },
+      },
+    );
   };
 
   return (

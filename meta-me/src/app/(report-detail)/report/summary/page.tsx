@@ -46,7 +46,7 @@ const MOCK_SUMMARY: ReportSummary = {
     dueLabel: '10일 뒤 완료함',
   },
   mirrors: {
-    me: '돌보기',
+    me: '돋보기',
     ai: '분석',
     others: '아직 없음',
   },

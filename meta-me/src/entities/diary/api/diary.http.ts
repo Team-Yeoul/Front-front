@@ -7,7 +7,6 @@ import type {
   DailyRecordListResponse,
   DailyRecordResponse,
   ListDailyRecordsParams,
-  MessageResponse,
   SubmitActualResultRequest,
   SubmitDailyRecordRequest,
   TailQuestionResponse,
@@ -41,15 +40,6 @@ export const listDailyRecords = (params?: ListDailyRecordsParams) =>
 
 export const getDailyRecord = (recordId: string) =>
   apiRequest<DailyRecordResponse>(`/v1/daily-records/${recordId}`);
-
-export const updateDailyRecord = (recordId: string, body: SubmitDailyRecordRequest) =>
-  apiRequest<DailyRecordResponse>(`/v1/daily-records/${recordId}`, {
-    method: 'PATCH',
-    body,
-  });
-
-export const deleteDailyRecord = (recordId: string) =>
-  apiRequest<MessageResponse>(`/v1/daily-records/${recordId}`, { method: 'DELETE' });
 
 export const createMetacogBetting = (body: CreateBettingRequest) =>
   apiRequest<BettingResponse>('/v1/metacog-bettings', { method: 'POST', body });

@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { getKeywordDetail } from '@/lib/api';
 import { useReportData } from '@/hooks/useReportData';
 import { DetailHeader } from '@/components/report/DetailHeader';
 import { Chip } from '@/components/report/Chip';
+import { BackToSummaryButton } from '@/components/report/BackToSummaryButton';
 import { BarChart } from '@/components/charts/BarChart';
 import type { KeywordDetail, KeywordItem } from '@/types';
 
@@ -76,10 +76,10 @@ const MOCK: KeywordDetail = {
   frequency: [
     { label: '코딩', count: 10, category: 'interest' },
     { label: 'AI', count: 8, category: 'interest' },
-    { label: '구조이해', count: 7, category: 'interest' },
+    { label: '구조 이해', count: 7, category: 'interest' },
     { label: '기획', count: 5, category: 'interest' },
-    { label: '반복암기', count: 4, category: 'disinterest' },
-    { label: '애매한역할', count: 3, category: 'disinterest' },
+    { label: '반복 암기', count: 4, category: 'disinterest' },
+    { label: '애매한 역할', count: 3, category: 'disinterest' },
   ],
 };
 
@@ -124,13 +124,7 @@ export default function KeywordDetailPage() {
         </div>
       </div>
 
-      <div className="px-6 py-5">
-        <Link href="/report/summary">
-          <button className="w-full h-14 bg-gray-900 text-white rounded-2xl text-base font-semibold">
-            리포트로 돌아가기
-          </button>
-        </Link>
-      </div>
+      <BackToSummaryButton />
     </div>
   );
 }

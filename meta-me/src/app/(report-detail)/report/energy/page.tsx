@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { getEnergyDetail } from '@/lib/api';
 import { useReportData } from '@/hooks/useReportData';
 import { DetailHeader } from '@/components/report/DetailHeader';
 import { Chip } from '@/components/report/Chip';
+import { BackToSummaryButton } from '@/components/report/BackToSummaryButton';
 import { DonutChart } from '@/components/charts/DonutChart';
 import type { EnergyDetail, PatternItem } from '@/types';
 
@@ -100,13 +100,7 @@ export default function EnergyDetailPage() {
         </div>
       </div>
 
-      <div className="px-6 py-5">
-        <Link href="/report/summary">
-          <button className="w-full h-14 bg-gray-900 text-white rounded-2xl text-base font-semibold">
-            리포트로 돌아가기
-          </button>
-        </Link>
-      </div>
+      <BackToSummaryButton />
     </div>
   );
 }

@@ -16,6 +16,7 @@ export default function OnboardingPage() {
   const [favoriteThing, setFavoriteThing] = useState('');
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [aiSentence, setAiSentence] = useState('');
+  const [submitError, setSubmitError] = useState('');
   const hasText =
     myOneSentence.trim().length > 0 &&
     selfStrength.trim().length > 0 &&
@@ -30,6 +31,7 @@ export default function OnboardingPage() {
 
   const handleDescriptionSubmit = () => {
     if (!hasText || submitOnboarding.isPending) return;
+    setSubmitError('');
     submitOnboarding.mutate(
       {
         my_one_sentence: myOneSentence,
@@ -44,7 +46,7 @@ export default function OnboardingPage() {
           }
           setStep('done');
         },
-        onError: () => setStep('done'),
+        onError: () => setSubmitError('제출에 실패했어요. 다시 시도해주세요.'),
       },
     );
   };
@@ -102,7 +104,7 @@ export default function OnboardingPage() {
             <div className="bg-white rounded-2xl overflow-hidden w-full">
               <div className="px-5 pt-6 pb-5 text-center">
                 <p className="text-[14px] font-semibold text-gray-900 mb-2 leading-snug">
-                  &lsquo;에타미&rsquo; 에서 알림을 보내고자 합니다.
+                  &lsquo;MetaMe&rsquo; 에서 알림을 보내고자 합니다.
                 </p>
                 <p className="text-[12px] text-gray-500 leading-relaxed">
                   경고, 사운드 및 아이콘 배지가 알림에 포함될 수 있습니다.
@@ -205,6 +207,7 @@ export default function OnboardingPage() {
         </div>
 
         <div className="px-6 pb-14 pt-4 flex flex-col gap-4 shrink-0">
+          {submitError && <p className="text-[13px] text-red-500 -mt-2">{submitError}</p>}
           <button
             onClick={handleDescriptionSubmit}
             disabled={submitOnboarding.isPending}

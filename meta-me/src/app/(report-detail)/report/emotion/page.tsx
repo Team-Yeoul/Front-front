@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { getEmotionDetail } from '@/lib/api';
 import { useReportData } from '@/hooks/useReportData';
 import { DetailHeader } from '@/components/report/DetailHeader';
 import { Chip } from '@/components/report/Chip';
+import { BackToSummaryButton } from '@/components/report/BackToSummaryButton';
 import { LineChart } from '@/components/charts/LineChart';
 import type { EmotionDetail } from '@/types';
 
@@ -55,23 +55,25 @@ function PatternCard({
   count,
   description,
   tags,
+  variant,
 }: {
   badge: string;
   title: string;
   count: number;
   description: string;
   tags: EmotionDetail['emotions'][number]['tags'];
+  variant: 'primary' | 'secondary';
 }) {
   return (
     <div className="mb-6">
-      <p className="text-[12px] font-medium text-[#8287FF] mb-1">
+      <p className={`text-[12px] font-medium mb-1 ${variant === 'primary' ? 'text-[#8287FF]' : 'text-[#c94f80]'}`}>
         {badge} · 기록 {count}개
       </p>
       <h4 className="text-[15px] font-semibold text-gray-900 mb-1.5">{title}</h4>
       <p className="text-[13px] text-gray-600 leading-relaxed mb-2.5">&ldquo;{description}&rdquo;</p>
       <div className="flex flex-wrap">
         {tags.map((t, i) => (
-          <Chip key={i} tag={t} variant="primary" />
+          <Chip key={i} tag={t} variant={variant} />
         ))}
       </div>
     </div>
@@ -87,10 +89,10 @@ export default function EmotionDetailPage() {
 
       <div className="flex-1 overflow-y-auto px-6 pt-5">
         {data.emotions.map((e, i) => (
-          <PatternCard key={e.title} badge={`감정 ${i + 1}`} title={e.title} count={e.count} description={e.description} tags={e.tags} />
+          <PatternCard key={e.title} badge={`감정 ${i + 1}`} title={e.title} count={e.count} description={e.description} tags={e.tags} variant="primary" />
         ))}
         {data.cautions.map((c, i) => (
-          <PatternCard key={c.title} badge={`주의 ${i + 1}`} title={c.title} count={c.count} description={c.description} tags={c.tags} />
+          <PatternCard key={c.title} badge={`주의 ${i + 1}`} title={c.title} count={c.count} description={c.description} tags={c.tags} variant="secondary" />
         ))}
 
         <div className="mt-2 mb-8">
@@ -100,13 +102,7 @@ export default function EmotionDetailPage() {
         </div>
       </div>
 
-      <div className="px-6 py-5">
-        <Link href="/report/summary">
-          <button className="w-full h-14 bg-gray-900 text-white rounded-2xl text-base font-semibold">
-            리포트로 돌아가기
-          </button>
-        </Link>
-      </div>
+      <BackToSummaryButton />
     </div>
   );
 }
