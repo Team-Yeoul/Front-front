@@ -19,6 +19,50 @@ function GoogleIcon() {
   );
 }
 
+function CheckBadgeIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16">
+      <circle cx="8" cy="8" r="8" fill="#4CAF6D" />
+      <path d="M4.5 8.2L6.8 10.5L11.5 5.5" stroke="white" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function EyeToggleIcon({ visible }: { visible: boolean }) {
+  if (visible) {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" stroke="#A9ACB6" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1="1" y1="1" x2="23" y2="23" stroke="#A9ACB6" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18">
+      <path d="M1 9C1 9 4 3.5 9 3.5C14 3.5 17 9 17 9C17 9 14 14.5 9 14.5C4 14.5 1 9 1 9Z" stroke="#A9ACB6" strokeWidth="1.4" fill="none" />
+      <circle cx="9" cy="9" r="2.4" stroke="#A9ACB6" strokeWidth="1.4" fill="none" />
+    </svg>
+  );
+}
+
+function CheckboxIcon({ checked }: { checked: boolean }) {
+  return (
+    <div
+      className="w-[18px] h-[18px] rounded-[5px] flex items-center justify-center shrink-0 border-[1.5px] transition-colors"
+      style={{
+        background: checked ? '#8287FF' : '#FFFFFF',
+        borderColor: checked ? '#8287FF' : '#D8D9E0',
+      }}
+    >
+      {checked && (
+        <svg width="10" height="8" viewBox="0 0 12 10">
+          <path d="M1 5L4.5 8.5L11 1" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </div>
+  );
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -64,170 +108,133 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="flex flex-col bg-white">
+    <div className="flex flex-col min-h-full bg-[#F2F2F7] px-7">
       {/* 헤더 */}
-      <div className="flex items-center px-4 h-[52px] border-b border-gray-100 shrink-0">
-        <Link href="/login" className="p-1 -ml-1">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M15 19l-7-7 7-7" stroke="#111827" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+      <div className="relative flex items-center h-6 mt-6">
+        <Link href="/terms" className="absolute left-0 p-1 -ml-1 text-[20px] text-[#1C1D24]" aria-label="뒤로가기">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M15 19l-7-7 7-7" stroke="#1C1D24" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </Link>
-        <span className="flex-1 text-center text-[16px] font-semibold text-gray-900 pr-8">회원가입</span>
+        <span className="w-full text-center text-[17px] font-bold text-[#1C1D24]">회원가입</span>
       </div>
+      <p className="text-[14px] text-[#8A8D9A] text-center mt-2">정보를 입력해 계정을 생성하세요</p>
 
-      <div className="flex flex-col px-5 pt-5 pb-6 gap-5">
-        {/* 타이틀 */}
-        <div>
-          <h2 className="text-[24px] font-bold text-gray-900 leading-tight">
-            나를 발견하는 여정,<br />지금 시작해요
-          </h2>
-          <p className="text-[13px] text-gray-400 mt-2">MetaMe와 함께 내 안의 OOO를 만나보세요</p>
+      {/* 폼 */}
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-8">
+        {/* 닉네임 */}
+        <div className="flex flex-col gap-2">
+          <label className="text-[13px] font-semibold text-[#4B4E5C]">닉네임</label>
+          <input
+            type="text"
+            value={nickname}
+            onChange={e => setNicknameInput(e.target.value)}
+            placeholder="사용할 이름을 작성해 주세요"
+            autoComplete="nickname"
+            suppressHydrationWarning
+            className="h-12 rounded-xl border border-[#E3E4EA] px-4 text-[14px] text-[#1C1D24] bg-[#FAFAFC] outline-none focus:border-[#8287FF] focus:bg-white placeholder:text-[#A9ACB6]"
+          />
         </div>
 
-        {/* 폼 */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
-          {/* 이메일 */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[13px] font-medium text-gray-700">이메일</label>
-            <div className="flex items-center h-[52px] border border-gray-200 rounded-xl px-4 bg-gray-50 gap-3">
-              <svg width="18" height="15" viewBox="0 0 18 15" fill="none">
-                <rect x="0.75" y="0.75" width="16.5" height="13.5" rx="2.25" stroke="#9CA3AF" strokeWidth="1.5"/>
-                <path d="M1 3.5L9 8.5L17 3.5" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@email.com"
-                autoComplete="email"
-                suppressHydrationWarning
-                className="flex-1 text-[15px] bg-transparent outline-none placeholder:text-gray-300"
-              />
+        {/* 이메일 */}
+        <div className="flex flex-col gap-2">
+          <label className="text-[13px] font-semibold text-[#4B4E5C]">이메일</label>
+          <div className="relative flex items-center">
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="내용을 입력하세요"
+              autoComplete="email"
+              suppressHydrationWarning
+              className="h-12 w-full rounded-xl border border-[#E3E4EA] pl-4 pr-10 text-[14px] text-[#1C1D24] bg-[#FAFAFC] outline-none focus:border-[#8287FF] focus:bg-white placeholder:text-[#A9ACB6]"
+            />
+            <div className="absolute right-4 pointer-events-none">
+              <CheckBadgeIcon />
             </div>
           </div>
-
-          {/* 비밀번호 */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[13px] font-medium text-gray-700">비밀번호</label>
-            <div className="flex items-center h-[52px] border border-gray-200 rounded-xl px-4 bg-gray-50 gap-3">
-              <svg width="16" height="19" viewBox="0 0 16 19" fill="none">
-                <rect x="0.75" y="7.75" width="14.5" height="10.5" rx="2.25" stroke="#9CA3AF" strokeWidth="1.5"/>
-                <path d="M4 8V5.5C4 3.01 5.79 1 8 1S12 3.01 12 5.5V8" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <input
-                type={showPw ? 'text' : 'password'}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="8자 이상 입력"
-                autoComplete="new-password"
-                suppressHydrationWarning
-                className="flex-1 text-[15px] bg-transparent outline-none placeholder:text-gray-300"
-              />
-              <button type="button" onClick={() => setShowPw(!showPw)} className="text-gray-300 shrink-0">
-                <svg width="20" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* 닉네임 */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[13px] font-medium text-gray-700">닉네임</label>
-            <div className="flex items-center h-[52px] border border-gray-200 rounded-xl px-4 bg-gray-50 gap-3">
-              <svg width="18" height="19" viewBox="0 0 18 19" fill="none">
-                <circle cx="9" cy="5.5" r="4" stroke="#9CA3AF" strokeWidth="1.5"/>
-                <path d="M1 18C1 14.134 4.686 11 9 11S17 14.134 17 18" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <input
-                type="text"
-                value={nickname}
-                onChange={e => setNicknameInput(e.target.value)}
-                placeholder="앱에서 사용할 이름"
-                autoComplete="nickname"
-                suppressHydrationWarning
-                className="flex-1 text-[15px] bg-transparent outline-none placeholder:text-gray-300"
-              />
-            </div>
-          </div>
-
-          {/* 생년월일 */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[13px] font-medium text-gray-700">생년월일</label>
-            <div className="flex items-center h-[52px] border border-gray-200 rounded-xl px-4 bg-gray-50 gap-3">
-              <svg width="18" height="19" viewBox="0 0 18 19" fill="none">
-                <rect x="0.75" y="2.75" width="16.5" height="15.5" rx="2" stroke="#9CA3AF" strokeWidth="1.5"/>
-                <path d="M0.75 7H17.25" stroke="#9CA3AF" strokeWidth="1.5"/>
-                <path d="M5 0.5V4M13 0.5V4" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <input
-                type="date"
-                value={birthDate}
-                onChange={e => setBirthDate(e.target.value)}
-                max={maxBirthDate}
-                className="flex-1 text-[15px] bg-transparent outline-none placeholder:text-gray-300"
-              />
-            </div>
-          </div>
-
-          {/* 약관 동의 체크박스 */}
-          <button
-            type="button"
-            onClick={() => setTermsAgreed(!termsAgreed)}
-            className="flex items-center gap-2.5 py-1"
-          >
-            <div className={`w-[20px] h-[20px] rounded-[5px] border-2 flex items-center justify-center shrink-0 transition-colors ${
-              termsAgreed ? 'bg-gray-900 border-gray-900' : 'border-gray-300 bg-white'
-            }`}>
-              {termsAgreed && (
-                <svg width="12" height="9" viewBox="0 0 12 9" fill="none">
-                  <path d="M1 4L4.5 7.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              )}
-            </div>
-            <span className="text-[13px] text-gray-700 text-left">
-              <span className="text-red-500 font-semibold">[필수]</span>{' '}
-              이용약관 및 개인정보 처리방침 동의
-            </span>
-          </button>
-
-          {error && <p className="text-[13px] text-red-500">{error}</p>}
-
-          {/* 가입하기 버튼 */}
-          <button
-            type="submit"
-            disabled={!canSubmit || signup.isPending}
-            className={`w-full h-[54px] rounded-2xl text-[15px] font-semibold transition-colors ${
-              canSubmit && !signup.isPending ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-400'
-            }`}
-          >
-            {signup.isPending ? '가입 중...' : '가입하기'}
-          </button>
-        </form>
-
-        {/* 구분선 */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-[12px] text-gray-400">또는 간편 가입</span>
-          <div className="flex-1 h-px bg-gray-200" />
         </div>
 
-        {/* 구글 회원가입 */}
-        <button
-          type="button"
-          onClick={() => signIn('google', { callbackUrl: '/onboarding' })}
-          className="w-full h-[54px] rounded-2xl bg-white border border-gray-200 flex items-center justify-center gap-2.5 font-semibold text-[15px] text-gray-800"
-        >
-          <GoogleIcon />
-          Google로 계속하기
+        {/* 비밀번호 */}
+        <div className="flex flex-col gap-2">
+          <label className="text-[13px] font-semibold text-[#4B4E5C]">비밀번호</label>
+          <div className="relative flex items-center">
+            <input
+              type={showPw ? 'text' : 'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="영문, 숫자 포함 8자 이상"
+              autoComplete="new-password"
+              suppressHydrationWarning
+              className="h-12 w-full rounded-xl border border-[#E3E4EA] pl-4 pr-10 text-[14px] text-[#1C1D24] bg-[#FAFAFC] outline-none focus:border-[#8287FF] focus:bg-white placeholder:text-[#A9ACB6]"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw(!showPw)}
+              className="absolute right-3.5 flex items-center justify-center"
+              aria-label={showPw ? '비밀번호 숨기기' : '비밀번호 보기'}
+            >
+              <EyeToggleIcon visible={showPw} />
+            </button>
+          </div>
+        </div>
+
+        {/* 생년월일 */}
+        <div className="flex flex-col gap-2">
+          <label className="text-[13px] font-semibold text-[#4B4E5C]">생년월일</label>
+          <input
+            type="date"
+            value={birthDate}
+            onChange={e => setBirthDate(e.target.value)}
+            max={maxBirthDate}
+            className="h-12 rounded-xl border border-[#E3E4EA] px-4 text-[14px] text-[#1C1D24] bg-[#FAFAFC] outline-none focus:border-[#8287FF] focus:bg-white"
+          />
+        </div>
+
+        {/* 약관 동의 */}
+        <button type="button" onClick={() => setTermsAgreed(!termsAgreed)} className="flex items-center gap-2 py-1">
+          <CheckboxIcon checked={termsAgreed} />
+          <span className="text-[13px] text-[#4B4E5C] text-left">
+            <span className="text-[#E2483F] font-semibold">[필수]</span> 이용약관 및 개인정보 처리방침 동의
+          </span>
         </button>
 
-        {/* 로그인 링크 */}
-        <div className="text-center text-[13px] text-gray-400">
-          이미 계정이 있으신가요?{' '}
-          <Link href="/login" className="text-blue-500 font-semibold">로그인</Link>
-        </div>
+        {error && <p className="text-[13px] text-[#E2483F]">{error}</p>}
+
+        {/* 시작하기 버튼 */}
+        <button
+          type="submit"
+          disabled={!canSubmit || signup.isPending}
+          className={`mt-1 h-12 rounded-2xl text-[16px] font-bold text-white transition-colors ${
+            canSubmit && !signup.isPending ? 'bg-[#8287FF] hover:bg-[#6a6ff0]' : 'bg-[#D8D9E0]'
+          }`}
+        >
+          {signup.isPending ? '가입 중...' : '시작하기'}
+        </button>
+      </form>
+
+      {/* 구분선 */}
+      <div className="flex items-center gap-3 mt-6">
+        <div className="flex-1 h-px bg-[#EDEDF2]" />
+        <span className="text-[12px] text-[#8A8D9A]">또는 간편 가입</span>
+        <div className="flex-1 h-px bg-[#EDEDF2]" />
+      </div>
+
+      {/* 구글 회원가입 */}
+      <button
+        type="button"
+        onClick={() => signIn('google', { callbackUrl: '/onboarding' })}
+        className="mt-4 h-12 rounded-2xl bg-white border border-[#E3E4EA] flex items-center justify-center gap-2.5 font-semibold text-[14px] text-[#1C1D24]"
+      >
+        <GoogleIcon />
+        Google로 계속하기
+      </button>
+
+      {/* 로그인 링크 */}
+      <div className="flex-1" />
+      <div className="flex justify-center gap-1.5 pb-8 pt-6">
+        <span className="text-[13px] text-[#8A8D9A]">계정이 존재한다면?</span>
+        <Link href="/login" className="text-[13px] font-bold text-[#6266E8]">로그인</Link>
       </div>
     </div>
   );

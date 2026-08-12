@@ -37,34 +37,34 @@ export default function ReportPage() {
   if (!status.unlocked) {
     const progressPct = Math.min(100, (recordedDays / status.requiredDays) * 100);
     return (
-      <div className="flex flex-col h-full bg-white px-6 pt-6">
-        <p className="text-[13px] text-gray-400 mb-1">리포트 미리보기</p>
-        <p className="text-[12px] text-gray-300 mb-5">내용은 기록이 쌓일수록 더 정확해질 예정이에요</p>
+      <div className="flex flex-col h-full bg-[#F2F2F7] px-6 pt-6">
+        <p className="text-[13px] text-[#4B4E5C] mb-1">리포트 미리보기</p>
+        <p className="text-[12px] text-[#A9ACB6] mb-5">내용은 기록이 쌓일수록 더 정확해질 예정이에요</p>
 
-        <div className="bg-[#8287FF] rounded-2xl px-5 py-4 mb-2">
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="text-[13px] font-medium text-white/90">며칠째 {displayName}님을 읽는 중이에요</span>
-            <span className="text-[13px] font-semibold text-white">
+        <div className="bg-white rounded-[20px] shadow-[0_8px_24px_rgba(20,20,40,0.05)] px-[22px] py-[22px] flex flex-col items-center text-center gap-4">
+          <div className="flex items-center gap-2.5 w-full">
+            <span className="flex-1 text-[13px] font-semibold text-[#4B4E5C] text-left">
+              며칠째 {displayName}님을 읽는 중이에요
+            </span>
+            <span className="text-[12px] font-bold text-[#6266E8]">
               {recordedDays}/{status.requiredDays}
             </span>
           </div>
-          <div className="h-1.5 rounded-full bg-white/25">
-            <div className="h-full rounded-full bg-white" style={{ width: `${progressPct}%` }} />
+          <div className="h-1.5 w-full rounded-full bg-[#EDEDF2] overflow-hidden">
+            <div className="h-full rounded-full bg-[#8287FF]" style={{ width: `${progressPct}%` }} />
           </div>
-        </div>
-
-        <div className="flex-1 flex items-center justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/mascot.png" alt="MetaMe 마스코트" width={140} height={140} />
+          <img src="/mascot.png" alt="MetaMe 마스코트" width={140} height={140} className="mt-1" />
+          <p className="text-[12px] text-[#8A8D9A] leading-relaxed">
+            최소 {status.requiredDays}일간의 기록이 쌓이면<br />리포트를 보여드려요
+          </p>
         </div>
 
-        <p className="text-center text-[13px] text-gray-400 mb-6">
-          최소 {status.requiredDays}일간의 기록이 쌓이면 리포트를 보여드려요
-        </p>
+        <div className="flex-1" />
 
         <div className="pb-8">
           <Link href="/diary">
-            <button className="w-full h-14 bg-gray-900 text-white rounded-2xl text-base font-semibold">
+            <button className="w-full h-14 bg-[#1C1D24] text-white rounded-2xl text-base font-semibold">
               오늘 기록하기
             </button>
           </Link>
@@ -74,11 +74,11 @@ export default function ReportPage() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-white px-6 pt-6">
-      <p className="text-[13px] text-gray-400 mb-5">리포트 미리보기</p>
+    <div className="flex flex-col h-full bg-[#F2F2F7] px-6 pt-6">
+      <p className="text-[13px] text-[#4B4E5C] mb-5">리포트 미리보기</p>
 
-      <h2 className="text-[24px] font-bold text-gray-900 mb-2">{status.matchLabel}</h2>
-      <p className="text-[13px] text-gray-400 mb-5">&lt;{status.matchDescription}&gt;</p>
+      <h2 className="text-[24px] font-bold text-[#1C1D24] mb-2">{status.matchLabel}</h2>
+      <p className="text-[13px] text-[#8A8D9A] mb-5">&quot;{status.matchDescription}&quot;</p>
 
       <div className="bg-[#8287FF] rounded-2xl px-5 py-4 flex mb-7">
         <div className="flex-1">
@@ -92,10 +92,10 @@ export default function ReportPage() {
         </div>
       </div>
 
-      <h3 className="text-[15px] font-semibold text-gray-900 mb-3">이번 주 핵심 요약</h3>
+      <h3 className="text-[15px] font-semibold text-[#1C1D24] mb-3">이번 주 핵심 요약</h3>
       <div className="flex flex-col gap-2.5 mb-8">
         {status.weeklyHighlights.map((line, i) => (
-          <p key={i} className="text-[13px] text-gray-600 leading-relaxed">
+          <p key={i} className="text-[13px] text-[#4B4E5C] leading-relaxed">
             {i + 1}. <HighlightText line={line} />
           </p>
         ))}
@@ -103,7 +103,7 @@ export default function ReportPage() {
 
       <div className="mt-auto pb-8">
         <Link href="/report/summary">
-          <button className="w-full h-14 bg-gray-900 text-white rounded-2xl text-base font-semibold">
+          <button className="w-full h-14 bg-[#1C1D24] text-white rounded-2xl text-base font-semibold">
             자세히 보기
           </button>
         </Link>
