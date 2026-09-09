@@ -3,37 +3,34 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signup } from '@/lib/api';
+import { useSignup } from '@/entities/user';
 import { useAuthStore } from '@/store';
 
 export default function SignupPage() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
-  const [name, setName] = useState('');
+  const signupMutation = useSignup();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const loading = signupMutation.isPending;
 
-  const nameValid = name.trim().length > 0;
   const emailValid = email.includes('@') && email.includes('.');
-  const canSubmit = nameValid && emailValid && password.length >= 8 && termsAgreed;
+  const canSubmit = emailValid && password.length >= 8 && birthDate.length > 0 && termsAgreed;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit || loading) return;
     setError('');
-    setLoading(true);
     try {
-      const res = await signup({ name, email, password });
+      const res = await signupMutation.mutateAsync({ email, password, birth_date: birthDate });
       setAuth(res.access_token, res.refresh_token, res.user_id);
       router.push('/onboarding');
     } catch {
       setError('회원가입에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -102,19 +99,18 @@ export default function SignupPage() {
             </div>
           </div>
 
-          {/* 닉네임 */}
+          {/* 생년월일 */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[13px] font-medium text-gray-700">닉네임</label>
+            <label className="text-[13px] font-medium text-gray-700">생년월일</label>
             <div className="flex items-center h-[52px] border border-gray-200 rounded-xl px-4 bg-gray-50 gap-3">
               <svg width="18" height="19" viewBox="0 0 18 19" fill="none">
-                <circle cx="9" cy="5.5" r="4" stroke="#9CA3AF" strokeWidth="1.5"/>
-                <path d="M1 18C1 14.134 4.686 11 9 11S17 14.134 17 18" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
+                <rect x="1" y="3" width="16" height="14" rx="2" stroke="#9CA3AF" strokeWidth="1.5"/>
+                <path d="M1 7H17M5 1V4.5M13 1V4.5" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
               <input
-                type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="앱에서 사용할 이름"
+                type="date"
+                value={birthDate}
+                onChange={e => setBirthDate(e.target.value)}
                 className="flex-1 text-[15px] bg-transparent outline-none placeholder:text-gray-300"
               />
             </div>
