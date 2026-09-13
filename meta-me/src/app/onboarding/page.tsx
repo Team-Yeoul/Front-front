@@ -2,20 +2,49 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { submitOnboarding } from '@/lib/api';
-import { useAuthStore } from '@/store';
+import { useSubmitOnboarding } from '@/entities/user';
+import type { OnboardingRequest } from '@/entities/user';
 
 type Step = 'notification' | 'description' | 'done' | 'day0';
 
+type QuestionKey = keyof OnboardingRequest;
+
+const QUESTIONS: { key: QuestionKey; title: React.ReactNode; caption: string }[] = [
+  {
+    key: 'my_one_sentence',
+    title: <>당신은 스스로를<br />한 문장으로 설명할<br />수 있나요?</>,
+    caption: '생각보다 우리는 스스로를 정확히 모를 수도 있어요',
+  },
+  {
+    key: 'self_strength',
+    title: <>당신이 생각하는<br />당신의 장점은<br />무엇인가요?</>,
+    caption: '스스로를 조금 더 들여다볼까요',
+  },
+  {
+    key: 'others_feedback',
+    title: <>다른 사람들에게<br />자주 듣는 말이<br />있다면?</>,
+    caption: '남들이 보는 나도 나를 이루는 한 조각이에요',
+  },
+  {
+    key: 'favorite_thing',
+    title: <>당신이 좋아한다고<br />생각하는 것은<br />무엇인가요?</>,
+    caption: '거의 다 왔어요',
+  },
+];
+
 export default function OnboardingPage() {
   const router = useRouter();
-  const accessToken = useAuthStore((s) => s.accessToken);
+  const submitOnboardingMutation = useSubmitOnboarding();
   const [step, setStep] = useState<Step>('notification');
-  const [description, setDescription] = useState('');
+  const [qIndex, setQIndex] = useState(0);
+  const [answers, setAnswers] = useState<Partial<OnboardingRequest>>({});
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [aiSentence, setAiSentence] = useState('');
-  const [loading, setLoading] = useState(false);
-  const hasText = description.trim().length > 0;
+  const loading = submitOnboardingMutation.isPending;
+
+  const question = QUESTIONS[qIndex];
+  const currentAnswer = answers[question.key] ?? '';
+  const hasText = currentAnswer.trim().length > 0;
 
   useEffect(() => {
     if (step !== 'done') return;
@@ -23,21 +52,22 @@ export default function OnboardingPage() {
     return () => clearTimeout(t);
   }, [step]);
 
-  const handleDescriptionSubmit = async () => {
+  const handleQuestionSubmit = async () => {
     if (!hasText || loading) return;
-    setLoading(true);
+
+    if (qIndex < QUESTIONS.length - 1) {
+      setQIndex(qIndex + 1);
+      return;
+    }
+
     try {
-      const res = await submitOnboarding(
-        { description },
-        accessToken ?? '',
-      );
+      const res = await submitOnboardingMutation.mutateAsync(answers as OnboardingRequest);
       if (res.ai_first_sentence && /[가-힣]/.test(res.ai_first_sentence)) {
         setAiSentence(res.ai_first_sentence);
       }
     } catch {
       // 실패해도 다음 단계로 진행
     } finally {
-      setLoading(false);
       setStep('done');
     }
   };
@@ -128,7 +158,7 @@ export default function OnboardingPage() {
     return (
       <div className="flex flex-col h-full bg-white">
         <button
-          onClick={() => setStep('notification')}
+          onClick={() => (qIndex > 0 ? setQIndex(qIndex - 1) : setStep('notification'))}
           className="px-5 pt-6 pb-2 w-fit focus:outline-none"
           aria-label="뒤로"
         >
@@ -139,15 +169,15 @@ export default function OnboardingPage() {
 
         <div className="flex-1 px-6 pt-4">
           <p className="text-[13px] text-gray-400 mb-5 leading-snug">
-            생각보다 우리는 스스로를 정확히 모를 수도 있어요
+            {question.caption}
           </p>
           <h2 className="text-[24px] font-bold text-gray-900 leading-[1.4] mb-9">
-            당신은 스스로를<br />한 문장으로 설명할<br />수 있나요?
+            {question.title}
           </h2>
           <input
             type="text"
-            value={description}
-            onChange={e => setDescription(e.target.value)}
+            value={currentAnswer}
+            onChange={e => setAnswers(a => ({ ...a, [question.key]: e.target.value }))}
             placeholder="내용을 입력하세요"
             className={`w-full h-[52px] rounded-xl px-4 text-[15px] text-gray-900 outline-none placeholder:text-gray-300 transition-colors ${
               hasText
@@ -159,11 +189,11 @@ export default function OnboardingPage() {
 
         <div className="px-6 pb-14 flex flex-col gap-4">
           <button
-            onClick={handleDescriptionSubmit}
+            onClick={handleQuestionSubmit}
             disabled={loading}
             className={`w-full h-14 rounded-2xl text-base font-semibold text-white transition-colors focus:outline-none ${hasText && !loading ? 'bg-gray-900' : 'bg-gray-300 cursor-default'}`}
           >
-            {loading ? '분석 중...' : '입력완료'}
+            {loading ? '분석 중...' : qIndex < QUESTIONS.length - 1 ? '다음' : '입력완료'}
           </button>
           <button
             onClick={() => setStep('done')}

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { login } from '@/lib/api';
+import { useLogin } from '@/entities/user';
 import { useAuthStore } from '@/store';
 
 function GoogleIcon() {
@@ -20,11 +20,12 @@ function GoogleIcon() {
 export default function LoginPage() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const loginMutation = useLogin();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const loading = loginMutation.isPending;
 
   const emailValid = email.includes('@') && email.includes('.');
   const canSubmit = emailValid && password.length >= 6;
@@ -33,15 +34,12 @@ export default function LoginPage() {
     e.preventDefault();
     if (!canSubmit || loading) return;
     setError('');
-    setLoading(true);
     try {
-      const res = await login({ email, password });
+      const res = await loginMutation.mutateAsync({ email, password });
       setAuth(res.access_token, res.refresh_token, res.user_id);
       router.push('/main');
     } catch {
       setError('이메일 또는 비밀번호가 올바르지 않습니다.');
-    } finally {
-      setLoading(false);
     }
   };
 
