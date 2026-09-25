@@ -38,6 +38,7 @@ export default function GrowthDetailPage() {
       subtitle="지난주와 비교해 무엇이 달라졌는지"
       step={5}
       total={5}
+      backHref="/report/persona"
       footer={
         <button
           onClick={() => router.push('/report')}

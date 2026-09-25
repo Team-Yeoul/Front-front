@@ -37,7 +37,6 @@ export default function SplashPage() {
             </button>
           </Link>
           <button className="w-full h-14 bg-gray-100 text-gray-800 rounded-2xl text-base font-semibold flex items-center justify-center gap-2.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path d="M18.1 10.2c0-.6-.06-1.18-.16-1.74H10v3.3h4.55a3.9 3.9 0 0 1-1.69 2.56v2.12h2.73C17.1 14.96 18.1 12.76 18.1 10.2z" fill="#4285F4"/>
               <path d="M10 18.4c2.29 0 4.21-.76 5.61-2.06l-2.73-2.12C12.13 14.83 11.15 15.1 10 15.1c-2.21 0-4.08-1.49-4.75-3.5H2.43v2.19C3.82 16.69 6.72 18.4 10 18.4z" fill="#34A853"/>

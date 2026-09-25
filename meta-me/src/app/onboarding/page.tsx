@@ -220,7 +220,7 @@ export default function OnboardingPage() {
               <div className="flex flex-wrap gap-2">
                 {SURVEY_QUESTIONS.flatMap((sq) => {
                   const a = surveyAnswers[sq.id];
-                  if (!a) return [];
+                  if (a === undefined || (Array.isArray(a) && a.length === 0)) return [];
                   const labels =
                     sq.type === 'multi'
                       ? (a as string[]).map((id) => sq.options.find((o) => o.id === id)?.label).filter(Boolean)

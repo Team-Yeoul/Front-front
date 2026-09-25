@@ -17,13 +17,16 @@ export function DonutChart({
   centerLabel,
   centerSubLabel,
   colors = FIXED_COLORS,
+  total: totalProp,
 }: {
   segments: DonutSegment[];
   centerLabel?: string;
   centerSubLabel?: string;
   colors?: string[];
+  /** Denominator for the arc fractions. Defaults to the sum of segment values (full pie). Pass an explicit total (e.g. 100) to leave the remainder as an empty gray gap. */
+  total?: number;
 }) {
-  const total = segments.reduce((sum, s) => sum + s.value, 0) || 1;
+  const total = totalProp ?? (segments.reduce((sum, s) => sum + s.value, 0) || 1);
   const fractions = segments.map((s) => s.value / total);
   const cumulativeStarts = fractions.reduce<{ list: number[]; sum: number }>(
     (acc, f) => ({ list: [...acc.list, acc.sum], sum: acc.sum + f }),

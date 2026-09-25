@@ -44,6 +44,7 @@ export default function EmotionDetailPage() {
       subtitle="근거가 된 기록 횟수를 함께 표시했어요"
       step={2}
       total={5}
+      backHref="/report/summary"
       nextHref="/report/keywords"
     >
       <div className="bg-white border border-gray-100 rounded-3xl px-5 py-5 mb-4 shadow-sm">

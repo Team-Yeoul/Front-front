@@ -45,8 +45,8 @@ export default function ChallengePage() {
   }, [accessToken, data]);
 
   const daysInMonth = monthEnd.getDate();
-  const achievedRate = Math.round((writtenDays.length / daysInMonth) * 100) || 67;
-  const achievedCount = writtenDays.length || 20;
+  const achievedRate = Math.round((writtenDays.length / daysInMonth) * 100);
+  const achievedCount = writtenDays.length;
 
   const isCurrentMonth = cursor.year === today.getFullYear() && cursor.month === today.getMonth() + 1;
 

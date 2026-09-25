@@ -44,6 +44,7 @@ export default function KeywordDetailPage() {
       subtitle="관심이 몰린 주제와 기분을 움직인 것들"
       step={3}
       total={5}
+      backHref="/report/emotion"
       nextHref="/report/persona"
     >
       <div className="bg-white border border-gray-100 rounded-3xl px-5 py-5 mb-4 shadow-sm">

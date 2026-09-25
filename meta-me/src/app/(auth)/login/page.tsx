@@ -48,11 +48,11 @@ export default function LoginPage() {
     <div className="flex flex-col bg-white">
       {/* 헤더 */}
       <div className="flex items-center px-5 h-[52px] shrink-0">
-        <span className="flex items-center gap-1.5 text-[15px] font-bold text-gray-900 lowercase">
+        <Link href="/" className="flex items-center gap-1.5 text-[15px] font-bold text-gray-900 lowercase">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="" className="w-5 h-5 object-contain" />
           metame
-        </span>
+        </Link>
       </div>
 
       <div className="flex flex-col px-5 pt-2 pb-6">

@@ -123,14 +123,14 @@ export default function MainPage() {
   const weekFlow = useWeekFlow();
 
   const today = new Date();
-  const accuracyPercent = profile?.latest_accuracy?.accuracy_percent ?? 76;
+  const accuracyPercent = accessToken ? (profile?.latest_accuracy?.accuracy_percent ?? 0) : 76;
   const nickname = '이시은';
   const prompt = PROMPTS[today.getDate() % PROMPTS.length];
   const dateLabel = `${today.getMonth() + 1}월 ${today.getDate()}일 ${WEEKDAYS[today.getDay()]}요일`;
 
   const streakDays = weekFlow.filter((s) => s === 'done').length;
   const todayIndex = today.getDay();
-  const completedToday = weekFlow[todayIndex] === 'done';
+  const completedToday = !!accessToken && weekFlow[todayIndex] === 'done';
   const achievementRate = Math.round((streakDays / 7) * 100);
 
   const hasRealRecent = !!accessToken && !!recent && recent.records.length > 0;
@@ -167,7 +167,15 @@ export default function MainPage() {
       >
         <p className="text-[13px] font-semibold text-gray-900">{dateLabel}</p>
         <h2 className="text-[19px] font-bold text-gray-900 leading-snug mt-1.5 mb-6">
-          {completedToday ? '오늘의 기록을 완료했어요' : `${nickname}님, 오늘 하루는\n${prompt}`}
+          {completedToday ? (
+            '오늘의 기록을 완료했어요'
+          ) : (
+            <>
+              {nickname}님, 오늘 하루는
+              <br />
+              {prompt}
+            </>
+          )}
         </h2>
 
         <div className="relative w-full flex justify-center mb-6">
