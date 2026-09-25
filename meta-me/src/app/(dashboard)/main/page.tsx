@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store';
 import { useGetMyProfile } from '@/entities/user';
@@ -16,6 +17,12 @@ const MOCK_RECENT_ENTRIES = [
   { id: '1', title: '오늘도 다 친구닷', date: '2025.06.17' },
   { id: '2', title: '엄마 때문에 화남', date: '2025.06.16' },
   { id: '3', title: '회사 때문에 스트레스', date: '2025.06.15' },
+];
+
+const PROMPTS = [
+  '오늘 하루는 어떤 장면으로 남았나요?',
+  '오늘 가장 크게 흔들린 감정은 뭐였나요?',
+  '오늘 스스로를 칭찬하고 싶은 순간이 있었나요?',
 ];
 
 /** Local YYYY-MM-DD, independent of timezone offset formatting quirks. */
@@ -51,35 +58,31 @@ function useWeekFlow() {
     day.setDate(start.getDate() + i);
     const dayKey = toDateKey(day);
 
-    if (dayKey === todayKey) return 'today' as const;
+    if (dayKey === todayKey) return recordedDates.has(dayKey) ? ('done' as const) : ('today' as const);
     if (day > today) return 'pending' as const;
     return recordedDates.has(dayKey) ? ('done' as const) : ('missed' as const);
   });
 }
 
-function DayStatusIcon({ status }: { status: DayStatus }) {
+function WeekdayPill({ status, label }: { status: DayStatus; label: string }) {
   if (status === 'done') {
     return (
-      <div className="w-9 h-9 rounded-full bg-[#28A745] flex items-center justify-center">
-        <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
-          <path d="M1 6l4.5 4.5L15 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center shrink-0">
+        <svg width="13" height="10" viewBox="0 0 13 10" fill="none">
+          <path d="M1 5l3.5 3.5L12 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
     );
   }
-  if (status === 'missed') {
-    return (
-      <div className="w-9 h-9 rounded-full bg-[#CC0000] flex items-center justify-center">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M1 1l12 12M13 1L1 13" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-        </svg>
-      </div>
-    );
-  }
-  if (status === 'today') {
-    return <div className="w-9 h-9 rounded-full ring-2 ring-offset-2 ring-[#8287FF] bg-[#8287FF]" />;
-  }
-  return <div className="w-9 h-9 rounded-full bg-gray-200" />;
+  return (
+    <div
+      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-[12px] ${
+        status === 'today' ? 'ring-2 ring-[#8287FF] text-[#8287FF] font-semibold' : 'bg-gray-100 text-gray-400'
+      }`}
+    >
+      {label}
+    </div>
+  );
 }
 
 function ChevronIcon({ size = 7 }: { size?: number }) {
@@ -119,67 +122,109 @@ export default function MainPage() {
   const { data: recent } = useListDailyRecords({ size: 3 }, !!accessToken);
   const weekFlow = useWeekFlow();
 
-  const dDay = profile
-    ? Math.floor((Date.now() - new Date(profile.user.created_at).getTime()) / 86400000)
-    : 0;
-  const accuracyPercent = profile?.latest_accuracy?.accuracy_percent ?? 0;
+  const today = new Date();
+  const accuracyPercent = profile?.latest_accuracy?.accuracy_percent ?? 76;
+  const nickname = '이시은';
+  const prompt = PROMPTS[today.getDate() % PROMPTS.length];
+  const dateLabel = `${today.getMonth() + 1}월 ${today.getDate()}일 ${WEEKDAYS[today.getDay()]}요일`;
+
+  const streakDays = weekFlow.filter((s) => s === 'done').length;
+  const todayIndex = today.getDay();
+  const completedToday = weekFlow[todayIndex] === 'done';
+  const achievementRate = Math.round((streakDays / 7) * 100);
 
   const hasRealRecent = !!accessToken && !!recent && recent.records.length > 0;
 
   return (
     <div className="flex flex-col h-full bg-[#F2F2F7] px-5 pb-6 gap-6 overflow-y-auto">
-      {/* 상태 카드 */}
-      <div className="relative mt-14">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/mascot.png"
-          alt="MetaMe 마스코트"
-          width={130}
-          height={130}
-          className="absolute -top-8 right-8 z-10"
-        />
-
-        <div
-          className="overflow-hidden rounded-3xl"
-          style={{ backgroundImage: 'linear-gradient(to bottom, #8287FF, #ffffff)' }}
-        >
-          <div className="px-5 pt-6">
-            <p className="text-[52px] leading-none font-bold text-gray-900">D+{dDay}</p>
-            <p className="text-[13px] text-gray-700 mt-2">아직 팔팔한 여울림 CEO</p>
-
-            <div className="flex items-center gap-3 mt-6 mb-4">
-              <span className="text-[13px] font-semibold text-gray-900 shrink-0">{accuracyPercent}%</span>
-              <div className="flex-1 h-1.5 rounded-full bg-white/50">
-                <div className="h-full rounded-full bg-[#8287FF]" style={{ width: `${accuracyPercent}%` }} />
-              </div>
-            </div>
-          </div>
-
-          <div className="px-5 pb-5 pt-1">
-            <button
-              onClick={() => router.push('/diary')}
-              className="w-full h-14 bg-gray-900 text-white rounded-2xl text-[15px] font-semibold"
-            >
-              기록 이어가기
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 나의 기록 흐름 */}
-      <div>
-        <div className="flex items-center gap-1 mb-4">
-          <h3 className="text-[15px] font-semibold text-gray-900">나의 기록 흐름</h3>
-          <ChevronIcon />
-        </div>
-        <div className="flex justify-between bg-gray-50 rounded-2xl px-3 py-4">
+      {/* 주간 스트립 */}
+      <div className="flex items-center justify-between mt-5">
+        <div className="flex items-center gap-2">
           {WEEKDAYS.map((day, i) => (
-            <div key={day} className="flex flex-col items-center gap-1.5">
-              <DayStatusIcon status={weekFlow[i]} />
-              <span className="text-[12px] text-gray-500">{day}</span>
-            </div>
+            <WeekdayPill key={day} status={weekFlow[i]} label={day} />
           ))}
         </div>
+        <Link
+          href="/challenge"
+          className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shrink-0"
+          aria-label="기록 챌린지"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="4" width="18" height="17" rx="2" stroke="#6B7280" strokeWidth="2" />
+            <path d="M3 9h18M7 2v4M17 2v4" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </Link>
+      </div>
+
+      {/* 오늘 기록 카드 */}
+      <div
+        className="relative overflow-hidden rounded-3xl px-5 pt-6 pb-5"
+        style={
+          completedToday
+            ? { backgroundImage: 'linear-gradient(135deg, #C9CCFF 0%, #FFFFFF 55%, #FFE9A8 100%)' }
+            : { backgroundColor: 'white', border: '1px solid #F0F0F0' }
+        }
+      >
+        <p className="text-[13px] font-semibold text-gray-900">{dateLabel}</p>
+        <h2 className="text-[19px] font-bold text-gray-900 leading-snug mt-1.5 mb-6">
+          {completedToday ? '오늘의 기록을 완료했어요' : `${nickname}님, 오늘 하루는\n${prompt}`}
+        </h2>
+
+        <div className="relative w-full flex justify-center mb-6">
+          <div className="w-[150px] h-[150px] rounded-full bg-gradient-to-br from-white to-gray-100 shadow-inner flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="MetaMe" className="w-16 h-auto opacity-80" />
+          </div>
+          {completedToday && (
+            <span className="absolute bottom-0 right-[calc(50%-75px)] w-8 h-8 rounded-full bg-[#8287FF] border-4 border-white flex items-center justify-center">
+              <svg width="13" height="10" viewBox="0 0 13 10" fill="none">
+                <path d="M1 5l3.5 3.5L12 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+          )}
+        </div>
+
+        {streakDays > 0 && (
+          <p className="text-[12px] font-semibold text-[#8287FF] mb-2">
+            연속 {streakDays}일{completedToday ? ' 작성 완료' : '째 작성 중'}
+          </p>
+        )}
+
+        {completedToday ? (
+          <div className="flex items-center justify-between">
+            <span className="text-[15px] font-semibold text-gray-900">새로운 기록 남기기</span>
+            <button
+              onClick={() => router.push('/diary')}
+              className="w-11 h-11 rounded-full bg-gray-900 flex items-center justify-center shrink-0"
+              aria-label="새로운 기록 남기기"
+            >
+              <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
+                <path d="M1 6h11M7 1l5 5-5 5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => router.push('/diary')}
+            className="w-full h-14 bg-gray-900 text-white rounded-2xl text-[15px] font-semibold"
+          >
+            오늘기록 이어가기
+          </button>
+        )}
+      </div>
+
+      {/* 이번 주 달성률 */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[13px] font-semibold text-gray-900">이번 주 달성률</span>
+          <span className="text-[13px] font-bold text-gray-900">{achievementRate}%</span>
+        </div>
+        <div className="h-2 rounded-full bg-white">
+          <div className="h-full rounded-full bg-[#8287FF]" style={{ width: `${achievementRate}%` }} />
+        </div>
+        <p className="text-[11px] text-gray-400 mt-1.5">
+          {streakDays}/7일 · 문장 정확도 {accuracyPercent}%
+        </p>
       </div>
 
       {/* 최근 기록 */}
@@ -216,4 +261,3 @@ export default function MainPage() {
     </div>
   );
 }
-

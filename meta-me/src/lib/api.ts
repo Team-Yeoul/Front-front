@@ -10,7 +10,7 @@ import type {
   KeywordDetail,
   EnergyDetail,
   PersonaDetail,
-  ActionExperimentStatus,
+  GrowthDetail,
   ObjectifyMirrors,
 } from '@/types';
 
@@ -71,8 +71,8 @@ export const getEnergyDetail = (token: string) =>
 export const getPersonaDetail = (token: string) =>
   fetcher<PersonaDetail>('/v1/report/persona', { headers: authHeader(token) });
 
-export const getActionExperimentStatus = (token: string) =>
-  fetcher<ActionExperimentStatus>('/v1/report/action', { headers: authHeader(token) });
+export const getGrowthDetail = (token: string) =>
+  fetcher<GrowthDetail>('/v1/report/growth', { headers: authHeader(token) });
 
 export const getObjectifyMirrors = (token: string) =>
   fetcher<ObjectifyMirrors>('/v1/objectify/mirrors', { headers: authHeader(token) });

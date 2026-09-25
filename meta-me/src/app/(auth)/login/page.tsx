@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const loading = loginMutation.isPending;
 
@@ -46,22 +47,19 @@ export default function LoginPage() {
   return (
     <div className="flex flex-col bg-white">
       {/* 헤더 */}
-      <div className="flex items-center px-4 h-[52px] border-b border-gray-100 shrink-0">
-        <Link href="/" className="p-1 -ml-1">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M15 19l-7-7 7-7" stroke="#111827" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </Link>
-        <span className="flex-1 text-center text-[16px] font-semibold text-gray-900 pr-8">로그인</span>
+      <div className="flex items-center px-5 h-[52px] shrink-0">
+        <span className="flex items-center gap-1.5 text-[15px] font-bold text-gray-900 lowercase">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="" className="w-5 h-5 object-contain" />
+          metame
+        </span>
       </div>
 
-      <div className="flex flex-col px-5 pt-8 pb-6">
-      {/* 로고 영역 */}
-      <div className="flex flex-col items-center mb-7">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="MetaMe" className="h-12 w-auto" />
-        <h1 className="text-[22px] font-bold text-gray-900 mt-3">MetaMe</h1>
-        <p className="text-[13px] text-gray-400 mt-1">MetaMe에 오신걸 환영합니다^^</p>
+      <div className="flex flex-col px-5 pt-2 pb-6">
+      {/* 타이틀 */}
+      <div className="mb-6">
+        <h2 className="text-[22px] font-bold text-gray-900 leading-tight">로그인</h2>
+        <p className="text-[13px] text-gray-400 mt-2">이메일과 비밀번호를 입력하세요</p>
       </div>
 
       {/* 폼 */}
@@ -115,46 +113,48 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* 비밀번호 찾기 */}
-        <div className="flex justify-end -mt-1">
-          <button type="button" className="text-[13px] text-blue-500 font-medium">
-            비밀번호를 잊으셨나요?
+        {/* 기억하기 / 비밀번호 찾기 */}
+        <div className="flex items-center justify-between -mt-1">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="w-[18px] h-[18px] rounded accent-[#8287FF]"
+            />
+            <span className="text-[13px] text-gray-500">기억하기</span>
+          </label>
+          <button type="button" className="text-[13px] text-gray-400 font-medium">
+            비밀번호 찾으러 가기
           </button>
         </div>
 
         {error && <p className="text-[13px] text-red-500 -mt-1">{error}</p>}
 
-        {/* 로그인 버튼 */}
+        {/* 시작하기 버튼 */}
         <button
           type="submit"
           disabled={!canSubmit || loading}
           className={`w-full h-[54px] rounded-2xl text-[15px] font-semibold transition-colors ${
-            canSubmit && !loading ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-400'
+            canSubmit && !loading ? 'bg-[#8287FF] text-white' : 'bg-gray-200 text-gray-400'
           }`}
         >
-          {loading ? '로그인 중...' : '로그인'}
+          {loading ? '로그인 중...' : '시작하기'}
         </button>
       </form>
 
-      {/* 구분선 */}
-      <div className="flex items-center gap-3 my-5">
-        <div className="flex-1 h-px bg-gray-200" />
-        <span className="text-[12px] text-gray-400">또는 간편 로그인</span>
-        <div className="flex-1 h-px bg-gray-200" />
-      </div>
-
       {/* 소셜 로그인 */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 mt-5">
         <button className="w-full h-[54px] rounded-2xl bg-white border border-gray-200 flex items-center justify-center gap-2.5 font-semibold text-[15px] text-gray-800">
           <GoogleIcon />
-          Google로 계속하기
+          Google로 시작하기
         </button>
       </div>
 
       {/* 회원가입 링크 */}
       <div className="mt-5 text-center text-[13px] text-gray-400">
-        아직 계정이 없으신가요?{' '}
-        <Link href="/terms" className="text-blue-500 font-semibold">회원가입</Link>
+        계정이 존재하지 않는다면?{' '}
+        <Link href="/terms" className="text-[#8287FF] font-semibold">회원가입</Link>
       </div>
       </div>
     </div>

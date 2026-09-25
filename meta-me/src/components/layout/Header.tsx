@@ -39,9 +39,16 @@ export function Header() {
     );
   }
 
+  const TITLES: Record<string, string> = {
+    '/diary': '다이어리',
+    '/report': '리포트 미',
+    '/mypage': '마이페이지',
+  };
+  const title = Object.entries(TITLES).find(([path]) => pathname.startsWith(path))?.[1] ?? 'MetaMe';
+
   return (
     <header className="px-6 py-4 border-b border-gray-100 bg-white">
-      <h1 className="text-[17px] font-semibold text-gray-900">MetaMe</h1>
+      <h1 className="text-[17px] font-semibold text-gray-900">{title}</h1>
     </header>
   );
 }
