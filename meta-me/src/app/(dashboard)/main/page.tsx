@@ -161,7 +161,7 @@ export default function MainPage() {
         className="relative overflow-hidden rounded-3xl px-5 pt-6 pb-5"
         style={
           completedToday
-            ? { backgroundImage: 'linear-gradient(135deg, #C9CCFF 0%, #FFFFFF 55%, #FFE9A8 100%)' }
+            ? { backgroundImage: 'linear-gradient(135deg, #D9DBFF 0%, #FFFFFF 38%, #FFFFFF 62%, #FFEFC2 100%)' }
             : { backgroundColor: 'white', border: '1px solid #F0F0F0' }
         }
       >
@@ -174,18 +174,20 @@ export default function MainPage() {
           )}
         </h2>
 
-        <div className="relative w-full flex justify-center mb-6">
-          <div className="w-[150px] h-[150px] rounded-full bg-gradient-to-br from-white to-gray-100 shadow-inner flex items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="MetaMe" className="w-16 h-auto opacity-80" />
+        <div className="w-full flex justify-center mb-6">
+          <div className="relative w-[150px] h-[150px]">
+            <div className="w-full h-full rounded-full bg-gradient-to-br from-white to-gray-100 shadow-inner flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="MetaMe" className="w-16 h-auto opacity-80" />
+            </div>
+            {completedToday && (
+              <span className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-[#8287FF] border-4 border-white flex items-center justify-center">
+                <svg width="13" height="10" viewBox="0 0 13 10" fill="none">
+                  <path d="M1 5l3.5 3.5L12 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+            )}
           </div>
-          {completedToday && (
-            <span className="absolute bottom-0 right-[calc(50%-75px)] w-8 h-8 rounded-full bg-[#8287FF] border-4 border-white flex items-center justify-center">
-              <svg width="13" height="10" viewBox="0 0 13 10" fill="none">
-                <path d="M1 5l3.5 3.5L12 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-          )}
         </div>
 
         {streakDays > 0 && (

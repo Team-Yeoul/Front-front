@@ -1,369 +1,550 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useCreateDailyRecord, useGetTodayDailyQuestion } from '@/entities/diary';
-import type { SubmitDailyRecordRequest } from '@/entities/diary';
+import {
+  useGetTodayDailyQuestion,
+  useCreateTailQuestion,
+  useUpdateTailQuestionAnswer,
+  useCreateDailyRecord,
+} from '@/entities/diary';
+import { useGetMyProfile } from '@/entities/user';
+import { useAuthStore } from '@/store';
 
-type Step = 'intro' | 'question' | 'emotion' | 'scene' | 'moment' | 'review' | 'complete';
+type Mode = 'AI' | 'FREE';
+type TurnKey = 'main' | 'tail1' | 'emotion' | 'yesno' | 'tail2' | 'done';
 
-const EMOTION_CHIPS = ['편안함', '뿌듯함', '화남', '우울함', '불안', '무기력', '답답함', '감사', '기쁨', '슬픔', '설렘', '만족감'];
-const ACTIVITY_CHIPS = ['공부', '업무', '운동', '요리', '휴식', '취미', '여행', '쇼핑', '게임', '독서'];
-const COMPANION_CHIPS = ['혼자', '친구', '부모님', '동료', '가족', '연인'];
+interface Msg {
+  id: string;
+  role: 'ai' | 'user';
+  badge?: string;
+  text: string;
+}
+
+const QUESTION_TYPE_LABEL: Record<string, string> = {
+  TIME_CONTEXT: '시간 맥락',
+  GROWTH_CONTEXT: '성장 맥락',
+  DISCOVERY_CONTEXT: '발견 맥락',
+};
 
 const FALLBACK_QUESTION = '오늘 가장 나답다고 느낀 순간은 언제였나요?';
+const FALLBACK_TAIL_1 = '그 순간을 좀 더 자세히 들려줄 수 있나요?';
+const FALLBACK_TAIL_2 = '오늘 고른 감정들, 어떤 상황이었는지 조금 더 이야기해볼까요?';
+const EMOTION_CHIPS = ['몰입', '조급함', '뿌듯함', '지침', '무던함', '편안함', '설렘', '답답함'];
 
-const PAGE_BG = { backgroundImage: 'linear-gradient(to bottom, #E9EAFF, #ffffff 40%)' };
+let uid = 0;
+const nextId = () => `m${++uid}`;
 
-function Chip({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
+function AiOrb({ size = 28 }: { size?: number }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-4 py-2.5 rounded-full text-[14px] font-medium border transition-colors ${
-        selected ? 'bg-[#8287FF] text-white border-[#8287FF]' : 'bg-white text-gray-600 border-gray-200'
-      }`}
-    >
-      {label}
-    </button>
+    <div
+      className="rounded-full shrink-0"
+      style={{
+        width: size,
+        height: size,
+        backgroundImage: 'radial-gradient(circle at 35% 30%, #FFDD8A 0%, #9195F6 42%, #6366F1 78%)',
+      }}
+    />
   );
 }
 
-function StepFooter({
-  onPrev,
-  onNext,
-  nextLabel = '다음으로',
-  nextDisabled = false,
-}: {
-  onPrev?: () => void;
-  onNext: () => void;
-  nextLabel?: string;
-  nextDisabled?: boolean;
-}) {
+function TypingDots() {
   return (
-    <div className="flex gap-2 pt-4">
-      {onPrev && (
-        <button
-          type="button"
-          onClick={onPrev}
-          className="w-24 h-14 rounded-2xl border border-gray-200 text-gray-500 font-semibold text-[15px]"
-        >
-          이전
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={onNext}
-        disabled={nextDisabled}
-        className={`flex-1 h-14 rounded-2xl text-[15px] font-semibold transition-colors ${
-          nextDisabled ? 'bg-gray-200 text-gray-400' : 'bg-gray-900 text-white'
-        }`}
-      >
-        {nextLabel}
-      </button>
+    <div className="flex items-end gap-2">
+      <AiOrb />
+      <div className="bg-white rounded-2xl rounded-bl-sm px-4 py-3.5 flex gap-1 shadow-sm">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="w-1.5 h-1.5 rounded-full bg-gray-300 animate-bounce"
+            style={{ animationDelay: `${i * 120}ms` }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Bubble({ msg, children }: { msg: Msg; children?: React.ReactNode }) {
+  if (msg.role === 'user') {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[80%] bg-[#6366F1] text-white rounded-2xl rounded-br-sm px-4 py-3 text-[14px] leading-relaxed whitespace-pre-line">
+          {msg.text}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start gap-2">
+      <AiOrb />
+      <div className="max-w-[82%] flex flex-col gap-2.5">
+        <div className="bg-white rounded-2xl rounded-bl-sm px-4 py-3.5 shadow-sm">
+          {msg.badge && (
+            <span className="inline-block text-[11px] font-semibold text-[#8A6D00] bg-[#FDE9A8] px-2.5 py-1 rounded-full mb-2">
+              {msg.badge}
+            </span>
+          )}
+          <p className="text-[14px] text-gray-900 leading-relaxed whitespace-pre-line">{msg.text}</p>
+          {children}
+        </div>
+      </div>
     </div>
   );
 }
 
 export default function DiaryPage() {
   const router = useRouter();
-  const { data: questionData } = useGetTodayDailyQuestion();
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const { data: questionData } = useGetTodayDailyQuestion(!!accessToken);
+  const { data: profile } = useGetMyProfile(!!accessToken);
+  const createTailQuestion = useCreateTailQuestion();
+  const updateTailAnswer = useUpdateTailQuestionAnswer();
   const createRecord = useCreateDailyRecord();
 
-  const [step, setStep] = useState<Step>('intro');
-  const [answerType, setAnswerType] = useState<'TEXT' | 'TAGS'>('TEXT');
-  const [userAnswer, setUserAnswer] = useState('');
+  const [started, setStarted] = useState(false);
+  const [mode, setMode] = useState<Mode>('AI');
+  const [freeText, setFreeText] = useState('');
+
+  const [turn, setTurn] = useState<TurnKey>('main');
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [typing, setTyping] = useState(false);
+  const [inputText, setInputText] = useState('');
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
-  const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
-  const [selectedCompanions, setSelectedCompanions] = useState<string[]>([]);
-  const [emotionTag, setEmotionTag] = useState('');
-  const [sceneDescription, setSceneDescription] = useState('');
-  const [isMyselfMoment, setIsMyselfMoment] = useState<boolean | null>(null);
-  const [myselfMomentDesc, setMyselfMomentDesc] = useState('');
+  const [yesNoChoice, setYesNoChoice] = useState<'yes' | 'no' | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [accuracyBefore, setAccuracyBefore] = useState(12);
+  const [accuracyAfter, setAccuracyAfter] = useState(14);
+  const [finalNote, setFinalNote] = useState('');
 
-  const fetchedQuestion = questionData?.question.question_text;
-  const questionText = fetchedQuestion && /[가-힣]/.test(fetchedQuestion) ? fetchedQuestion : FALLBACK_QUESTION;
+  const answers = useRef({ main: '', tail1: '', tail2: '' });
+  const questionIdRef = useRef<string | null>(null);
+  const tail1IdRef = useRef<string | null>(null);
+  const tail2IdRef = useRef<string | null>(null);
 
-  const makeToggle = (setter: React.Dispatch<React.SetStateAction<string[]>>) => (tag: string) => {
-    setter((tags) => (tags.includes(tag) ? tags.filter((t) => t !== tag) : [...tags, tag]));
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages, typing]);
+
+  useEffect(() => {
+    if (profile?.latest_accuracy?.accuracy_percent != null) {
+      setAccuracyBefore(profile.latest_accuracy.accuracy_percent);
+      setAccuracyAfter(profile.latest_accuracy.accuracy_percent + 2);
+    }
+  }, [profile]);
+
+  const rawQuestion = questionData?.question.question_text;
+  const questionText = rawQuestion && /[가-힣]/.test(rawQuestion) ? rawQuestion : FALLBACK_QUESTION;
+  const questionBadge = QUESTION_TYPE_LABEL[questionData?.question.question_type ?? ''] ?? '오늘의 질문';
+  questionIdRef.current = questionData?.question.question_id ?? null;
+
+  const today = new Date();
+  const dateLabel = `${today.getMonth() + 1}월 ${today.getDate()}일`;
+  const nickname = '소희';
+
+  const turnNumber: Record<TurnKey, number> = { main: 1, tail1: 2, emotion: 3, yesno: 4, tail2: 5, done: 5 };
+
+  const appendAi = (badge: string | undefined, text: string) => {
+    setMessages((m) => [...m, { id: nextId(), role: 'ai', badge, text }]);
   };
-  const toggleEmotion = makeToggle(setSelectedEmotions);
-  const toggleActivity = makeToggle(setSelectedActivities);
-  const toggleCompanion = makeToggle(setSelectedCompanions);
-
-  const handleSubmit = () => {
-    const body: SubmitDailyRecordRequest = {
-      answer_type: answerType,
-      user_answer: answerType === 'TEXT' ? userAnswer : undefined,
-      user_answer_tags:
-        answerType === 'TAGS' ? [...selectedEmotions, ...selectedActivities, ...selectedCompanions] : undefined,
-      emotion_tag: emotionTag,
-      scene_description: sceneDescription,
-      is_myself_moment: !!isMyselfMoment,
-      myself_moment_desc: isMyselfMoment ? myselfMomentDesc : undefined,
-    };
-    createRecord.mutate(body, {
-      onSuccess: () => setStep('complete'),
-      onError: () => setStep('complete'),
-    });
+  const appendUser = (text: string) => {
+    setMessages((m) => [...m, { id: nextId(), role: 'user', text }]);
   };
 
-  if (step === 'intro') {
+  const beginChat = () => {
+    setStarted(true);
+    appendAi(questionBadge, questionText);
+  };
+
+  const goTail1 = async () => {
+    setTyping(true);
+    let text = FALLBACK_TAIL_1;
+    try {
+      if (questionIdRef.current) {
+        const res = await createTailQuestion.mutateAsync(questionIdRef.current);
+        tail1IdRef.current = res.tail_question.tail_id;
+        if (res.tail_question.question_text) text = res.tail_question.question_text;
+      }
+    } catch {
+      // 실패해도 대화는 이어감
+    }
+    setTyping(false);
+    appendAi('시간 맥락', text);
+    setTurn('tail1');
+  };
+
+  const goEmotion = () => {
+    appendAi(undefined, '지금 감정을 태그로 골라줄래요? 여러 개도 괜찮아요.');
+    setTurn('emotion');
+  };
+
+  const goYesNo = () => {
+    appendAi(undefined, '오늘 나답다고 느낀 순간이 있었나요?');
+    setTurn('yesno');
+  };
+
+  const goTail2 = async () => {
+    setTyping(true);
+    let text = FALLBACK_TAIL_2;
+    try {
+      if (questionIdRef.current) {
+        const res = await createTailQuestion.mutateAsync(questionIdRef.current);
+        tail2IdRef.current = res.tail_question.tail_id;
+        if (res.tail_question.question_text) text = res.tail_question.question_text;
+      }
+    } catch {
+      // 실패해도 대화는 이어감
+    }
+    setTyping(false);
+    appendAi(`자동 추가 · 태그 ${selectedEmotions.length}개`, text);
+    setTurn('tail2');
+  };
+
+  const finish = async (lastAnswer: string) => {
+    setSaving(true);
+    setTyping(true);
+    try {
+      if (tail1IdRef.current && questionIdRef.current) {
+        await updateTailAnswer.mutateAsync({
+          questionId: questionIdRef.current,
+          tailId: tail1IdRef.current,
+          body: { user_answer: answers.current.tail1 || '패스' },
+        });
+      }
+      if (tail2IdRef.current && questionIdRef.current) {
+        await updateTailAnswer.mutateAsync({
+          questionId: questionIdRef.current,
+          tailId: tail2IdRef.current,
+          body: { user_answer: lastAnswer || '패스' },
+        });
+      }
+      await createRecord.mutateAsync({
+        answer_type: 'TEXT',
+        user_answer: answers.current.main,
+        emotion_tag: selectedEmotions.join(', ') || '기록함',
+        scene_description: answers.current.tail1 || answers.current.main,
+        is_myself_moment: yesNoChoice === 'yes',
+        myself_moment_desc: yesNoChoice === 'yes' ? inputText : undefined,
+      });
+    } catch {
+      // 실패해도 완료 화면은 보여줌
+    }
+    setTyping(false);
+    setFinalNote(
+      selectedEmotions.length > 0
+        ? `'${selectedEmotions[0]} 상태'가 이번 주 들어 자주 보였어요. 문장에 반영해둘게요.`
+        : '오늘 기록을 바탕으로 문장을 업데이트해둘게요.',
+    );
+    setTurn('done');
+    setSaving(false);
+  };
+
+  const handleSend = async () => {
+    if (turn === 'main') {
+      const text = inputText.trim();
+      if (!text) return;
+      answers.current.main = text;
+      appendUser(text);
+      setInputText('');
+      await goTail1();
+      return;
+    }
+    if (turn === 'tail1') {
+      const text = inputText.trim();
+      if (!text) return;
+      answers.current.tail1 = text;
+      appendUser(text);
+      setInputText('');
+      goEmotion();
+      return;
+    }
+    if (turn === 'emotion') {
+      if (selectedEmotions.length === 0) return;
+      appendUser(selectedEmotions.join(', '));
+      goYesNo();
+      return;
+    }
+    if (turn === 'yesno') {
+      if (yesNoChoice === null) return;
+      const text = yesNoChoice === 'yes' ? inputText.trim() : '';
+      if (yesNoChoice === 'yes' && !text) return;
+      appendUser(yesNoChoice === 'yes' ? `있었어요 — ${text}` : '잘 모르겠어요');
+      setInputText('');
+      await goTail2();
+      return;
+    }
+    if (turn === 'tail2') {
+      const text = inputText.trim();
+      if (!text) return;
+      answers.current.tail2 = text;
+      appendUser(text);
+      setInputText('');
+      await finish(text);
+    }
+  };
+
+  const skipTurn = async () => {
+    if (turn === 'main') {
+      answers.current.main = '오늘은 특별히 떠오르는 게 없어요';
+      appendUser('건너뛰기');
+      await goTail1();
+    } else if (turn === 'tail1') {
+      appendUser('건너뛰기');
+      goEmotion();
+    } else if (turn === 'tail2') {
+      appendUser('건너뛰기');
+      await finish('');
+    }
+  };
+
+  const submitFree = async () => {
+    const text = freeText.trim();
+    if (!text) return;
+    setSaving(true);
+    try {
+      await createRecord.mutateAsync({
+        answer_type: 'TEXT',
+        user_answer: text,
+        emotion_tag: '자유 기록',
+        scene_description: text,
+        is_myself_moment: false,
+      });
+    } catch {
+      // 실패해도 완료 화면은 보여줌
+    }
+    setSaving(false);
+    setFinalNote('자유롭게 남겨주신 기록, 잘 저장해뒀어요.');
+    setStarted(true);
+    setTurn('done');
+  };
+
+  // ── 완료 화면 ──
+  if (turn === 'done') {
     return (
-      <div className="flex flex-col h-full px-5 pt-8 pb-6" style={PAGE_BG}>
-        <div className="flex-1 flex flex-col items-center justify-center text-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/Group.png" alt="질문" width={72} height={66} className="mb-6" />
-          <p className="text-[18px] font-bold text-gray-900 leading-snug">
-            안녕하세요, 여울님
-            <br />
-            오늘의 나를 기록해볼까요?
-          </p>
-          <p className="text-[13px] text-gray-400 mt-4 leading-relaxed">
-            최근 사람들 반응을 자주 언급했어요
-            <br />
-            오늘도 그런 순간이 있었나요?
-          </p>
+      <div className="flex flex-col h-full bg-[#F4F3FA] px-5 pt-6 pb-6">
+        <p className="text-[13px] text-gray-400 mb-2">{dateLabel}</p>
+        <p className="text-[20px] font-bold text-gray-900 leading-snug mb-6">
+          오늘의 기록 정리됐어요.
+          <br />
+          오늘 하루도 수고 많으셨어요!
+        </p>
+
+        <div className="bg-white rounded-2xl px-5 py-5 mb-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[14px] font-semibold text-gray-900">오늘 기록 정리됨</p>
+            <p className="text-[13px] font-semibold text-[#6366F1]">
+              정확도 {accuracyBefore}% → {accuracyAfter}%
+            </p>
+          </div>
+          <div className="h-1.5 rounded-full bg-gray-100 mb-3">
+            <div
+              className="h-full rounded-full bg-[#6366F1]"
+              style={{ width: `${Math.min(100, accuracyAfter)}%` }}
+            />
+          </div>
+          <p className="text-[13px] text-gray-500 leading-relaxed">{finalNote}</p>
         </div>
-        <StepFooter onNext={() => setStep('question')} nextLabel="오늘 기록하기" />
+
+        <button
+          onClick={() => router.push('/main')}
+          className="mt-auto w-full h-14 bg-gray-900 text-white rounded-2xl text-[15px] font-semibold"
+        >
+          완료하기
+        </button>
       </div>
     );
   }
 
-  if (step === 'question') {
-    const nextDisabled =
-      answerType === 'TEXT'
-        ? userAnswer.trim().length === 0
-        : selectedEmotions.length === 0 || selectedActivities.length === 0 || selectedCompanions.length === 0;
+  // ── 시작 화면 ──
+  if (!started) {
     return (
-      <div className="flex flex-col h-full px-5 pt-6 pb-6" style={PAGE_BG}>
-        <p className="text-[22px] font-bold text-gray-900 leading-snug mb-6">{questionText}</p>
-
-        <div className="flex bg-gray-100 rounded-xl p-1 mb-5">
-          <button
-            type="button"
-            onClick={() => setAnswerType('TEXT')}
-            className={`flex-1 h-11 rounded-lg text-[14px] font-medium transition-colors ${
-              answerType === 'TEXT' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'
-            }`}
-          >
-            텍스트
+      <div
+        className="flex flex-col h-full px-6 pt-6 pb-6"
+        style={{ backgroundImage: 'linear-gradient(160deg, #F3E7D6 0%, #ECE9F6 45%, #DADFFB 100%)' }}
+      >
+        <div className="flex items-center mb-4">
+          <button onClick={() => router.push('/main')} className="w-7 h-7 flex items-center justify-center -ml-1">
+            <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+              <path d="M7 1L1 7l6 6" stroke="#6B7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
-          <button
-            type="button"
-            onClick={() => setAnswerType('TAGS')}
-            className={`flex-1 h-11 rounded-lg text-[14px] font-medium transition-colors ${
-              answerType === 'TAGS' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'
-            }`}
-          >
-            태그
-          </button>
+          <span className="flex-1 text-center text-[13px] text-gray-500 -ml-7">{dateLabel} {['일','월','화','수','목','금','토'][today.getDay()]}요일</span>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          {answerType === 'TEXT' ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center gap-6">
+          <div
+            className="w-[170px] h-[170px] rounded-full"
+            style={{ backgroundImage: 'radial-gradient(circle at 38% 32%, #FFDD8A 0%, #8B90F5 45%, #5457E8 80%)' }}
+          />
+          <p className="text-[19px] font-bold text-gray-900 leading-snug">
+            {nickname}님, 오늘 하루는
+            <br />
+            어떤 장면으로 남았나요?
+          </p>
+        </div>
+
+        <div className="bg-white/70 backdrop-blur rounded-2xl p-3">
+          {mode === 'FREE' ? (
             <textarea
-              value={userAnswer}
-              onChange={(e) => setUserAnswer(e.target.value)}
-              placeholder="이곳에 편안하고 자유롭게 적어보세요"
-              className="w-full h-52 border border-gray-200 rounded-2xl p-5 text-[15px] text-gray-900 outline-none placeholder:text-gray-300 resize-none"
+              value={freeText}
+              onChange={(e) => setFreeText(e.target.value)}
+              placeholder="오늘 하루를 자유롭게 적어보세요"
+              className="w-full h-24 bg-transparent outline-none text-[14px] text-gray-900 placeholder:text-gray-400 resize-none mb-2"
             />
           ) : (
-            <div className="flex flex-col gap-6">
-              <div>
-                <p className="text-[14px] font-semibold text-gray-700 mb-2.5">오늘 감정을 느꼈나요?</p>
-                <div className="flex flex-wrap gap-2.5">
-                  {EMOTION_CHIPS.map((c) => (
-                    <Chip key={c} label={c} selected={selectedEmotions.includes(c)} onClick={() => toggleEmotion(c)} />
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="text-[14px] font-semibold text-gray-700 mb-2.5">가장 기억에 남는 활동은 무엇인가요?</p>
-                <div className="flex flex-wrap gap-2.5">
-                  {ACTIVITY_CHIPS.map((c) => (
-                    <Chip key={c} label={c} selected={selectedActivities.includes(c)} onClick={() => toggleActivity(c)} />
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="text-[14px] font-semibold text-gray-700 mb-2.5">누구랑 함께했나요?</p>
-                <div className="flex flex-wrap gap-2.5">
-                  {COMPANION_CHIPS.map((c) => (
-                    <Chip key={c} label={c} selected={selectedCompanions.includes(c)} onClick={() => toggleCompanion(c)} />
-                  ))}
-                </div>
-              </div>
-            </div>
+            <p className="text-[13px] text-gray-400 px-1 py-3">
+              {questionData ? '질문이 도착했어요' : '첫 질문을 기다리는 중'}
+            </p>
           )}
-        </div>
-
-        <StepFooter onPrev={() => setStep('intro')} onNext={() => setStep('emotion')} nextDisabled={nextDisabled} />
-      </div>
-    );
-  }
-
-  if (step === 'emotion') {
-    return (
-      <div className="flex flex-col h-full px-5 pt-6 pb-6" style={PAGE_BG}>
-        <p className="text-[22px] font-bold text-gray-900 leading-snug mb-6">지금 감정을 한 단어로 표현해주세요</p>
-
-        <textarea
-          value={emotionTag}
-          onChange={(e) => setEmotionTag(e.target.value)}
-          placeholder="지금 마음을 한 단어로 적어보세요"
-          className="w-full h-20 border border-gray-200 rounded-2xl p-5 text-[15px] text-gray-900 outline-none placeholder:text-gray-300 resize-none mb-6"
-        />
-
-        <div className="flex-1 overflow-y-auto">
-          <div className="flex flex-wrap gap-2.5">
-            {EMOTION_CHIPS.map((c) => (
-              <Chip key={c} label={c} selected={emotionTag === c} onClick={() => setEmotionTag(c)} />
-            ))}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setMode('AI')}
+              className={`flex items-center gap-1.5 text-[12px] font-medium px-3 py-2 rounded-full transition-colors ${
+                mode === 'AI' ? 'bg-[#6366F1] text-white' : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-current" /> AI 질문
+            </button>
+            <button
+              onClick={() => setMode('FREE')}
+              className={`text-[12px] font-medium px-3 py-2 rounded-full transition-colors ${
+                mode === 'FREE' ? 'bg-[#6366F1] text-white' : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              자유 기록
+            </button>
+            <button
+              onClick={mode === 'FREE' ? submitFree : beginChat}
+              disabled={mode === 'FREE' ? !freeText.trim() || saving : false}
+              className="ml-auto w-10 h-10 rounded-full bg-[#6366F1] text-white flex items-center justify-center shrink-0 disabled:opacity-40"
+              aria-label="보내기"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M12 19V5M5 12l7-7 7 7" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
           </div>
         </div>
-
-        <StepFooter
-          onPrev={() => setStep('question')}
-          onNext={() => setStep('scene')}
-          nextDisabled={emotionTag.trim().length === 0}
-        />
       </div>
     );
   }
 
-  if (step === 'scene') {
-    return (
-      <div className="flex flex-col h-full px-5 pt-6 pb-6" style={PAGE_BG}>
-        <p className="text-[22px] font-bold text-gray-900 leading-snug mb-6">
-          오늘 하신 활동 중 가장 선명하게 기억나는 장면은?
-        </p>
-        <textarea
-          value={sceneDescription}
-          onChange={(e) => setSceneDescription(e.target.value)}
-          placeholder={'선명한 장면을 설명해주세요. 예를 들면:\n"오늘 팀장님이 갑자기 나를 불러서 칭찬을 했다"'}
-          className="w-full flex-1 border border-gray-200 rounded-2xl p-5 text-[15px] text-gray-900 outline-none placeholder:text-gray-300 resize-none"
-        />
-        <StepFooter
-          onPrev={() => setStep('emotion')}
-          onNext={() => setStep('moment')}
-          nextDisabled={sceneDescription.trim().length === 0}
-        />
-      </div>
-    );
-  }
-
-  if (step === 'moment') {
-    const nextDisabled = isMyselfMoment === null || (isMyselfMoment && myselfMomentDesc.trim().length === 0);
-    return (
-      <div className="flex flex-col h-full px-5 pt-6 pb-6" style={PAGE_BG}>
-        <p className="text-[22px] font-bold text-gray-900 leading-snug mb-6">
-          오늘 돌아보았을 때 나답다고 느낀 순간이 있었나요?
-        </p>
-
-        <div className="flex gap-2.5 mb-5">
-          <button
-            type="button"
-            onClick={() => setIsMyselfMoment(true)}
-            className={`flex-1 h-14 rounded-xl text-[15px] font-semibold border transition-colors ${
-              isMyselfMoment === true ? 'bg-[#8287FF] text-white border-[#8287FF]' : 'bg-white border-gray-200 text-gray-500'
-            }`}
-          >
-            있었어요!
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsMyselfMoment(false)}
-            className={`flex-1 h-14 rounded-xl text-[15px] font-semibold border transition-colors ${
-              isMyselfMoment === false ? 'bg-[#8287FF] text-white border-[#8287FF]' : 'bg-white border-gray-200 text-gray-500'
-            }`}
-          >
-            없었어요
-          </button>
-        </div>
-
-        {isMyselfMoment && (
-          <textarea
-            value={myselfMomentDesc}
-            onChange={(e) => setMyselfMomentDesc(e.target.value)}
-            placeholder="어떤 순간이었는지 들려주세요"
-            className="w-full flex-1 border border-gray-200 rounded-2xl p-5 text-[15px] text-gray-900 outline-none placeholder:text-gray-300 resize-none"
-          />
-        )}
-        {!isMyselfMoment && <div className="flex-1" />}
-
-        <StepFooter
-          onPrev={() => setStep('scene')}
-          onNext={() => setStep('review')}
-          nextLabel="저장하기"
-          nextDisabled={nextDisabled}
-        />
-      </div>
-    );
-  }
-
-  if (step === 'review') {
-    return (
-      <div className="flex flex-col h-full px-5 pt-6 pb-6" style={PAGE_BG}>
-        <p className="text-[22px] font-bold text-gray-900 leading-snug mb-6">
-          나답다고 느꼈던 그 순간을 공유해봐요!
-        </p>
-        <div className="flex-1 bg-gray-50 rounded-2xl p-5 overflow-y-auto">
-          <p className="text-[13px] text-gray-400 mb-1">오늘의 감정</p>
-          <p className="text-[15px] font-semibold text-gray-900 mb-4">{emotionTag}</p>
-          <p className="text-[13px] text-gray-400 mb-1">기억나는 장면</p>
-          <p className="text-[14px] text-gray-700 mb-4 leading-relaxed">{sceneDescription}</p>
-          {isMyselfMoment && (
-            <>
-              <p className="text-[13px] text-gray-400 mb-1">나다움을 느낀 순간</p>
-              <p className="text-[14px] text-gray-700 leading-relaxed">{myselfMomentDesc}</p>
-            </>
-          )}
-        </div>
-        <StepFooter
-          onPrev={() => setStep('moment')}
-          onNext={handleSubmit}
-          nextLabel={createRecord.isPending ? '저장 중...' : '이어가기'}
-          nextDisabled={createRecord.isPending}
-        />
-      </div>
-    );
-  }
-
-  const todayLabel = new Date().toLocaleDateString('sv-SE').replaceAll('-', '.');
-  const daySummary = [sceneDescription, isMyselfMoment ? myselfMomentDesc : ''].filter(Boolean).join('\n\n');
+  // ── 대화 화면 ──
+  const canSend =
+    turn === 'main' || turn === 'tail1' || turn === 'tail2'
+      ? inputText.trim().length > 0
+      : turn === 'emotion'
+        ? selectedEmotions.length > 0
+        : yesNoChoice === 'yes'
+          ? inputText.trim().length > 0
+          : yesNoChoice === 'no';
 
   return (
-    <div className="flex flex-col h-full px-5 pt-8 pb-6" style={PAGE_BG}>
-      <p className="text-[13px] text-gray-400 mb-2">{todayLabel}</p>
-      <p className="text-[22px] font-bold text-gray-900 leading-snug mb-6">
-        오늘의 기록 완료.
-        <br />
-        오늘 하루도 수고 많으셨어요!
-      </p>
-
-      <div className="bg-[#8287FF] rounded-2xl px-5 py-5 flex mb-7">
-        <div className="flex-1">
-          <p className="text-[12px] text-white/70 mb-1">기록 깊이</p>
-          <p className="text-[20px] font-bold text-white">+12XP</p>
-        </div>
-        <div className="w-px bg-white/20 mx-2" />
-        <div className="flex-1">
-          <p className="text-[12px] text-white/70 mb-1">객관화 정확도</p>
-          <p className="text-[20px] font-bold text-white">+1%</p>
-        </div>
+    <div className="flex flex-col h-full bg-[#F4F3FA]">
+      <div className="flex items-center justify-between px-5 pt-6 pb-3">
+        <button onClick={() => router.push('/main')} className="w-7 h-7 flex items-center justify-center -ml-1">
+          <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+            <path d="M7 1L1 7l6 6" stroke="#6B7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <span className="text-[13px] font-medium text-gray-600">오늘의 대화 · {dateLabel}</span>
+        <span className="text-[12px] font-semibold text-[#6366F1] w-8 text-right">{turnNumber[turn]}/5</span>
       </div>
 
-      <p className="text-[15px] font-semibold text-gray-900 mb-3">여울님의 오늘 하루는 이랬어요.</p>
-      <div className="flex-1 bg-gray-50 rounded-2xl p-5 overflow-y-auto mb-6">
-        {daySummary ? (
-          <p className="text-[14px] text-gray-700 leading-relaxed whitespace-pre-line">{daySummary}</p>
-        ) : (
-          <p className="text-[14px] text-gray-300">여기에 간략하게 내용 넣기</p>
+      <div ref={listRef} className="flex-1 overflow-y-auto px-5 pb-4 flex flex-col gap-4">
+        {messages.map((m) => (
+          <Bubble key={m.id} msg={m}>
+            {m.role === 'ai' && turn === 'emotion' && m.id === messages[messages.length - 1]?.id && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {EMOTION_CHIPS.map((c) => {
+                  const selected = selectedEmotions.includes(c);
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() =>
+                        setSelectedEmotions((cur) =>
+                          cur.includes(c) ? cur.filter((x) => x !== c) : cur.length >= 3 ? cur : [...cur, c],
+                        )
+                      }
+                      className={`text-[13px] font-medium px-3.5 py-2 rounded-full border transition-colors ${
+                        selected ? 'bg-[#6366F1] text-white border-[#6366F1]' : 'bg-gray-50 text-gray-500 border-gray-200'
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  );
+                })}
+                <p className="w-full text-[11px] text-gray-400 mt-1">
+                  {selectedEmotions.length}개 선택됨 · 아래에서 보내기
+                </p>
+              </div>
+            )}
+            {m.role === 'ai' && turn === 'yesno' && m.id === messages[messages.length - 1]?.id && (
+              <div className="flex gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setYesNoChoice('yes')}
+                  className={`flex-1 h-11 rounded-xl text-[13px] font-semibold border transition-colors ${
+                    yesNoChoice === 'yes' ? 'border-[#6366F1] text-[#6366F1]' : 'border-gray-200 text-gray-500'
+                  }`}
+                >
+                  있었어요
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setYesNoChoice('no');
+                    setInputText('');
+                  }}
+                  className={`flex-1 h-11 rounded-xl text-[13px] font-semibold border transition-colors ${
+                    yesNoChoice === 'no' ? 'border-[#6366F1] text-[#6366F1]' : 'border-gray-200 text-gray-500'
+                  }`}
+                >
+                  잘 모르겠어요
+                </button>
+              </div>
+            )}
+          </Bubble>
+        ))}
+        {typing && <TypingDots />}
+      </div>
+
+      <div className="px-5 pb-6 pt-2 bg-[#F4F3FA]">
+        <div className="flex items-center gap-2 bg-white rounded-2xl px-4 py-2.5 shadow-sm">
+          <input
+            value={turn === 'yesno' && yesNoChoice !== 'yes' ? '' : inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            disabled={turn === 'emotion' || (turn === 'yesno' && yesNoChoice !== 'yes')}
+            placeholder={
+              turn === 'emotion'
+                ? '위에서 감정을 선택해주세요'
+                : turn === 'yesno' && yesNoChoice !== 'yes'
+                  ? '선택지를 골라주세요'
+                  : turn === 'yesno'
+                    ? '어떤 순간이었는지 적어보세요'
+                    : '답을 적어보세요'
+            }
+            className="flex-1 text-[14px] outline-none placeholder:text-gray-300 disabled:bg-transparent"
+          />
+          <button
+            onClick={handleSend}
+            disabled={!canSend || saving}
+            className="w-9 h-9 rounded-full bg-[#6366F1] text-white flex items-center justify-center shrink-0 disabled:opacity-40"
+            aria-label="보내기"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <path d="M12 19V5M5 12l7-7 7 7" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+        {(turn === 'main' || turn === 'tail1' || turn === 'tail2') && (
+          <button onClick={skipTurn} className="text-[12px] text-gray-400 mt-2.5 ml-1">
+            건너뛰기
+          </button>
         )}
       </div>
-
-      <StepFooter onNext={() => router.push('/main')} nextLabel="완료하기" />
     </div>
   );
 }
