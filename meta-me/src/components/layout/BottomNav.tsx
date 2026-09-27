@@ -18,6 +18,7 @@ const tabs = [
           strokeLinecap="round"
           strokeLinejoin="round"
         />
+        {active && <rect x="14.5" y="4.5" width="2.2" height="3.6" rx="0.4" fill={color} />}
       </svg>
     ),
   },
@@ -68,8 +69,8 @@ export function BottomNav() {
             <Link key={tab.href} href={tab.href} className="relative flex-1 flex items-center justify-center">
               {active && (
                 <span
-                  className="absolute w-14 h-14 rounded-full pointer-events-none"
-                  style={{ backgroundImage: 'radial-gradient(circle, rgba(99,102,241,0.14) 0%, rgba(99,102,241,0) 70%)' }}
+                  className="absolute w-20 h-20 rounded-full pointer-events-none"
+                  style={{ backgroundImage: 'radial-gradient(circle, rgba(99,102,241,0.16) 0%, rgba(99,102,241,0) 65%)' }}
                 />
               )}
               <div className="relative flex flex-col items-center gap-1.5">
