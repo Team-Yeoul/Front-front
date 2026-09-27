@@ -1,18 +1,82 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-
-function toDateString(year: number, month: number, day: number) {
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
+const ITEM_HEIGHT = 40;
+const VISIBLE_ROWS = 5;
+const PAD_ROWS = Math.floor(VISIBLE_ROWS / 2);
 
 function parseValue(value: string) {
   if (!value) return null;
   const [y, m, d] = value.split('-').map(Number);
   if (!y || !m || !d) return null;
   return { year: y, month: m, day: d };
+}
+
+function daysInMonth(year: number, month: number) {
+  return new Date(year, month, 0).getDate();
+}
+
+function WheelColumn({
+  items,
+  selected,
+  onChange,
+  unit,
+}: {
+  items: number[];
+  selected: number;
+  onChange: (value: number) => void;
+  unit: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const scrollingRef = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || scrollingRef.current) return;
+    const index = items.indexOf(selected);
+    if (index >= 0) el.scrollTop = index * ITEM_HEIGHT;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length]);
+
+  const timerRef = useRef<number | undefined>(undefined);
+
+  const handleScroll = () => {
+    scrollingRef.current = true;
+    const el = ref.current;
+    if (!el) return;
+    window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => {
+      const index = Math.round(el.scrollTop / ITEM_HEIGHT);
+      const clamped = Math.max(0, Math.min(items.length - 1, index));
+      if (el.scrollTop !== clamped * ITEM_HEIGHT) el.scrollTop = clamped * ITEM_HEIGHT;
+      scrollingRef.current = false;
+      const value = items[clamped];
+      if (value !== undefined && value !== selected) onChange(value);
+    }, 120);
+  };
+
+  return (
+    <div className="relative flex-1">
+      <div
+        ref={ref}
+        onScroll={handleScroll}
+        className="h-[200px] overflow-y-auto snap-y snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ paddingBlock: PAD_ROWS * ITEM_HEIGHT }}
+      >
+        {items.map((n) => (
+          <div
+            key={n}
+            className="h-10 flex items-center justify-center snap-center text-[16px]"
+            style={{ color: n === selected ? '#111827' : '#C7CBD4', fontWeight: n === selected ? 700 : 400 }}
+          >
+            {n}
+            {unit}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function DatePicker({
@@ -32,104 +96,59 @@ export function DatePicker({
   const today = new Date();
   const effectiveMaxYear = maxYear ?? today.getFullYear();
   const [open, setOpen] = useState(false);
-  const [cursor, setCursor] = useState({
-    year: parsed?.year ?? effectiveMaxYear - 20,
-    month: parsed?.month ?? today.getMonth() + 1,
-  });
+  const [draft, setDraft] = useState(
+    parsed ?? { year: effectiveMaxYear - 20, month: today.getMonth() + 1, day: today.getDate() },
+  );
 
-  const years = Array.from({ length: effectiveMaxYear - minYear + 1 }, (_, i) => effectiveMaxYear - i);
-  const daysInMonth = new Date(cursor.year, cursor.month, 0).getDate();
-  const firstWeekday = new Date(cursor.year, cursor.month - 1, 1).getDay();
-  const cells = [...Array(firstWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  useEffect(() => {
+    if (open) setDraft(parsed ?? { year: effectiveMaxYear - 20, month: today.getMonth() + 1, day: today.getDate() });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
-  const displayLabel = parsed ? `${parsed.year}. ${String(parsed.month).padStart(2, '0')}. ${String(parsed.day).padStart(2, '0')}.` : '';
+  const years = Array.from({ length: effectiveMaxYear - minYear + 1 }, (_, i) => minYear + i);
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const dayCount = daysInMonth(draft.year, draft.month);
+  const days = Array.from({ length: dayCount }, (_, i) => i + 1);
 
-  const selectDay = (day: number) => {
-    onChange(toDateString(cursor.year, cursor.month, day));
+  const displayLabel = parsed
+    ? `${parsed.year}. ${String(parsed.month).padStart(2, '0')}. ${String(parsed.day).padStart(2, '0')}.`
+    : '';
+
+  const confirm = () => {
+    const day = Math.min(draft.day, daysInMonth(draft.year, draft.month));
+    onChange(`${draft.year}-${String(draft.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
     setOpen(false);
   };
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex-1 text-left text-[15px] bg-transparent outline-none"
-      >
+      <button type="button" onClick={() => setOpen(true)} className="flex-1 text-left text-[15px] bg-transparent outline-none">
         <span className={displayLabel ? 'text-gray-900' : 'text-gray-300'}>{displayLabel || placeholder}</span>
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div onClick={() => setOpen(false)} className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-[520px] bg-white rounded-t-3xl overflow-hidden">
+          <div className="relative w-full max-w-[520px] bg-white rounded-t-3xl overflow-hidden pb-[env(safe-area-inset-bottom)]">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+              <button onClick={() => setOpen(false)} className="text-[14px] text-gray-400 w-14 text-left">
+                취소
+              </button>
               <h2 className="text-[16px] font-bold text-gray-900">생년월일 선택</h2>
-              <button onClick={() => setOpen(false)} className="-mr-2 p-2" aria-label="닫기">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M6 6l12 12M18 6L6 18" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" />
-                </svg>
+              <button onClick={confirm} className="text-[14px] font-semibold text-[#8287FF] w-14 text-right">
+                완료
               </button>
             </div>
 
-            <div className="flex items-center gap-2 px-5 pt-4 pb-2">
-              <div className="relative flex-1">
-                <select
-                  value={cursor.year}
-                  onChange={(e) => setCursor((c) => ({ ...c, year: Number(e.target.value) }))}
-                  className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-3 text-[14px] font-semibold text-gray-900 outline-none appearance-none"
-                >
-                  {years.map((y) => (
-                    <option key={y} value={y}>
-                      {y}년
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="relative flex-1">
-                <select
-                  value={cursor.month}
-                  onChange={(e) => setCursor((c) => ({ ...c, month: Number(e.target.value) }))}
-                  className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-3 text-[14px] font-semibold text-gray-900 outline-none appearance-none"
-                >
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                    <option key={m} value={m}>
-                      {m}월
-                    </option>
-                  ))}
-                </select>
+            <div className="relative px-5 py-2">
+              <div className="pointer-events-none absolute left-5 right-5 top-1/2 -translate-y-1/2 h-10 rounded-xl bg-gray-100" />
+              <div className="flex">
+                <WheelColumn items={years} selected={draft.year} unit="년" onChange={(year) => setDraft((d) => ({ ...d, year }))} />
+                <WheelColumn items={months} selected={draft.month} unit="월" onChange={(month) => setDraft((d) => ({ ...d, month }))} />
+                <WheelColumn items={days} selected={draft.day} unit="일" onChange={(day) => setDraft((d) => ({ ...d, day }))} />
               </div>
             </div>
-
-            <div className="px-5 pb-6 pt-2">
-              <div className="grid grid-cols-7 gap-y-2">
-                {WEEKDAYS.map((w, i) => (
-                  <span
-                    key={w}
-                    className={`text-[12px] text-center font-medium py-1 ${i === 0 ? 'text-[#c94f80]' : 'text-gray-400'}`}
-                  >
-                    {w}
-                  </span>
-                ))}
-                {cells.map((day, i) => {
-                  if (day === null) return <span key={`empty-${i}`} />;
-                  const isSelected = parsed?.year === cursor.year && parsed.month === cursor.month && parsed.day === day;
-                  return (
-                    <div key={day} className="flex items-center justify-center py-0.5">
-                      <button
-                        type="button"
-                        onClick={() => selectDay(day)}
-                        className={`w-9 h-9 rounded-full flex items-center justify-center text-[13px] transition-colors ${
-                          isSelected ? 'bg-[#8287FF] text-white font-semibold' : 'text-gray-700 hover:bg-gray-100'
-                        }`}
-                      >
-                        {day}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <div className="pb-6" />
           </div>
         </div>
       )}
