@@ -133,6 +133,7 @@ export default function OnboardingPage() {
           ) : undefined
         }
         ctaLabel={introIndex === INTRO_SLIDES.length - 1 ? '첫 질문 보기' : undefined}
+        align="left"
         onNext={goNext}
         onSkip={() => setStep('notification')}
         dotIndex={introIndex}
@@ -173,13 +174,16 @@ export default function OnboardingPage() {
           </span>
         </div>
 
-        <div className="px-6 pb-2">
-          <div className="h-1 rounded-full bg-gray-100">
+        <div className="px-6 pb-2 flex items-center gap-2">
+          <div className="flex-1 h-1 rounded-full bg-gray-100">
             <div
               className="h-full rounded-full bg-[#8287FF] transition-all"
               style={{ width: `${((surveyIndex + 1) / SURVEY_QUESTIONS.length) * 100}%` }}
             />
           </div>
+          <span className="text-[11px] font-semibold text-[#8287FF] shrink-0">
+            {Math.round(((surveyIndex + 1) / SURVEY_QUESTIONS.length) * 100)}%
+          </span>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 pt-4">

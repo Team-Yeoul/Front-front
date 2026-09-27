@@ -170,11 +170,7 @@ export default function MainPage() {
           {completedToday ? (
             '오늘의 기록을 완료했어요'
           ) : (
-            <>
-              {nickname}님, 오늘 하루는
-              <br />
-              {prompt}
-            </>
+            `${nickname}님, ${prompt}`
           )}
         </h2>
 
@@ -198,16 +194,18 @@ export default function MainPage() {
           </p>
         )}
 
-        {completedToday ? (
+        {streakDays > 0 ? (
           <div className="flex items-center justify-between">
-            <span className="text-[15px] font-semibold text-gray-900">새로운 기록 남기기</span>
+            <span className="text-[15px] font-semibold text-gray-900">
+              {completedToday ? '새로운 기록 남기기' : '오늘 기록 이어가기'}
+            </span>
             <button
               onClick={() => router.push('/diary')}
               className="w-11 h-11 rounded-full bg-gray-900 flex items-center justify-center shrink-0"
-              aria-label="새로운 기록 남기기"
+              aria-label={completedToday ? '새로운 기록 남기기' : '오늘 기록 이어가기'}
             >
-              <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
-                <path d="M1 6h11M7 1l5 5-5 5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <svg width="8" height="13" viewBox="0 0 8 13" fill="none">
+                <path d="M1 1.5L6.5 6.5L1 11.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
           </div>

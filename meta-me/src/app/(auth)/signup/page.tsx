@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSignup, userApi } from '@/entities/user';
@@ -20,9 +20,10 @@ export default function SignupPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const loading = signupMutation.isPending;
+  const submittedRef = useRef(false);
 
   useEffect(() => {
-    if (!service || !privacy) router.replace('/terms');
+    if (!submittedRef.current && (!service || !privacy)) router.replace('/terms');
   }, [service, privacy, router]);
 
   const emailValid = email.includes('@') && email.includes('.');
@@ -41,6 +42,7 @@ export default function SignupPage() {
       } catch {
         // 알림 설정 저장 실패는 가입 자체를 막지 않음
       }
+      submittedRef.current = true;
       resetTerms();
       router.push('/onboarding');
     } catch {

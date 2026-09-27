@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store';
 import { useListDailyRecords } from '@/entities/diary';
 import { DetailHeader } from '@/components/report/DetailHeader';
 import { MonthCalendar } from '@/components/home/MonthCalendar';
+import { BottomNav } from '@/components/layout/BottomNav';
 
 const MOCK_WRITTEN_DAYS = [2, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20, 21, 23, 24];
 const MOCK_ATTENDED_DAYS = [4, 5];
@@ -59,9 +60,14 @@ export default function ChallengePage() {
           챌린지 내용 보기
         </button>
 
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[12px] text-gray-400">내 달성률</span>
-          <span className="text-[18px] font-bold text-gray-900">{achievedRate}%</span>
+        <div className="flex items-end justify-between mb-2">
+          <span className="text-[15px] font-bold text-gray-900">
+            {achievedCount} / {daysInMonth} 일
+          </span>
+          <div className="text-right">
+            <p className="text-[12px] text-gray-400">내 달성률</p>
+            <p className="text-[18px] font-bold text-gray-900">{achievedRate}%</p>
+          </div>
         </div>
         <div className="h-2 rounded-full bg-gray-100 mb-5">
           <div className="h-full rounded-full bg-[#8287FF]" style={{ width: `${Math.min(100, achievedRate)}%` }} />
@@ -77,10 +83,6 @@ export default function ChallengePage() {
           <div className="flex items-center justify-between">
             <span className="text-[12px] text-gray-400">기록 주기</span>
             <span className="text-[13px] text-gray-800">매일</span>
-          </div>
-          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-            <span className="text-[12px] text-gray-400">달성일</span>
-            <span className="text-[13px] text-gray-800">{achievedCount} / {daysInMonth}일</span>
           </div>
         </div>
 
@@ -106,6 +108,8 @@ export default function ChallengePage() {
           todayDay={isCurrentMonth ? today.getDate() : undefined}
         />
       </div>
+
+      <BottomNav />
     </div>
   );
 }

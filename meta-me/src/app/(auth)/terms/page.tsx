@@ -126,10 +126,13 @@ export default function TermsPage() {
   return (
     <div className="flex flex-col min-h-full bg-gray-100">
       {/* 뒤로가기 */}
-      <div className="px-5 pt-6 pb-1">
-        <Link href="/login" className="inline-flex items-center justify-center w-8 h-8">
-          <svg width="10" height="16" viewBox="0 0 10 16" fill="none">
-            <path d="M8.5 1.5L1.5 8L8.5 14.5" stroke="#1C1C1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <div className="px-5 pt-4 pb-3">
+        <Link
+          href="/login"
+          className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-gray-100"
+        >
+          <svg width="9" height="15" viewBox="0 0 9 15" fill="none">
+            <path d="M8 1.5L1.5 7.5L8 13.5" stroke="#1C1C1E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </Link>
       </div>
