@@ -31,12 +31,15 @@ export default function ReportSummaryPage() {
       nextHref="/report/emotion"
     >
       <div className="bg-white border border-gray-100 rounded-3xl px-5 py-6 mb-5 shadow-sm flex flex-col items-center">
-        <p className="text-[13px] text-gray-400 mb-4">문장 정확도</p>
         <DonutChart
+          centerTopLabel="문장 정확도"
           centerLabel={`${summary.accuracyPercent}%`}
           centerSubLabel={`▲ ${summary.accuracyDeltaPercent}%p`}
           colors={['#8287FF', '#F5D949']}
           total={100}
+          size={160}
+          stroke={20}
+          legendPosition="below"
           segments={[
             { label: '이번 주', value: baseline, displayValue: `${summary.accuracyPercent}%` },
             { label: '지난주 증가분', value: summary.accuracyDeltaPercent, displayValue: `${summary.accuracyDeltaPercent}%p` },
