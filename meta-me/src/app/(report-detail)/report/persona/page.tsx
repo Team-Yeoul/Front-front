@@ -46,7 +46,6 @@ export default function PersonaDetailPage() {
       title="나의 성향 지도"
       step={4}
       total={5}
-      backHref="/report/keywords"
       nextHref="/report/action"
     >
       <div className="flex gap-6 border-b border-gray-100 mb-5 -mt-1">

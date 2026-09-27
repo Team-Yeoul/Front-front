@@ -28,7 +28,6 @@ export default function ReportSummaryPage() {
       subtitle={summary.aiIntro}
       step={1}
       total={5}
-      backHref="/report"
       nextHref="/report/emotion"
     >
       <div className="bg-white border border-gray-100 rounded-3xl px-5 py-6 mb-5 shadow-sm flex flex-col items-center">
