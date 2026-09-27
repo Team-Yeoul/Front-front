@@ -136,9 +136,9 @@ export default function MainPage() {
   const hasRealRecent = !!accessToken && !!recent && recent.records.length > 0;
 
   return (
-    <div className="flex flex-col h-full bg-[#F2F2F7] px-5 pb-6 gap-6 overflow-y-auto">
+    <div className="flex flex-col h-full bg-[#F2F2F7] px-5 pb-6 gap-5 overflow-y-auto">
       {/* 주간 스트립 */}
-      <div className="flex items-center justify-between mt-5">
+      <div className="flex items-center justify-between mt-4">
         <div className="flex items-center gap-2">
           {WEEKDAYS.map((day, i) => (
             <WeekdayPill key={day} status={weekFlow[i]} label={day} />
@@ -158,7 +158,7 @@ export default function MainPage() {
 
       {/* 오늘 기록 카드 */}
       <div
-        className="relative overflow-hidden rounded-3xl px-5 pt-6 pb-5"
+        className="relative shrink-0 overflow-hidden rounded-3xl px-5 pt-5 pb-5"
         style={
           completedToday
             ? { backgroundImage: 'linear-gradient(135deg, #D9DBFF 0%, #FFFFFF 38%, #FFFFFF 62%, #FFEFC2 100%)' }
@@ -166,7 +166,7 @@ export default function MainPage() {
         }
       >
         <p className="text-[13px] font-semibold text-gray-900">{dateLabel}</p>
-        <h2 className="text-[19px] font-bold text-gray-900 leading-snug mt-1.5 mb-6">
+        <h2 className="text-[18px] font-bold text-gray-900 leading-snug mt-1.5 mb-4">
           {completedToday ? (
             '오늘의 기록을 완료했어요'
           ) : (
@@ -174,15 +174,15 @@ export default function MainPage() {
           )}
         </h2>
 
-        <div className="w-full flex justify-center mb-6">
-          <div className="relative w-[150px] h-[150px]">
+        <div className="w-full flex justify-center mb-4">
+          <div className="relative w-[104px] h-[104px]">
             <div className="w-full h-full rounded-full bg-gradient-to-br from-white to-gray-100 shadow-inner flex items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="MetaMe" className="w-16 h-auto opacity-80" />
+              <img src="/logo.png" alt="MetaMe" className="w-11 h-auto opacity-80" />
             </div>
             {completedToday && (
-              <span className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-[#8287FF] border-4 border-white flex items-center justify-center">
-                <svg width="13" height="10" viewBox="0 0 13 10" fill="none">
+              <span className="absolute bottom-0.5 right-0.5 w-6 h-6 rounded-full bg-[#8287FF] border-[3px] border-white flex items-center justify-center">
+                <svg width="10" height="8" viewBox="0 0 13 10" fill="none">
                   <path d="M1 5l3.5 3.5L12 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </span>
@@ -191,7 +191,7 @@ export default function MainPage() {
         </div>
 
         {streakDays > 0 && (
-          <p className="text-[12px] font-semibold text-[#8287FF] mb-2">
+          <p className="text-[12px] font-semibold text-[#8287FF] mb-1.5">
             연속 {streakDays}일{completedToday ? ' 작성 완료' : '째 작성 중'}
           </p>
         )}
