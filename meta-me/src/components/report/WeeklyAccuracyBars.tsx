@@ -24,12 +24,12 @@ export function WeeklyAccuracyBars({
 
   return (
     <div className="w-full">
-      <div className="flex items-end gap-3 h-[110px]">
+      <div className="flex items-end gap-3 h-[76px]">
         {data.map((d, i) => (
           <div key={d.label} className="flex-1 flex flex-col items-center justify-end h-full gap-1.5">
-            {showValues && <span className={`text-[12px] font-semibold tabular-nums ${valueColor}`}>{d.value}%</span>}
+            {showValues && <span className={`text-[11px] font-semibold tabular-nums ${valueColor}`}>{d.value}%</span>}
             <div
-              className="w-full rounded-t-lg"
+              className="w-full max-w-[34px] rounded-t-lg"
               style={{ height: `${(d.value / max) * 100}%`, backgroundColor: barColor(i) }}
             />
           </div>

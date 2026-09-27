@@ -144,8 +144,8 @@ export default function ReportPage() {
       <ReportTabs />
 
       <div className="flex-1 overflow-y-auto px-5 pt-5 pb-8">
-        <div className="bg-[#8287FF] rounded-3xl px-5 py-5 mb-5">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-[#8287FF] rounded-3xl px-5 py-4 mb-5">
+          <div className="flex items-center justify-between mb-3">
             <span className="text-[13px] font-medium text-white">전주 대비 메타인지 정확도</span>
             <span className="text-[12px] font-semibold text-gray-900 bg-[#F5D949] px-2.5 py-1 rounded-full">
               {status.weeklyDeltaLabel}
