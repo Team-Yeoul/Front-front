@@ -31,6 +31,7 @@ const FALLBACK_QUESTION = '오늘 가장 나답다고 느낀 순간은 언제였
 const FALLBACK_TAIL_1 = '그 순간을 좀 더 자세히 들려줄 수 있나요?';
 const FALLBACK_TAIL_2 = '오늘 고른 감정들, 어떤 상황이었는지 조금 더 이야기해볼까요?';
 const EMOTION_CHIPS = ['몰입', '조급함', '뿌듯함', '지침', '무던함', '편안함', '설렘', '답답함'];
+const PATTERN_COUNT = 3;
 
 let uid = 0;
 const nextId = () => `m${++uid}`;
@@ -60,6 +61,39 @@ function TypingDots() {
             style={{ animationDelay: `${i * 120}ms` }}
           />
         ))}
+      </div>
+    </div>
+  );
+}
+
+function AccuracyGauge({ percent, delta }: { percent: number; delta: number }) {
+  const SIZE = 200;
+  const STROKE = 26;
+  const R = (SIZE - STROKE) / 2;
+  const CIRC = 2 * Math.PI * R;
+  const SWEEP = 0.72;
+  return (
+    <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }}>
+      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} className="-rotate-90">
+        <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="#E7E7F6" strokeWidth={STROKE} />
+        <circle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={R}
+          fill="none"
+          stroke="#6366F1"
+          strokeWidth={STROKE}
+          strokeDasharray={`${SWEEP * CIRC} ${CIRC}`}
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <p className="text-[13px] text-gray-500 mb-1.5">나의 문장 정확도</p>
+        <p className="text-gray-900 leading-none">
+          <span className="text-[44px] font-bold">{percent}</span>
+          <span className="text-[20px] font-bold align-top">%</span>
+        </p>
+        <p className="text-[13px] text-[#6366F1] font-semibold mt-2">▲ {delta}%</p>
       </div>
     </div>
   );
@@ -97,7 +131,7 @@ export default function DiaryPage() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
   const { data: questionData } = useGetTodayDailyQuestion(!!accessToken);
-  const { data: profile } = useGetMyProfile(!!accessToken);
+  const { data: profile, refetch: refetchProfile } = useGetMyProfile(!!accessToken);
   const createTailQuestion = useCreateTailQuestion();
   const updateTailAnswer = useUpdateTailQuestionAnswer();
   const createRecord = useCreateDailyRecord();
@@ -227,13 +261,17 @@ export default function DiaryPage() {
         is_myself_moment: yesNoChoice === 'yes',
         myself_moment_desc: yesNoChoice === 'yes' ? inputText : undefined,
       });
+      const refreshed = await refetchProfile();
+      if (refreshed.data?.latest_accuracy?.accuracy_percent != null) {
+        setAccuracyAfter(refreshed.data.latest_accuracy.accuracy_percent);
+      }
     } catch {
       // 실패해도 완료 화면은 보여줌
     }
     setTyping(false);
     setFinalNote(
       selectedEmotions.length > 0
-        ? `'${selectedEmotions[0]} 상태'가 이번 주 들어 자주 보였어요. 문장에 반영해둘게요.`
+        ? `'${selectedEmotions[0]}' — ${PATTERN_COUNT}번째로 반복된 패턴이에요.`
         : '오늘 기록을 바탕으로 문장을 업데이트해둘게요.',
     );
     setTurn('done');
@@ -321,36 +359,51 @@ export default function DiaryPage() {
 
   // ── 완료 화면 ──
   if (turn === 'done') {
+    const delta = Math.max(0, accuracyAfter - accuracyBefore);
     return (
-      <div className="flex flex-col h-full bg-[#F4F3FA] px-5 pt-6 pb-6">
-        <p className="text-[13px] text-gray-400 mb-2">{dateLabel}</p>
-        <p className="text-[20px] font-bold text-gray-900 leading-snug mb-6">
-          오늘의 기록 정리됐어요.
-          <br />
-          오늘 하루도 수고 많으셨어요!
-        </p>
+      <div className="flex flex-col h-full bg-[#F4F3FA] px-6 pt-6 pb-6">
+        <button onClick={() => router.push('/main')} className="self-end text-[13px] text-gray-400">
+          닫기
+        </button>
+
+        <div className="flex flex-col items-center mt-2 mb-2">
+          <div className="w-11 h-11 rounded-full bg-[#6366F1] flex items-center justify-center mb-4">
+            <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+              <path d="M1 7l5.5 5.5L17 1.5" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <p className="text-[21px] font-bold text-gray-900 mb-2">오늘 기록 완료</p>
+          <p className="text-[13px] text-gray-500 text-center leading-relaxed">
+            5개 질문에 답했어요. 문장이 조금 더 정확해졌습니다.
+          </p>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <AccuracyGauge percent={accuracyAfter} delta={delta} />
+        </div>
 
         <div className="bg-white rounded-2xl px-5 py-5 mb-5 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[14px] font-semibold text-gray-900">오늘 기록 정리됨</p>
-            <p className="text-[13px] font-semibold text-[#6366F1]">
-              정확도 {accuracyBefore}% → {accuracyAfter}%
-            </p>
-          </div>
-          <div className="h-1.5 rounded-full bg-gray-100 mb-3">
-            <div
-              className="h-full rounded-full bg-[#6366F1]"
-              style={{ width: `${Math.min(100, accuracyAfter)}%` }}
-            />
-          </div>
-          <p className="text-[13px] text-gray-500 leading-relaxed">{finalNote}</p>
+          <p className="text-[12px] font-semibold text-[#6366F1] mb-2">오늘 발견한 것</p>
+          <p className="text-[14px] font-semibold text-gray-900 leading-relaxed mb-3">{finalNote}</p>
+          {selectedEmotions.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {selectedEmotions.map((tag) => (
+                <span key={tag} className="text-[12px] font-medium text-gray-600 bg-gray-100 px-3 py-1.5 rounded-full">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         <button
-          onClick={() => router.push('/main')}
-          className="mt-auto w-full h-14 bg-gray-900 text-white rounded-2xl text-[15px] font-semibold"
+          onClick={() => router.push('/objectify')}
+          className="w-full h-14 bg-[#6366F1] text-white rounded-2xl text-[15px] font-semibold mb-3"
         >
-          완료하기
+          오늘의 문장 보기 ›
+        </button>
+        <button onClick={() => router.push('/main')} className="text-[13px] text-gray-400 text-center">
+          홈으로
         </button>
       </div>
     );
