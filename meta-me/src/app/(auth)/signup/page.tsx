@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSignup, userApi } from '@/entities/user';
 import { useAuthStore, useTermsStore } from '@/store';
+import { DatePicker } from '@/components/DatePicker';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -137,12 +138,7 @@ export default function SignupPage() {
                 <rect x="1" y="3" width="16" height="14" rx="2" stroke="#9CA3AF" strokeWidth="1.5"/>
                 <path d="M1 7H17M5 1V4.5M13 1V4.5" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
-              <input
-                type="date"
-                value={birthDate}
-                onChange={e => setBirthDate(e.target.value)}
-                className="flex-1 text-[15px] bg-transparent outline-none placeholder:text-gray-300"
-              />
+              <DatePicker value={birthDate} onChange={setBirthDate} />
             </div>
           </div>
 
