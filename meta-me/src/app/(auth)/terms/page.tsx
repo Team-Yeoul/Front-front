@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTermsStore } from '@/store';
 
 function CircleCheckbox({ checked }: { checked: boolean }) {
   return (
@@ -106,30 +107,29 @@ function TermsDetailModal({ termsKey, onClose }: { termsKey: TermsKey; onClose: 
 
 export default function TermsPage() {
   const router = useRouter();
+  const setTerms = useTermsStore((s) => s.setTerms);
   const [service, setService] = useState(false);
   const [privacy, setPrivacy] = useState(false);
   const [marketing, setMarketing] = useState(false);
   const [detailView, setDetailView] = useState<TermsKey | null>(null);
 
-  const allRequired = service && privacy;
+  const allChecked = service && privacy && marketing;
   const canContinue = service && privacy;
 
   const handleAllRequired = () => {
-    const next = !allRequired;
+    const next = !allChecked;
     setService(next);
     setPrivacy(next);
+    setMarketing(next);
   };
 
   return (
     <div className="flex flex-col min-h-full bg-gray-100">
       {/* 뒤로가기 */}
-      <div className="px-5 pt-4 pb-3">
-        <Link
-          href="/login"
-          className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white shadow-sm"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path d="M15 19l-7-7 7-7" stroke="#111827" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <div className="px-5 pt-6 pb-1">
+        <Link href="/login" className="inline-flex items-center justify-center w-8 h-8">
+          <svg width="10" height="16" viewBox="0 0 10 16" fill="none">
+            <path d="M8.5 1.5L1.5 8L8.5 14.5" stroke="#1C1C1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </Link>
       </div>
@@ -149,7 +149,7 @@ export default function TermsPage() {
           onClick={handleAllRequired}
           className="w-full flex items-center gap-3 px-5 py-4"
         >
-          <CircleCheckbox checked={allRequired} />
+          <CircleCheckbox checked={allChecked} />
           <span className="text-[15px] font-semibold text-gray-900">필수 약관 전체 동의하기</span>
         </button>
 
@@ -198,7 +198,11 @@ export default function TermsPage() {
       {/* 계속하기 버튼 */}
       <div className="mt-auto px-5 py-5">
         <button
-          onClick={() => canContinue && router.push('/signup')}
+          onClick={() => {
+            if (!canContinue) return;
+            setTerms({ service, privacy, marketing });
+            router.push('/signup');
+          }}
           disabled={!canContinue}
           className={`w-full h-[54px] rounded-2xl text-[15px] font-semibold transition-colors ${
             canContinue ? 'bg-[#1a1a1a] text-white' : 'bg-gray-200 text-gray-400'

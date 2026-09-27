@@ -1,14 +1,45 @@
 @import 'tailwindcss';
 
 @font-face {
-  font-family: 'Cafe24Proslim';
-  src: url('/fonts/Cafe24PROSlimFit.woff2') format('woff2'),
-       url('/fonts/Cafe24PROSlimFit.woff') format('woff');
-  font-weight: normal;
+  font-family: 'Pretendard';
+  src: url('/fonts/Pretendard-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('/fonts/Pretendard-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('/fonts/Pretendard-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('/fonts/Pretendard-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('/fonts/Pretendard-Bold.woff2') format('woff2');
+  font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 
 body {
-  font-family: 'Cafe24Proslim', sans-serif;
+  font-family: 'Pretendard', sans-serif;
 }

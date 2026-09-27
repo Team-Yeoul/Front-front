@@ -74,10 +74,14 @@ export interface ReportStatus {
   unlocked: boolean;
   recordedDays: number;
   requiredDays: number;
-  matchPercent: number;
-  matchLabel: string;
-  matchDescription: string;
-  weeklyHighlights: HighlightLine[];
+  weeklyTrend: { label: string; value: number }[];
+  weeklyDeltaLabel: string;
+  personaAxes: PersonaAxis[];
+  strength: string;
+  weakness: string;
+  interestTags: { label: string; count: number }[];
+  disinterestTags: { label: string; count: number }[];
+  energyAlert: { badge: string; countLabel: string; description: string };
 }
 
 export interface DateTag {
@@ -93,43 +97,13 @@ export interface PersonaAxis {
 }
 
 export interface ReportSummary {
-  day: number;
-  scope: string;
-  title: string;
-  matchPercent: number;
-  recordedDays: number;
-  weeklyHighlights: HighlightLine[];
-  emotion: {
-    emotionTags: string[];
-    cautionTags: string[];
-    description: string;
-  };
-  interest: {
-    interestTags: string[];
-    disinterestTags: string[];
-    description: string;
-  };
-  energy: {
-    chargeTags: string[];
-    drainTags: string[];
-  };
-  personaGrowth: {
-    from: number;
-    to: number;
-    description: string;
-  };
-  weeklyGrowth: {
-    description: string;
-    comparisonLabel: string;
-    dueLabel: string;
-  };
-  mirrors: {
-    me: string;
-    ai: string;
-    others: string;
-  };
-  personaMap: PersonaAxis[];
-  personaNote: string;
+  recordedCount: number;
+  aiIntro: string;
+  accuracyPercent: number;
+  accuracyDeltaPercent: number;
+  weeklyCount: number;
+  streakDays: number;
+  aiAnalysis: string;
 }
 
 export interface PatternItem {
@@ -149,10 +123,16 @@ export interface KeywordItem extends PatternItem {
   category: 'interest' | 'disinterest';
 }
 
+export interface EnergyPatternItem {
+  variant: 'boost' | 'drain' | 'void';
+  title: string;
+  subtitle: string;
+}
+
 export interface KeywordDetail {
   interestKeywords: KeywordItem[];
   disinterestKeywords: KeywordItem[];
-  frequency: { label: string; count: number; category: 'interest' | 'disinterest' }[];
+  energyPatterns: EnergyPatternItem[];
 }
 
 export interface EnergyDetail {
@@ -166,17 +146,34 @@ export interface PersonaAxisDetail extends PersonaAxis {
   description: string;
 }
 
+export interface PersonaMatch {
+  label: string;
+  selfValue: number;
+  othersValue: number;
+}
+
+export interface PersonaCompare {
+  quote: string;
+  axisLabels: string[];
+  selfValues: number[];
+  othersValues: number[];
+  matches: PersonaMatch[];
+  topDiff: { label: string; selfValue: number; othersValue: number; note: string };
+}
+
 export interface PersonaDetail {
   summary: string;
   axes: PersonaAxisDetail[];
   shiningMoments: string[];
   cautionMoments: string[];
   note: string;
+  compare: PersonaCompare;
 }
 
-export interface ActionExperimentStatus {
-  ready: boolean;
-  message: string;
+export interface GrowthDetail {
+  trend: { label: string; value: number }[];
+  deltaLabel: string;
+  insights: { title: string; description: string }[];
 }
 
 export interface ObjectifyMirrors {

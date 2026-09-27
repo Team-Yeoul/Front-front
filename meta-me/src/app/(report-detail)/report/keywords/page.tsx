@@ -1,102 +1,37 @@
 'use client';
 
-import Link from 'next/link';
 import { getKeywordDetail } from '@/lib/api';
 import { useReportData } from '@/hooks/useReportData';
-import { DetailHeader } from '@/components/report/DetailHeader';
-import { Chip } from '@/components/report/Chip';
-import { BarChart } from '@/components/charts/BarChart';
-import type { KeywordDetail, KeywordItem } from '@/types';
+import { CarouselChrome } from '@/components/report/CarouselChrome';
+import { EnergyPatternCard } from '@/components/report/EnergyPatternCard';
+import type { KeywordDetail } from '@/types';
 
 const MOCK: KeywordDetail = {
   interestKeywords: [
-    {
-      category: 'interest',
-      title: '코딩',
-      count: 5,
-      description: '동향 6회 · 공감 4회 — 몰입하는 시간 언급이 많았어요.',
-      tags: [
-        { date: '6/30', label: '조절과제 기록' },
-        { date: '6/22', label: '지친 기록' },
-        { date: '6/13', label: '답안 기록' },
-      ],
-    },
-    {
-      category: 'interest',
-      title: 'AI',
-      count: 4,
-      description: '동향 5회 · 공감 4회 — 새로운 도구를 익힐 때 흥미가 드러났어요.',
-      tags: [
-        { date: '6/30', label: '조절과제 기록' },
-        { date: '6/22', label: '지친 기록' },
-        { date: '6/13', label: '답안 기록' },
-      ],
-    },
-    {
-      category: 'interest',
-      title: '구조 이해',
-      count: 3,
-      description: '동향 7회 · 공감 5회 — 전체 맥락을 파악할 때 만족감이 컸어요.',
-      tags: [
-        { date: '6/30', label: '조절과제 기록' },
-        { date: '6/22', label: '지친 기록' },
-      ],
-    },
-    {
-      category: 'interest',
-      title: '기획',
-      count: 2,
-      description: '동향 3회 · 공감 2회 — 방향을 설계하는 과정을 즐겼어요.',
-      tags: [{ date: '6/13', label: '답안 기록' }],
-    },
+    { category: 'interest', title: '글쓰기', count: 9, description: '', tags: [] },
+    { category: 'interest', title: '러닝', count: 6, description: '', tags: [] },
+    { category: 'interest', title: '전시', count: 4, description: '', tags: [] },
   ],
   disinterestKeywords: [
-    {
-      category: 'disinterest',
-      title: '반복 암기',
-      count: 3,
-      description: '동향 4회 · 부정 감정 3회 — 같은 내용을 반복할 때 피로가 나타났어요.',
-      tags: [
-        { date: '6/30', label: '조절과제 기록' },
-        { date: '6/22', label: '지친 기록' },
-      ],
-    },
-    {
-      category: 'disinterest',
-      title: '애매한 역할',
-      count: 4,
-      description: '동향 10회 · 부정 감정 4회 — 역할이 불분명한 협업에서 스트레스가 컸어요.',
-      tags: [
-        { date: '6/30', label: '조절과제 기록' },
-        { date: '6/22', label: '지친 기록' },
-        { date: '6/13', label: '답안 기록' },
-      ],
-    },
+    { category: 'disinterest', title: '긴 회의', count: 7, description: '', tags: [] },
+    { category: 'disinterest', title: '숫자 정리', count: 3, description: '', tags: [] },
   ],
-  frequency: [
-    { label: '코딩', count: 10, category: 'interest' },
-    { label: 'AI', count: 8, category: 'interest' },
-    { label: '구조이해', count: 7, category: 'interest' },
-    { label: '기획', count: 5, category: 'interest' },
-    { label: '반복암기', count: 4, category: 'disinterest' },
-    { label: '애매한역할', count: 3, category: 'disinterest' },
+  energyPatterns: [
+    { variant: 'boost', title: '에너지 부스터', subtitle: '아침 러닝 · 혼자 쓰는 시간' },
+    { variant: 'drain', title: '에너지 뱀파이어', subtitle: '늦은 밤 알림 확인 · 5회' },
+    { variant: 'void', title: '에너지 블랙홀', subtitle: '목적 없는 스크롤 · 평균 42분' },
   ],
 };
 
-function KeywordCard({ item }: { item: KeywordItem }) {
+function KeywordChip({ label, count, active }: { label: string; count: number; active: boolean }) {
   return (
-    <div className="mb-5">
-      <div className="flex items-baseline gap-2 mb-1">
-        <h4 className="text-[15px] font-semibold text-gray-900">{item.title}</h4>
-        <span className="text-[11px] text-gray-400">기록 {item.count}개</span>
-      </div>
-      <p className="text-[13px] text-gray-600 leading-relaxed mb-2">{item.description}</p>
-      <div className="flex flex-wrap">
-        {item.tags.map((t, i) => (
-          <Chip key={i} tag={t} variant={item.category === 'interest' ? 'primary' : 'secondary'} />
-        ))}
-      </div>
-    </div>
+    <span
+      className={`text-[13px] font-medium px-3.5 py-1.5 rounded-full mr-2 mb-2 inline-block ${
+        active ? 'bg-[#8287FF] text-white' : 'bg-gray-100 text-gray-500'
+      }`}
+    >
+      {label} {count}
+    </span>
   );
 }
 
@@ -104,33 +39,37 @@ export default function KeywordDetailPage() {
   const data = useReportData(getKeywordDetail, MOCK);
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      <DetailHeader title="흥미/무흥미 키워드" subtitle="이번 리포트에서 발견한 키워드 3가지" backHref="/report/summary" />
-
-      <div className="flex-1 overflow-y-auto px-6 pt-5">
-        <p className="text-[12px] font-semibold text-[#8287FF] mb-3">흥미 키워드</p>
-        {data.interestKeywords.map((item) => (
-          <KeywordCard key={item.title} item={item} />
-        ))}
-
-        <p className="text-[12px] font-semibold text-[#c94f80] mt-2 mb-3">무흥미/피로 키워드</p>
-        {data.disinterestKeywords.map((item) => (
-          <KeywordCard key={item.title} item={item} />
-        ))}
-
-        <div className="mt-4 mb-8">
-          <p className="text-[13px] font-semibold text-gray-900 mb-3">키워드별 등장 횟수</p>
-          <BarChart data={data.frequency} />
+    <CarouselChrome
+      title="키워드와 에너지"
+      subtitle="관심이 몰린 주제와 기분을 움직인 것들"
+      step={3}
+      total={5}
+      backHref="/report/emotion"
+      nextHref="/report/persona"
+    >
+      <div className="bg-white border border-gray-100 rounded-3xl px-5 py-5 mb-4 shadow-sm">
+        <p className="text-[12px] text-gray-400 mb-1.5">자주 관심을 보인 주제</p>
+        <div className="mb-3">
+          {data.interestKeywords.map((k, i) => (
+            <KeywordChip key={k.title} label={k.title} count={k.count} active={i === 0} />
+          ))}
+        </div>
+        <p className="text-[12px] text-gray-400 mb-1.5">흥미가 낮게 나타난 주제</p>
+        <div>
+          {data.disinterestKeywords.map((k) => (
+            <KeywordChip key={k.title} label={k.title} count={k.count} active={false} />
+          ))}
         </div>
       </div>
 
-      <div className="px-6 py-5">
-        <Link href="/report/summary">
-          <button className="w-full h-14 bg-gray-900 text-white rounded-2xl text-base font-semibold">
-            리포트로 돌아가기
-          </button>
-        </Link>
+      <div className="mb-6">
+        <h3 className="text-[15px] font-semibold text-gray-900 mb-3">에너지 패턴</h3>
+        <div className="flex flex-col gap-2.5">
+          {data.energyPatterns.map((p) => (
+            <EnergyPatternCard key={p.title} variant={p.variant} title={p.title} subtitle={p.subtitle} />
+          ))}
+        </div>
       </div>
-    </div>
+    </CarouselChrome>
   );
 }

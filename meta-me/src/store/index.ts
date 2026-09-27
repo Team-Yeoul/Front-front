@@ -50,3 +50,22 @@ export const useUIStore = create<UIStore>((set) => ({
   isLoading: false,
   setLoading: (isLoading) => set({ isLoading }),
 }));
+
+interface TermsAgreement {
+  service: boolean;
+  privacy: boolean;
+  marketing: boolean;
+}
+
+interface TermsStore extends TermsAgreement {
+  setTerms: (terms: TermsAgreement) => void;
+  reset: () => void;
+}
+
+const initialTerms: TermsAgreement = { service: false, privacy: false, marketing: false };
+
+export const useTermsStore = create<TermsStore>((set) => ({
+  ...initialTerms,
+  setTerms: (terms) => set(terms),
+  reset: () => set(initialTerms),
+}));
