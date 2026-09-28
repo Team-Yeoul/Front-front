@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LoadingScreen } from "./_components/LoadingScreen";
 import { ResultScreen } from "./_components/ResultScreen";
@@ -18,6 +18,14 @@ type Step = "loading" | "result" | "monster_discovery" | "dogam";
 const TOTAL_PER_CATEGORY = 10;
 
 export default function ObjectifyPage() {
+  return (
+    <Suspense fallback={null}>
+      <ObjectifyPageInner />
+    </Suspense>
+  );
+}
+
+function ObjectifyPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const startOnDogam = searchParams.get("view") === "dogam";
