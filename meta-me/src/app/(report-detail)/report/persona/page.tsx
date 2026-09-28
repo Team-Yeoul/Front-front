@@ -144,17 +144,19 @@ export default function PersonaDetailPage() {
               <p className="text-[12px] font-semibold text-gray-900">차이가 큰 부분</p>
               <span className="text-[12px] text-gray-500">{data.compare.topDiff.label}</span>
             </div>
-            <div className="flex flex-col gap-1.5 mb-2">
-              <div className="h-2.5 rounded-full bg-gray-200">
-                <div className="h-full rounded-full bg-[#8287FF]" style={{ width: `${data.compare.topDiff.selfValue}%` }} />
+            <div className="flex items-center gap-3 mb-2">
+              <div className="flex-1 flex flex-col gap-1.5">
+                <div className="h-2.5 rounded-full bg-gray-200">
+                  <div className="h-full rounded-full bg-[#8287FF]" style={{ width: `${data.compare.topDiff.selfValue}%` }} />
+                </div>
+                <div className="h-2.5 rounded-full bg-gray-200">
+                  <div className="h-full rounded-full bg-[#F5D949]" style={{ width: `${data.compare.topDiff.othersValue}%` }} />
+                </div>
               </div>
-              <div className="h-2.5 rounded-full bg-gray-200">
-                <div className="h-full rounded-full bg-[#F5D949]" style={{ width: `${data.compare.topDiff.othersValue}%` }} />
-              </div>
+              <span className="text-[15px] font-bold text-gray-900 shrink-0">
+                +{data.compare.topDiff.othersValue - data.compare.topDiff.selfValue}
+              </span>
             </div>
-            <p className="text-[11px] text-gray-500 text-right mb-2">
-              +{data.compare.topDiff.othersValue - data.compare.topDiff.selfValue}
-            </p>
             <p className="text-[12px] text-gray-600 leading-relaxed">{data.compare.topDiff.note}</p>
           </div>
         </>

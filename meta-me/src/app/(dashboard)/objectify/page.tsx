@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { LoadingScreen } from "./_components/LoadingScreen";
 import { ResultScreen } from "./_components/ResultScreen";
 import { MonsterDiscoveryScreen } from "./_components/MonsterDiscoveryScreen";
@@ -9,12 +10,20 @@ import { MyRecordSheet } from "./_components/MyRecordSheet";
 import { MirrorSheet } from "./_components/MirrorSheet";
 import { MonsterGrowthSheet } from "./_components/MonsterGrowthSheet";
 import { MonsterDetailSheet } from "./_components/MonsterDetailSheet";
+import { useListMyMonsters } from "@/entities/collection";
+import type { MonsterCategory } from "@/entities/collection";
 
 type Step = "loading" | "result" | "monster_discovery" | "dogam";
 
+const TOTAL_PER_CATEGORY = 10;
+
 export default function ObjectifyPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const startOnDogam = searchParams.get("view") === "dogam";
+
   // 화면 단계를 관리하는 상태
-  const [step, setStep] = useState<Step>("loading");
+  const [step, setStep] = useState<Step>(startOnDogam ? "dogam" : "loading");
 
   // 첫 진입 화면 로딩 진행률 (0 ~ 100)
   const [progress, setProgress] = useState(0);
@@ -26,7 +35,9 @@ export default function ObjectifyPage() {
   const [selectedMonsterDetail, setSelectedMonsterDetail] = useState(false);
 
   // 도감 화면 카테고리 필터 선택 상태
-  const [selectedCategory, setSelectedCategory] = useState("전체");
+  const [selectedCategory, setSelectedCategory] = useState<MonsterCategory>("COGNITIVE");
+  const { data: dogamData } = useListMyMonsters({ category: selectedCategory }, step === "dogam");
+  const dogamCount = dogamData?.total_count ?? 4;
 
   // 첫 진입 로딩 애니메이션 구현 (100% 도달 시 결과창으로 자동 이동)
   useEffect(() => {
@@ -51,13 +62,28 @@ export default function ObjectifyPage() {
 
       {/* 상단 앱바 */}
       <header className="p-5 pt-8 bg-transparent flex justify-between items-center">
-        <h1 className="text-[22px] font-medium tracking-tight">
-          {step === "loading" && "객관화 도감"}
-          {(step === "result" || step === "monster_discovery") && "객관화 미러"}
-          {step === "dogam" && "객관화 도감"}
-        </h1>
-        {step === "result" && (
-          <span className="text-[15px] text-gray-500 font-normal">2026.06.30</span>
+        {step === "dogam" ? (
+          <>
+            <button onClick={() => router.push("/mypage")} className="w-8 h-8 flex items-center justify-center -ml-2" aria-label="뒤로">
+              <svg width="9" height="15" viewBox="0 0 9 15" fill="none">
+                <path d="M8 1.5L1.5 7.5L8 13.5" stroke="#1C1C1E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <h1 className="text-[18px] font-bold tracking-tight">코그니 도감</h1>
+            <span className="text-[13px] text-gray-400 w-8 text-right">
+              {dogamCount}/{TOTAL_PER_CATEGORY}
+            </span>
+          </>
+        ) : (
+          <>
+            <h1 className="text-[22px] font-medium tracking-tight">
+              {step === "loading" && "객관화 도감"}
+              {(step === "result" || step === "monster_discovery") && "객관화 미러"}
+            </h1>
+            {step === "result" && (
+              <span className="text-[15px] text-gray-500 font-normal">2026.06.30</span>
+            )}
+          </>
         )}
       </header>
 

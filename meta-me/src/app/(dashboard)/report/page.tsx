@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { getReportStatus } from '@/lib/api';
 import { useReportData } from '@/hooks/useReportData';
 import { WeeklyAccuracyBars } from '@/components/report/WeeklyAccuracyBars';
+import { HubTabs } from '@/components/layout/HubTabs';
 import type { ReportStatus } from '@/types';
 
 const MOCK_STATUS: ReportStatus = {
@@ -42,34 +42,6 @@ const MOCK_STATUS: ReportStatus = {
   },
 };
 
-const TABS = [
-  { key: 'month', label: '이번 달', href: '/challenge' },
-  { key: 'dogam', label: '도감', href: '/objectify' },
-  { key: 'report', label: '리포트', href: '/report' },
-] as const;
-
-function ReportTabs() {
-  const pathname = usePathname();
-  return (
-    <div className="flex gap-6 px-6 border-b border-gray-100">
-      {TABS.map((tab) => {
-        const active = tab.key === 'report' ? pathname.startsWith('/report') : false;
-        return (
-          <Link
-            key={tab.key}
-            href={tab.href}
-            className={`py-3 text-[14px] font-medium border-b-2 -mb-px transition-colors ${
-              active ? 'text-[#8287FF] border-[#8287FF]' : 'text-gray-400 border-transparent'
-            }`}
-          >
-            {tab.label}
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
 function ProfileAxisRow({ label, value, rightLabel }: { label: string; value: number; rightLabel: string }) {
   return (
     <div className="flex items-center gap-3">
@@ -101,7 +73,7 @@ export default function ReportPage() {
     const progressPct = Math.min(100, (status.recordedDays / status.requiredDays) * 100);
     return (
       <div className="flex flex-col h-full bg-white">
-        <ReportTabs />
+        <HubTabs active="report" />
         <div className="flex-1 flex flex-col px-6 pt-6">
           <p className="text-[13px] text-gray-400 mb-1">리포트 미리보기</p>
           <p className="text-[12px] text-gray-300 mb-5">내용은 기록이 쌓일수록 더 정확해질 예정이에요</p>
@@ -141,11 +113,11 @@ export default function ReportPage() {
 
   return (
     <div className="flex flex-col h-full bg-white">
-      <ReportTabs />
+      <HubTabs active="report" />
 
       <div className="flex-1 overflow-y-auto px-5 pt-5 pb-8">
-        <div className="bg-[#8287FF] rounded-3xl px-5 py-5 mb-5">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-[#8287FF] rounded-3xl px-5 py-4 mb-5">
+          <div className="flex items-center justify-between mb-3">
             <span className="text-[13px] font-medium text-white">전주 대비 메타인지 정확도</span>
             <span className="text-[12px] font-semibold text-gray-900 bg-[#F5D949] px-2.5 py-1 rounded-full">
               {status.weeklyDeltaLabel}

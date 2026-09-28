@@ -32,7 +32,8 @@ const tabs = [
     ),
   },
   {
-    href: '/report',
+    href: '/report/summary',
+    matchPrefix: '/report',
     icon: (color: string, active: boolean) => (
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
         <path
@@ -63,7 +64,7 @@ export function BottomNav() {
     <nav className="h-[72px] border-t border-gray-100 bg-white">
       <div className="flex h-full">
         {tabs.map((tab) => {
-          const active = pathname.startsWith(tab.href);
+          const active = pathname.startsWith(tab.matchPrefix ?? tab.href);
           const color = active ? ACTIVE : INACTIVE;
           return (
             <Link key={tab.href} href={tab.href} className="relative flex-1 flex items-center justify-center">
