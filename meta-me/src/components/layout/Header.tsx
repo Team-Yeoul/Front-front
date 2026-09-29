@@ -39,10 +39,13 @@ export function Header() {
     );
   }
 
+  // /diary, /mypage, /objectify는 페이지 자체에 완결된 헤더(뒤로가기, 탭, 설정 버튼 등)가
+  // 이미 있어서 이 공용 헤더를 또 그리면 제목이 중복으로 찍힘 — 그 경로들은 렌더링하지 않음.
+  const NO_HEADER_PREFIXES = ['/diary', '/mypage', '/objectify'];
+  if (NO_HEADER_PREFIXES.some((p) => pathname.startsWith(p))) return null;
+
   const TITLES: Record<string, string> = {
-    '/diary': '다이어리',
     '/report': '리포트 미',
-    '/mypage': '마이페이지',
   };
   const title = Object.entries(TITLES).find(([path]) => pathname.startsWith(path))?.[1] ?? 'MetaMe';
 
