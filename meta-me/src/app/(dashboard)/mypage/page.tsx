@@ -109,8 +109,18 @@ export default function MyPage() {
           </div>
 
           <div className="relative flex justify-center mb-6">
+            <div
+              className="absolute rounded-[50%]"
+              style={{
+                width: 260,
+                height: 150,
+                bottom: 6,
+                backgroundColor: '#F3E3BF',
+                transform: 'rotate(-8deg)',
+              }}
+            />
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/mascot.png" alt="MetaMe 마스코트" className="w-[200px] h-auto" />
+            <img src="/mascot.png" alt="MetaMe 마스코트" className="relative w-[200px] h-auto" />
             <div className="absolute bottom-0 right-6 flex flex-col gap-2">
               <button
                 onClick={() => {
@@ -170,13 +180,13 @@ export default function MyPage() {
                     clearAuth();
                     router.push('/login');
                   }}
-                  className="flex-1 h-[50px] rounded-2xl bg-[#E32424] text-white text-[15px] font-semibold"
+                  className="flex-1 h-[50px] rounded-2xl bg-gray-100 text-gray-500 text-[15px] font-semibold"
                 >
                   예
                 </button>
                 <button
                   onClick={() => setShowLogoutModal(false)}
-                  className="flex-1 h-[50px] rounded-2xl bg-gray-900 text-white text-[15px] font-semibold"
+                  className="flex-1 h-[50px] rounded-2xl bg-[#8287FF] text-white text-[15px] font-semibold"
                 >
                   아니오
                 </button>
