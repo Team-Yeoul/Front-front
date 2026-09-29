@@ -64,7 +64,11 @@ export function BottomNav() {
     <nav className="h-[72px] border-t border-gray-100 bg-white">
       <div className="flex h-full">
         {tabs.map((tab) => {
-          const active = pathname.startsWith(tab.matchPrefix ?? tab.href);
+          // The report hub (`/report` exactly) is reached via mypage's own tabs, not
+          // this nav's report shortcut (which jumps straight into the detail carousel) —
+          // so it should highlight mypage, not the report tab.
+          const active =
+            pathname === '/report' ? tab.href === '/mypage' : pathname.startsWith(tab.matchPrefix ?? tab.href);
           const color = active ? ACTIVE : INACTIVE;
           return (
             <Link key={tab.href} href={tab.href} className="relative flex-1 flex items-center justify-center">
