@@ -10,6 +10,7 @@ import {
 } from '@/entities/diary';
 import { useGetMyProfile } from '@/entities/user';
 import { useAuthStore } from '@/store';
+import { useStatusBarTheme } from '@/hooks/useStatusBarTheme';
 
 type Mode = 'AI' | 'FREE';
 type TurnKey = 'main' | 'tail1' | 'emotion' | 'yesno' | 'tail2' | 'done';
@@ -137,6 +138,7 @@ export default function DiaryPage() {
   const createRecord = useCreateDailyRecord();
 
   const [started, setStarted] = useState(false);
+  useStatusBarTheme(started ? '#F4F3FA' : '#F3E7D6', 'dark');
   const [mode, setMode] = useState<Mode>('AI');
   const [freeText, setFreeText] = useState('');
 

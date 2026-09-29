@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSignup, userApi } from '@/entities/user';
+import { ApiError } from '@/shared/api';
 import { useAuthStore, useTermsStore } from '@/store';
 import { DatePicker } from '@/components/DatePicker';
 
@@ -46,8 +47,8 @@ export default function SignupPage() {
       submittedRef.current = true;
       resetTerms();
       router.push('/onboarding');
-    } catch {
-      setError('회원가입에 실패했습니다. 다시 시도해주세요.');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '회원가입에 실패했습니다. 다시 시도해주세요.');
     }
   };
 

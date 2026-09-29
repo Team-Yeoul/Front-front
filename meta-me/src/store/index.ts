@@ -69,3 +69,22 @@ export const useTermsStore = create<TermsStore>((set) => ({
   setTerms: (terms) => set(terms),
   reset: () => set(initialTerms),
 }));
+
+export interface StatusBarTheme {
+  /** CSS background for the mock status bar (desktop preview only). */
+  bg: string;
+  /** Icon/text color scheme — 'light' = white icons for a colored/dark bg. */
+  fg: 'light' | 'dark';
+}
+
+interface StatusBarStore {
+  theme: StatusBarTheme;
+  setTheme: (theme: StatusBarTheme) => void;
+}
+
+export const DEFAULT_STATUS_BAR_THEME: StatusBarTheme = { bg: '#ffffff', fg: 'dark' };
+
+export const useStatusBarStore = create<StatusBarStore>((set) => ({
+  theme: DEFAULT_STATUS_BAR_THEME,
+  setTheme: (theme) => set({ theme }),
+}));

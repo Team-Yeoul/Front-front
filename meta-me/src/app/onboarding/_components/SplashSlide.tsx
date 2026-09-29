@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useStatusBarTheme } from '@/hooks/useStatusBarTheme';
 
 export function SplashSlide({
   eyebrow,
@@ -25,6 +26,8 @@ export function SplashSlide({
   dotIndex: number;
   dotCount: number;
 }) {
+  useStatusBarTheme('#C9CCFF', 'dark');
+
   const dots = (
     <div className="flex items-center gap-1.5">
       {Array.from({ length: dotCount }, (_, i) => (

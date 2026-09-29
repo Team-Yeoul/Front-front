@@ -67,9 +67,9 @@ export function DogamScreen({ selectedCategory, onSelectCategory, onSelectMonste
           <button
             key={m.user_monster_id}
             onClick={onSelectMonster}
-            className="bg-white rounded-2xl p-4 text-left shadow-sm hover:bg-gray-50 transition-colors"
+            className="bg-white border border-gray-100 rounded-2xl p-4 text-left hover:bg-gray-50 transition-colors"
           >
-            <div className="w-14 h-14 rounded-full bg-gray-100 mx-auto mb-3" />
+            <div className="w-[70px] h-[70px] rounded-full bg-[#F2F2F7] mx-auto mb-3" />
             <p className="text-[14px] font-semibold text-gray-900 text-center mb-1">
               {m.current_title || m.monster.stage_titles}
             </p>
@@ -82,13 +82,11 @@ export function DogamScreen({ selectedCategory, onSelectCategory, onSelectMonste
           </button>
         ))}
         {Array.from({ length: lockedCount }).map((_, i) => (
-          <div key={`locked-${i}`} className="bg-gray-50 rounded-2xl p-4 text-center">
-            <div className="w-9 h-9 rounded-full bg-gray-200 mx-auto mb-3 flex items-center justify-center">
-              <svg width="13" height="15" viewBox="0 0 13 15" fill="none">
-                <rect x="1" y="6.5" width="11" height="7.5" rx="1.5" stroke="#9CA3AF" strokeWidth="1.4" />
-                <path d="M3 6.5V4a3.5 3.5 0 0 1 7 0v2.5" stroke="#9CA3AF" strokeWidth="1.4" strokeLinecap="round" />
-              </svg>
-            </div>
+          <div key={`locked-${i}`} className="bg-[#EDEDF2] rounded-2xl p-4 text-center flex flex-col items-center">
+            <svg width="34" height="30" viewBox="0 0 24 22" fill="none" className="mb-2.5">
+              <rect x="3" y="9" width="18" height="12" rx="2.5" fill="#1A1A1E" />
+              <path d="M6 9V6a6 6 0 0 1 12 0v3" stroke="#1A1A1E" strokeWidth="2.4" strokeLinecap="round" />
+            </svg>
             <p className="text-[14px] font-bold text-gray-400 mb-1">???</p>
             <p className="text-[11px] text-gray-400 leading-relaxed mb-1">
               기록 {UNLOCK_DAY_HINTS[i % UNLOCK_DAY_HINTS.length]}일이 더 쌓이면 열려요
