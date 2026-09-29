@@ -1,6 +1,11 @@
+'use client';
+
 import Link from 'next/link';
+import { useStatusBarTheme } from '@/hooks/useStatusBarTheme';
 
 export default function SplashPage() {
+  useStatusBarTheme('#4F52E5', 'light');
+
   return (
     <main
       className="flex flex-col h-full px-6"
@@ -31,9 +36,9 @@ export default function SplashPage() {
         </p>
 
         <div className="flex flex-col gap-3 mt-7">
-          <Link href="/terms">
+          <Link href="/login">
             <button className="w-full h-14 bg-[#8287FF] text-white rounded-2xl text-base font-semibold">
-              가입하기
+              로그인
             </button>
           </Link>
           <button className="w-full h-14 bg-gray-100 text-gray-800 rounded-2xl text-base font-semibold flex items-center justify-center gap-2.5">
