@@ -125,7 +125,7 @@ export function Button({
   return (
     <button
       {...rest}
-      className={`w-full h-14 rounded-2xl text-[16px] font-semibold flex items-center justify-center gap-2 transition-opacity disabled:opacity-40 ${VARIANT[variant]} ${className}`}
+      className={`w-full max-w-[382px] mx-auto h-[63px] rounded-2xl text-[16px] font-semibold flex items-center justify-center gap-2 transition-opacity disabled:opacity-40 ${VARIANT[variant]} ${className}`}
     >
       {children}
     </button>

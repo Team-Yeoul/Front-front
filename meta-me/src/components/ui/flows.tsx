@@ -168,7 +168,7 @@ export function CogniHero({
           <div className="flex gap-2.5">
             <button
               onClick={onSave}
-              className="flex-1 h-14 rounded-2xl bg-white flex items-center justify-center gap-2 text-[16px] font-semibold text-ink"
+              className="flex-1 h-[63px] rounded-2xl bg-white flex items-center justify-center gap-2 text-[16px] font-semibold text-ink"
             >
               <DownloadIcon /> 이미지 저장
             </button>

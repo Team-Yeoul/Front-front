@@ -121,9 +121,7 @@ function QuestionBody({ q, answer, setAnswer }: { q: OnboardingQuestion; answer:
                   <button key={o.label} onClick={() => setAnswer(i)} className="w-9 h-9 flex items-center justify-center" aria-label={o.label}>
                     {i === idx ? (
                       <span className="w-10 h-10 rounded-full bg-primary-line/60 flex items-center justify-center">
-                        <span className="w-7 h-7 rounded-full bg-primary flex items-center justify-center">
-                          <span className="w-2.5 h-2.5 rounded-full bg-yellow" />
-                        </span>
+                        <span className="w-7 h-7 rounded-full bg-primary" />
                       </span>
                     ) : (
                       <span className="w-4 h-4 rounded-full border-[1.5px] border-[#B4B4BB]" />
