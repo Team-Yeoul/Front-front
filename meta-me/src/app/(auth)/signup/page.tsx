@@ -9,6 +9,7 @@ import { useAuthStore, useTermsStore } from '@/store';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button } from '@/components/ui/primitives';
 import { Field, RememberRow } from '@/components/ui/Field';
+import { BirthDateField } from '@/components/ui/BirthDateField';
 import { Wordmark } from '@/components/ui/brand';
 
 const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
@@ -96,7 +97,7 @@ export default function SignupPage() {
             />
             <RememberRow checked={rememberMe} onChange={setRememberMe} />
           </div>
-          <Field label="생년월일" type="date" value={birthDate} onChange={setBirthDate} />
+          <BirthDateField value={birthDate} onChange={setBirthDate} />
           {error && <p className="text-[13px] text-danger -mt-2">{error}</p>}
         </div>
       </div>
