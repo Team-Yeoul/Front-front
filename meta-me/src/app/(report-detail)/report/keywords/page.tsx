@@ -1,74 +1,58 @@
 'use client';
 
-import { getKeywordDetail } from '@/lib/api';
-import { useReportData } from '@/hooks/useReportData';
-import { CarouselChrome } from '@/components/report/CarouselChrome';
-import { EnergyPatternCard } from '@/components/report/EnergyPatternCard';
-import type { KeywordDetail } from '@/types';
+import { Card, ReportScreen } from '@/components/ui/report';
+import { MOCK_REPORT } from '@/lib/mock';
 
-const MOCK: KeywordDetail = {
-  interestKeywords: [
-    { category: 'interest', title: '글쓰기', count: 9, description: '', tags: [] },
-    { category: 'interest', title: '러닝', count: 6, description: '', tags: [] },
-    { category: 'interest', title: '전시', count: 4, description: '', tags: [] },
-  ],
-  disinterestKeywords: [
-    { category: 'disinterest', title: '긴 회의', count: 7, description: '', tags: [] },
-    { category: 'disinterest', title: '숫자 정리', count: 3, description: '', tags: [] },
-  ],
-  energyPatterns: [
-    { variant: 'boost', title: '에너지 부스터', subtitle: '아침 러닝 · 혼자 쓰는 시간' },
-    { variant: 'drain', title: '에너지 뱀파이어', subtitle: '늦은 밤 알림 확인 · 5회' },
-    { variant: 'void', title: '에너지 블랙홀', subtitle: '목적 없는 스크롤 · 평균 42분' },
-  ],
+const ENERGY_STYLE = {
+  booster: { row: 'bg-white', icon: 'bg-primary', glyph: '↑', desc: 'text-primary' },
+  vampire: { row: 'bg-yellow-soft', icon: 'bg-yellow', glyph: '↓', desc: 'text-gold' },
+  blackhole: { row: 'bg-white', icon: 'bg-[#3A3A40]', glyph: '○', desc: 'text-sub' },
 };
 
-function KeywordChip({ label, count, active }: { label: string; count: number; active: boolean }) {
+export default function ReportKeywordsPage() {
   return (
-    <span
-      className={`text-[13px] font-medium px-3.5 py-1.5 rounded-full mr-2 mb-2 inline-block ${
-        active ? 'bg-[#8287FF] text-white' : 'bg-gray-100 text-gray-500'
-      }`}
-    >
-      {label} {count}
-    </span>
-  );
-}
-
-export default function KeywordDetailPage() {
-  const data = useReportData(getKeywordDetail, MOCK);
-
-  return (
-    <CarouselChrome
-      title="키워드와 에너지"
-      subtitle="관심이 몰린 주제와 기분을 움직인 것들"
-      step={3}
-      total={5}
-      nextHref="/report/persona"
-    >
-      <div className="bg-white border border-gray-100 rounded-3xl px-5 py-5 mb-4 shadow-sm">
-        <p className="text-[12px] text-gray-400 mb-1.5">자주 관심을 보인 주제</p>
-        <div className="mb-3">
-          {data.interestKeywords.map((k, i) => (
-            <KeywordChip key={k.title} label={k.title} count={k.count} active={i === 0} />
+    <ReportScreen eyebrow="KEYWORD & ENERGY" title="키워드와 에너지" sub="관심이 몰린 주제와 기분을 움직인 것들">
+      <Card>
+        <p className="text-[16px] font-bold text-ink">흥미 / 무흥미 키워드</p>
+        <p className="text-[12px] text-sub mt-3">자주 관심을 보인 주제</p>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {MOCK_REPORT.interests.map((k, i) => (
+            <span
+              key={k.label}
+              className={`h-9 px-4 rounded-full text-[15px] font-semibold inline-flex items-center ${i === 0 ? 'bg-primary text-white' : 'bg-primary-soft text-primary'}`}
+            >
+              {k.label} {k.count}
+            </span>
           ))}
         </div>
-        <p className="text-[12px] text-gray-400 mb-1.5">흥미가 낮게 나타난 주제</p>
-        <div>
-          {data.disinterestKeywords.map((k) => (
-            <KeywordChip key={k.title} label={k.title} count={k.count} active={false} />
+        <p className="text-[12px] text-sub mt-4">흥미가 낮게 나타난 주제</p>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {MOCK_REPORT.disinterests.map((k) => (
+            <span key={k.label} className="h-9 px-4 rounded-full bg-[#E8E8EE] text-[15px] text-[#48484F] inline-flex items-center">
+              {k.label} {k.count}
+            </span>
           ))}
         </div>
-      </div>
-
-      <div className="mb-6">
-        <h3 className="text-[15px] font-semibold text-gray-900 mb-3">에너지 패턴</h3>
-        <div className="flex flex-col gap-2.5">
-          {data.energyPatterns.map((p) => (
-            <EnergyPatternCard key={p.title} variant={p.variant} title={p.title} subtitle={p.subtitle} />
-          ))}
+      </Card>
+      <Card>
+        <p className="text-[16px] font-bold text-ink">에너지 패턴</p>
+        <div className="flex flex-col gap-2.5 mt-4">
+          {MOCK_REPORT.energy.map((e) => {
+            const s = ENERGY_STYLE[e.kind];
+            return (
+              <div key={e.kind} className={`flex items-center gap-3.5 rounded-2xl px-4 py-4 ${s.row}`}>
+                <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-[14px] font-bold ${s.icon} ${e.kind === 'vampire' ? 'text-ink' : 'text-white'}`}>
+                  {s.glyph}
+                </span>
+                <div>
+                  <p className="text-[15px] font-bold text-ink">{e.title}</p>
+                  <p className={`text-[13px] mt-0.5 ${s.desc}`}>{e.desc}</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </div>
-    </CarouselChrome>
+      </Card>
+    </ReportScreen>
   );
 }

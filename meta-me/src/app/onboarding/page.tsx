@@ -1,473 +1,497 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSubmitOnboarding } from '@/entities/user';
-import type { OnboardingRequest } from '@/entities/user';
-import { SplashSlide } from './_components/SplashSlide';
-import { MultiChoiceQuestion } from './_components/MultiChoiceQuestion';
-import { ScaleQuestion } from './_components/ScaleQuestion';
-import { CardGridQuestion } from './_components/CardGridQuestion';
-import { ListChoiceQuestion } from './_components/ListChoiceQuestion';
-import { SURVEY_QUESTIONS } from './_components/surveyQuestions';
+import { Screen } from '@/components/ui/Screen';
+import { BackButton, Button, CheckIcon, Dots, Img3D, OptionRow, TextButton } from '@/components/ui/primitives';
+import { GradientBg } from '@/components/ui/overlays';
+import { AnalyzingScreen, AskFriendSheet, CogniHero, FeatureIcons } from '@/components/ui/flows';
+import { HourSlider } from '@/components/ui/HourSlider';
+import { MOCK_NICKNAME } from '@/lib/mock';
+import { ONBOARDING_QUESTIONS, type OnboardingQuestion } from './questions';
 
-type Step = 'intro' | 'survey' | 'notification' | 'description' | 'done' | 'sentenceChange' | 'day0' | 'day1';
+type Phase = 'intro' | 'question' | 'analyzing' | 'result' | 'outro';
+type Answer = string | string[] | number | undefined;
 
-type QuestionKey = keyof OnboardingRequest;
-type SurveyAnswer = string[] | number | string;
+/* ── 인트로 / 아웃트로 슬라이드 ─────────────────────────── */
 
-const INTRO_SLIDES = [
-  { heading: <>안녕하세요.<br />처음부터 무거운 질문은<br />하지 않을게요.</> },
-  {
-    eyebrow: 'METAME',
-    heading: (
-      <>
-        앞으로 당신을 더 잘 이해해서
-        <br />
-        도와드릴 수 있도록,
-        <br />
-        가볍게 3가지만 골라주세요.
-      </>
-    ),
-    body: '약 2분 · 9개 질문',
-  },
-  { heading: <>잘 모르겠으면&ldquo;아직 모르겠어요&rdquo;를 골라도 괜찮아요.</> },
-];
-
-const QUESTIONS: { key: QuestionKey; title: React.ReactNode; caption: string }[] = [
-  {
-    key: 'my_one_sentence',
-    title: <>당신은 스스로를<br />한 문장으로 설명할<br />수 있나요?</>,
-    caption: '생각보다 우리는 스스로를 정확히 모를 수도 있어요',
-  },
-  {
-    key: 'self_strength',
-    title: <>당신이 생각하는<br />당신의 장점은<br />무엇인가요?</>,
-    caption: '스스로를 조금 더 들여다볼까요',
-  },
-  {
-    key: 'others_feedback',
-    title: <>다른 사람들에게<br />자주 듣는 말이<br />있다면?</>,
-    caption: '남들이 보는 나도 나를 이루는 한 조각이에요',
-  },
-  {
-    key: 'favorite_thing',
-    title: <>당신이 좋아한다고<br />생각하는 것은<br />무엇인가요?</>,
-    caption: '거의 다 왔어요',
-  },
-];
-
-function isSurveyAnswerValid(q: (typeof SURVEY_QUESTIONS)[number], answer: SurveyAnswer | undefined) {
-  if (q.type === 'multi') return Array.isArray(answer) && answer.length > 0;
-  if (q.type === 'scale') return typeof answer === 'number';
-  return typeof answer === 'string' && answer.length > 0;
+function Slide({
+  variant,
+  children,
+  align = 'left',
+  hint,
+  dots,
+  onNext,
+  onSkip,
+  cta,
+}: {
+  variant: 'a' | 'b' | 'c';
+  children: ReactNode;
+  align?: 'left' | 'center';
+  hint?: string;
+  dots?: [number, number];
+  onNext: () => void;
+  onSkip?: () => void;
+  cta?: string;
+}) {
+  return (
+    <Screen statusBg={variant === 'c' ? '#FFF6D8' : '#E6E6FF'} background={<GradientBg variant={variant} />}>
+      <div className="relative h-full flex flex-col" onClick={cta ? undefined : onNext}>
+        <div className="h-10 flex items-center justify-end px-6">
+          {onSkip && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSkip();
+              }}
+              className="text-[13px] text-[#48484F]"
+            >
+              넘어가기
+            </button>
+          )}
+        </div>
+        <div className={`flex-1 flex flex-col justify-center px-10 ${align === 'center' ? 'items-center text-center' : ''}`}>
+          {children}
+        </div>
+        <div className="flex flex-col items-center gap-5 pb-8 px-5">
+          {hint && (
+            <p className="text-[13px] text-[#48484F] flex items-center gap-2">
+              {hint}
+              {hint.startsWith('옆으로') && <span>→</span>}
+            </p>
+          )}
+          {dots && <Dots count={dots[1]} index={dots[0]} variant="bar" />}
+          {cta && (
+            <Button variant="dark" onClick={onNext}>
+              {cta}
+            </Button>
+          )}
+        </div>
+      </div>
+    </Screen>
+  );
 }
+
+const slideTitle = 'text-[26px] font-bold text-ink leading-[1.55]';
+
+/* ── 질문 본문 ─────────────────────────────────────────── */
+
+function QuestionBody({ q, answer, setAnswer }: { q: OnboardingQuestion; answer: Answer; setAnswer: (a: Answer) => void }) {
+  switch (q.kind) {
+    case 'sentence': {
+      const later = answer === '__later__';
+      const text = typeof answer === 'string' && !later ? answer : '';
+      return (
+        <div className="flex flex-col gap-4">
+          <div className={`rounded-2xl px-4 py-3.5 border-[1.5px] ${later ? 'bg-surface border-transparent opacity-50' : 'bg-primary-soft/60 border-primary'}`}>
+            <p className="text-[12px] font-semibold text-primary">내 문장</p>
+            <textarea
+              value={text}
+              disabled={later}
+              maxLength={80}
+              rows={2}
+              onChange={(e) => setAnswer(e.target.value)}
+              placeholder="계획은 잘 세우는데, 시작 앞에서 오래 머무는 사람."
+              className="w-full mt-1.5 bg-transparent outline-none resize-none text-[16px] font-semibold text-ink placeholder:text-mute placeholder:font-medium caret-primary"
+            />
+            <p className="text-right font-mono text-[12px] text-mute">{text.length} / 80</p>
+          </div>
+          <button
+            onClick={() => setAnswer(later ? '' : '__later__')}
+            className="flex items-center gap-3 rounded-2xl bg-yellow-soft px-4 h-14 text-left"
+          >
+            <span className={`w-[22px] h-[22px] rounded-[6px] flex items-center justify-center ${later ? 'bg-[#E5B92E]' : 'border-[1.5px] border-[#E5C45A]'}`}>
+              {later && <CheckIcon size={13} />}
+            </span>
+            <span className="text-[15px] text-gold">한 문장은 나중에 쓸게요</span>
+          </button>
+        </div>
+      );
+    }
+    case 'scale': {
+      const idx = typeof answer === 'number' ? answer : 2;
+      const picked = q.options[idx];
+      return (
+        <div className="flex flex-col gap-4">
+          <div className="rounded-3xl bg-surface px-5 pt-5 pb-5">
+            <div className="relative">
+              <div className="flex justify-between items-center px-1">
+                {q.options.map((o, i) => (
+                  <button key={o.label} onClick={() => setAnswer(i)} className="w-9 h-9 flex items-center justify-center" aria-label={o.label}>
+                    {i === idx ? (
+                      <span className="w-10 h-10 rounded-full bg-primary-line/60 flex items-center justify-center">
+                        <span className="w-7 h-7 rounded-full bg-primary flex items-center justify-center">
+                          <span className="w-2.5 h-2.5 rounded-full bg-yellow" />
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="w-4 h-4 rounded-full border-[1.5px] border-[#B4B4BB]" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="mx-3 mt-4 h-1 rounded-full bg-[#E1E1E8]">
+                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(idx / (q.options.length - 1)) * 100}%` }} />
+              </div>
+            </div>
+            <div className="grid grid-cols-5 gap-1 mt-4">
+              {q.options.map((o, i) => (
+                <button
+                  key={o.label}
+                  onClick={() => setAnswer(i)}
+                  className={`text-[11px] leading-[1.45] text-center break-keep ${i === idx ? 'font-bold text-primary' : 'text-sub'}`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-3xl border border-line px-5 py-4">
+            <p className="text-[12px] font-semibold text-primary">지금 고른 답</p>
+            <p className="text-[18px] font-bold text-ink mt-1.5">{picked.label}</p>
+            <p className="text-[13px] text-sub mt-1.5 leading-relaxed">{picked.description}</p>
+          </div>
+        </div>
+      );
+    }
+    case 'multi': {
+      const list = Array.isArray(answer) ? answer : [];
+      const toggle = (o: string) => {
+        if (list.includes(o)) setAnswer(list.filter((x) => x !== o));
+        else if (!q.max || list.length < q.max) setAnswer([...list, o]);
+      };
+      return (
+        <div className="flex flex-col gap-2.5">
+          {q.options.map((o) =>
+            q.soft ? (
+              <button
+                key={o}
+                onClick={() => toggle(o)}
+                className={`flex items-center gap-3 rounded-2xl px-4 h-14 text-left ${list.includes(o) ? 'bg-primary-soft' : 'bg-surface'}`}
+              >
+                <span className={`w-[22px] h-[22px] rounded-[6px] flex items-center justify-center ${list.includes(o) ? 'bg-primary' : 'bg-white border-[1.5px] border-[#D5D5DC]'}`}>
+                  {list.includes(o) && <CheckIcon size={13} />}
+                </span>
+                <span className="text-[15px] text-[#48484F]">{o}</span>
+              </button>
+            ) : (
+              <OptionRow key={o} label={o} selected={list.includes(o)} onClick={() => toggle(o)} />
+            ),
+          )}
+        </div>
+      );
+    }
+    case 'list':
+      return (
+        <div className="flex flex-col gap-2.5">
+          {q.options.map((o) => (
+            <OptionRow key={o.label} label={o.label} description={o.description} selected={answer === o.label} onClick={() => setAnswer(o.label)} />
+          ))}
+        </div>
+      );
+    case 'cards':
+      return (
+        <div className="grid grid-cols-2 gap-3">
+          {q.options.map((o, i) => {
+            const selected = answer === o.label;
+            const solid = q.accent === 'solid';
+            return (
+              <button
+                key={o.label}
+                onClick={() => setAnswer(o.label)}
+                className={`flex flex-col text-left rounded-3xl p-4 min-h-[150px] border-[1.5px] transition-colors ${
+                  selected
+                    ? solid
+                      ? 'bg-primary border-primary'
+                      : 'bg-primary-soft border-primary'
+                    : 'bg-surface border-transparent'
+                }`}
+              >
+                {q.glyphs && (
+                  <span
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-[14px] font-semibold ${
+                      selected && solid ? 'bg-yellow text-ink' : 'bg-white text-primary'
+                    }`}
+                  >
+                    {selected && solid ? <CheckIcon size={14} color="#1A1A1E" /> : q.glyphs[i] === '✓' ? '◡' : q.glyphs[i]}
+                  </span>
+                )}
+                <span className={`${q.glyphs ? 'mt-auto pt-6' : ''} text-[16px] font-bold leading-snug ${selected && solid ? 'text-white' : 'text-ink'}`}>
+                  {o.label}
+                </span>
+                {o.description && (
+                  <span className={`text-[13px] mt-1.5 leading-relaxed ${selected && solid ? 'text-white/85' : 'text-sub'}`}>{o.description}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      );
+    case 'hours': {
+      const h = typeof answer === 'number' ? answer : 2;
+      return (
+        <div>
+          <p className="text-center text-[40px] font-bold text-ink -mt-2">{h >= 4 ? '4시간 이상' : `${h}시간`}</p>
+          <div className="mt-8">
+            <HourSlider min={0} max={4} step={0.5} value={h} onChange={setAnswer} />
+            <div className="flex justify-between text-[13px] text-sub mt-4">
+              <span>0시간</span>
+              <span>2시간</span>
+              <span>4시간 이상</span>
+            </div>
+          </div>
+          <div className="mt-10 rounded-2xl bg-surface px-5 py-4 flex gap-3">
+            <span className="text-[14px] font-bold text-primary">TIP</span>
+            <div>
+              <p className="text-[15px] font-semibold text-ink">정답은 없어요</p>
+              <p className="text-[13px] text-sub mt-1 leading-relaxed">
+                요즘 실제로 필요하다고 느끼는 만큼 골라주세요. 리포트에서 기록과 함께 비교해 드려요.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+  }
+}
+
+function isAnswered(q: OnboardingQuestion, a: Answer) {
+  if (q.kind === 'sentence') return typeof a === 'string' && a.trim().length > 0;
+  if (q.kind === 'multi') return Array.isArray(a) && a.length > 0;
+  if (q.kind === 'scale' || q.kind === 'hours') return true;
+  return typeof a === 'string' && a.length > 0;
+}
+
+const labelOf = (a: Answer, q?: OnboardingQuestion) => {
+  if (Array.isArray(a)) return a.join(', ');
+  if (typeof a === 'number' && q?.kind === 'scale') return q.options[a].label;
+  if (typeof a === 'string' && a !== '__later__') return a;
+  return '';
+};
+
+/* ── 페이지 ────────────────────────────────────────────── */
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const submitOnboardingMutation = useSubmitOnboarding();
-  const [step, setStep] = useState<Step>('intro');
-  const [introIndex, setIntroIndex] = useState(0);
-  const [surveyIndex, setSurveyIndex] = useState(0);
-  const [surveyAnswers, setSurveyAnswers] = useState<Record<string, SurveyAnswer>>({});
+  const submitOnboarding = useSubmitOnboarding();
+  const [phase, setPhase] = useState<Phase>('intro');
+  const [slide, setSlide] = useState(0);
   const [qIndex, setQIndex] = useState(0);
-  const [answers, setAnswers] = useState<Partial<OnboardingRequest>>({});
-  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
-  const [aiSentence, setAiSentence] = useState('');
-  const [accuracyPercent, setAccuracyPercent] = useState(12);
-  const loading = submitOnboardingMutation.isPending;
+  const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const [askOpen, setAskOpen] = useState(false);
+  const [accuracy, setAccuracy] = useState(12);
 
-  const question = QUESTIONS[qIndex];
-  const currentAnswer = answers[question.key] ?? '';
-  const hasText = currentAnswer.trim().length > 0;
+  const q = ONBOARDING_QUESTIONS[qIndex];
+  const total = ONBOARDING_QUESTIONS.length;
+  const isLast = qIndex === total - 1;
 
-  useEffect(() => {
-    if (step !== 'done') return;
-    const t = setTimeout(() => setStep('sentenceChange'), 2200);
-    return () => clearTimeout(t);
-  }, [step]);
-
-  const handleQuestionSubmit = async () => {
-    if (!hasText || loading) return;
-
-    if (qIndex < QUESTIONS.length - 1) {
-      setQIndex(qIndex + 1);
-      return;
-    }
-
+  const submit = async () => {
+    const byId = (id: string) => labelOf(answers[id], ONBOARDING_QUESTIONS.find((x) => x.id === id)) || '아직 모르겠어요';
     try {
-      const res = await submitOnboardingMutation.mutateAsync(answers as OnboardingRequest);
-      if (res.ai_first_sentence && /[가-힣]/.test(res.ai_first_sentence)) {
-        setAiSentence(res.ai_first_sentence);
-      }
-      if (typeof res.accuracy_percent === 'number') {
-        setAccuracyPercent(res.accuracy_percent);
-      }
+      // v2 온보딩 질문은 API 필드(4개 문장)와 1:1로 맞지 않아 가장 가까운 답을 묶어서 보낸다.
+      const res = await submitOnboarding.mutateAsync({
+        my_one_sentence: byId('my_one_sentence'),
+        self_strength: byId('self_awareness'),
+        others_feedback: byId('repeating_pattern'),
+        favorite_thing: byId('curious_about'),
+      });
+      if (typeof res.accuracy_percent === 'number') setAccuracy(res.accuracy_percent);
     } catch {
-      // 실패해도 다음 단계로 진행
-    } finally {
-      setStep('done');
+      // 로그아웃 상태이거나 실패해도 흐름은 이어감
     }
   };
 
-  // ── 인트로 스플래시 ──
-  if (step === 'intro') {
-    const slide = INTRO_SLIDES[introIndex];
-    const goNext = () => {
-      if (introIndex < INTRO_SLIDES.length - 1) {
-        setIntroIndex(introIndex + 1);
-      } else {
-        setStep('survey');
-      }
-    };
-    return (
-      <SplashSlide
-        eyebrow={slide.eyebrow}
-        heading={slide.heading}
-        body={slide.body}
-        chip={
-          introIndex === INTRO_SLIDES.length - 1 ? (
-            <span className="inline-block text-[13px] font-semibold text-gray-900 bg-[#FFE9A8] px-4 py-2 rounded-full">
-              아직 모르겠어요
-            </span>
-          ) : undefined
-        }
-        ctaLabel={introIndex === INTRO_SLIDES.length - 1 ? '첫 질문 보기' : undefined}
-        align="left"
-        onNext={goNext}
-        onSkip={() => setStep('notification')}
-        dotIndex={introIndex}
-        dotCount={INTRO_SLIDES.length}
-      />
-    );
-  }
+  const next = () => {
+    if (!isLast) {
+      setQIndex(qIndex + 1);
+      return;
+    }
+    submit();
+    setPhase('analyzing');
+  };
 
-  // ── 9문항 설문 ──
-  if (step === 'survey') {
-    const q = SURVEY_QUESTIONS[surveyIndex];
-    const answer = surveyAnswers[q.id];
-    const valid = isSurveyAnswerValid(q, answer);
-    const setAnswer = (value: SurveyAnswer) => setSurveyAnswers((prev) => ({ ...prev, [q.id]: value }));
-
-    const goNext = () => {
-      if (surveyIndex < SURVEY_QUESTIONS.length - 1) {
-        setSurveyIndex(surveyIndex + 1);
-      } else {
-        setStep('notification');
-      }
-    };
-
-    return (
-      <div className="flex flex-col h-full bg-white">
-        <div className="px-6 pt-6 pb-2 flex items-center justify-between">
-          <button
-            onClick={() => (surveyIndex > 0 ? setSurveyIndex(surveyIndex - 1) : setStep('intro'))}
-            className="w-8 h-8 flex items-center justify-center -ml-2"
-            aria-label="뒤로"
-          >
-            <svg width="9" height="15" viewBox="0 0 9 15" fill="none">
-              <path d="M8 1.5L1.5 7.5L8 13.5" stroke="#1C1C1E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-          <span className="text-[12px] text-gray-300">
-            {surveyIndex + 1} / {SURVEY_QUESTIONS.length}
+  /* 인트로 */
+  if (phase === 'intro') {
+    const go = () => (slide < 2 ? setSlide(slide + 1) : (setPhase('question'), setSlide(0)));
+    const skip = () => (setPhase('question'), setSlide(0));
+    if (slide === 0)
+      return (
+        <Slide variant="a" dots={[0, 3]} hint="옆으로 밀어서 계속" onNext={go}>
+          <p className="font-mono text-[12px] tracking-[0.2em] text-[#5A5A62]">METAME</p>
+          <h1 className={`${slideTitle} mt-6`}>
+            안녕하세요.
+            <br />
+            처음부터 무거운 질문은
+            <br />
+            하지 않을게요.
+          </h1>
+        </Slide>
+      );
+    if (slide === 1)
+      return (
+        <Slide variant="b" dots={[1, 3]} hint="옆으로 밀어서 계속" onNext={go} onSkip={skip}>
+          <h1 className={slideTitle}>
+            앞으로 당신을 더 잘 이해해서
+            <br />
+            도와드릴 수 있도록,
+            <br />
+            가볍게 3가지만 골라주세요.
+          </h1>
+          <span className="self-start mt-6 h-8 px-4 rounded-full bg-white text-[13px] font-semibold text-primary inline-flex items-center">
+            약 2분 · 9개 질문
           </span>
-        </div>
-
-        <div className="px-6 pb-2 flex items-center gap-2">
-          <div className="flex-1 h-1 rounded-full bg-gray-100">
-            <div
-              className="h-full rounded-full bg-[#8287FF] transition-all"
-              style={{ width: `${((surveyIndex + 1) / SURVEY_QUESTIONS.length) * 100}%` }}
-            />
-          </div>
-          <span className="text-[11px] font-semibold text-[#8287FF] shrink-0">
-            {Math.round(((surveyIndex + 1) / SURVEY_QUESTIONS.length) * 100)}%
-          </span>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 pt-4">
-          <h2 className="text-[19px] font-bold text-gray-900 leading-[1.4] mb-1.5">{q.title}</h2>
-          {q.caption && <p className="text-[13px] text-gray-400 mb-5">{q.caption}</p>}
-          {!q.caption && <div className="mb-5" />}
-
-          {q.type === 'multi' && (
-            <MultiChoiceQuestion
-              options={q.options}
-              max={q.max}
-              selected={(answer as string[]) ?? []}
-              onChange={setAnswer}
-            />
-          )}
-          {q.type === 'scale' && (
-            <ScaleQuestion
-              options={q.options}
-              selected={typeof answer === 'number' ? answer : null}
-              onChange={setAnswer}
-            />
-          )}
-          {q.type === 'cardgrid' && (
-            <CardGridQuestion
-              options={q.options}
-              selected={(answer as string) ?? ''}
-              onChange={setAnswer}
-              note={q.note}
-            />
-          )}
-          {q.type === 'list' && (
-            <ListChoiceQuestion options={q.options} selected={(answer as string) ?? ''} onChange={setAnswer} />
-          )}
-
-          {surveyIndex === SURVEY_QUESTIONS.length - 1 && (
-            <div className="bg-gray-50 rounded-2xl px-4 py-4 mt-6">
-              <p className="text-[12px] text-gray-400 mb-2.5">지금까지 고른 것</p>
-              <div className="flex flex-wrap gap-2">
-                {SURVEY_QUESTIONS.flatMap((sq) => {
-                  const a = surveyAnswers[sq.id];
-                  if (a === undefined || (Array.isArray(a) && a.length === 0)) return [];
-                  const labels =
-                    sq.type === 'multi'
-                      ? (a as string[]).map((id) => sq.options.find((o) => o.id === id)?.label).filter(Boolean)
-                      : sq.type === 'scale'
-                        ? [sq.options[a as number]?.label]
-                        : [sq.options.find((o) => o.id === a)?.label];
-                  return labels.filter((l): l is string => !!l);
-                }).map((label, i) => (
-                  <span key={`${label}-${i}`} className="text-[12px] text-gray-600 bg-white px-3 py-1.5 rounded-full">
-                    {label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="px-6 pb-10 pt-3 flex flex-col gap-3">
-          <button
-            onClick={goNext}
-            disabled={!valid}
-            className={`w-full h-14 rounded-2xl text-base font-semibold text-white transition-colors ${
-              valid ? 'bg-gray-900' : 'bg-gray-300'
-            }`}
-          >
-            {surveyIndex === SURVEY_QUESTIONS.length - 1 ? '메타미 시작하기' : `다음 (${surveyIndex + 1}/${SURVEY_QUESTIONS.length})`}
-          </button>
-          <button onClick={() => setStep('notification')} className="text-sm text-gray-400 text-center">
-            넘어가기
-          </button>
-        </div>
-      </div>
+        </Slide>
+      );
+    return (
+      <Slide variant="c" dots={[2, 3]} onNext={go} onSkip={skip} cta="첫 질문 보기">
+        <h1 className={slideTitle}>
+          잘 모르겠으면
+          <br />
+          “아직 모르겠어요”를
+          <br />
+          골라도 괜찮아요.
+        </h1>
+        <span className="self-start mt-6 h-8 px-4 rounded-full bg-yellow text-[13px] font-semibold text-ink inline-flex items-center">
+          아직 모르겠어요
+        </span>
+      </Slide>
     );
   }
 
-  // ── 알림 권한 ──
-  if (step === 'notification') {
-    return (
-      <div className="relative flex flex-col h-full bg-white">
-        <button
-          onClick={() => setStep('survey')}
-          className="px-5 pt-6 pb-2 text-sm text-blue-500 text-left flex items-center gap-0.5"
-        >
-          <svg width="8" height="13" viewBox="0 0 8 13" fill="none">
-            <path d="M7 1L1 6.5L7 12" stroke="#3478F6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <span className="ml-1">뒤로가기</span>
-        </button>
-
-        <div className="flex-1 overflow-y-auto px-6">
-          <div className="mt-2 mb-7 bg-gray-100 rounded-2xl h-48 p-5 flex flex-col gap-3">
-            <div className="h-2.5 rounded-full bg-gray-300 w-3/4" />
-            <div className="h-2.5 rounded-full bg-gray-300 w-1/2" />
-            <div className="flex gap-2 mt-2">
-              <div className="h-8 rounded-lg bg-gray-300 w-24" />
-              <div className="h-8 rounded-lg bg-gray-300 w-16" />
-            </div>
-          </div>
-
-          <h2 className="text-[22px] font-bold text-gray-900 leading-[1.45] mb-4">
-            푸시 알림을 활성화하여 나를 이해하는 여정을 시작해보세요
-          </h2>
-          <p className="text-sm text-gray-400 leading-relaxed">
-            하루 한 번, 놓치기 쉬운 나의 감정과 생각을 자연스럽게 기록해보세요.
-            쌓인 답변은 나를 이해하는 인사이트로 이어져요. 놓치지 않으려면 알림을 활성화하세요.
-          </p>
-        </div>
-
-        <div className="px-6 pb-14 flex flex-col gap-4">
-          <button
-            onClick={() => setShowPermissionDialog(true)}
-            className="w-full h-14 bg-gray-900 text-white rounded-2xl text-base font-semibold focus:outline-none"
-          >
-            알림받기
-          </button>
-          <button
-            onClick={() => setStep('description')}
-            className="text-sm text-gray-400 text-center focus:outline-none"
-          >
-            나중에
-          </button>
-        </div>
-
-        {showPermissionDialog && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center px-10 z-50">
-            <div className="bg-white rounded-2xl overflow-hidden w-full">
-              <div className="px-5 pt-6 pb-5 text-center">
-                <p className="text-[14px] font-semibold text-gray-900 mb-2 leading-snug">
-                  &lsquo;메타미&rsquo; 에서 알림을 보내고자 합니다.
-                </p>
-                <p className="text-[12px] text-gray-500 leading-relaxed">
-                  경고, 사운드 및 아이콘 배지가 알림에 포함될 수 있습니다.
-                  설정에서 이를 구성할 수 있습니다.
-                </p>
-              </div>
-              <div className="border-t border-gray-200 flex">
-                <button
-                  onClick={() => { setShowPermissionDialog(false); setStep('description'); }}
-                  className="flex-1 py-3.5 text-[14px] text-blue-500 border-r border-gray-200 focus:outline-none"
-                >
-                  허용하지 않음
-                </button>
-                <button
-                  onClick={() => { setShowPermissionDialog(false); setStep('description'); }}
-                  className="flex-1 py-3.5 text-[14px] text-blue-500 font-semibold focus:outline-none"
-                >
-                  허용
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+  /* 질문 */
+  if (phase === 'question') {
+    const answer = answers[q.id];
+    const setAnswer = (a: Answer) => setAnswers((prev) => ({ ...prev, [q.id]: a }));
+    const titleFirst = q.kind === 'hours';
+    const title = (
+      <div className={titleFirst ? '' : 'mt-2'}>
+        <h1 className="text-[20px] font-bold text-ink leading-[1.5] whitespace-pre-line">{q.title}</h1>
+        {'caption' in q && q.caption && <p className="text-[13px] text-sub mt-1.5">{q.caption}</p>}
       </div>
     );
-  }
-
-  // ── 자기소개 (4문항, 실제 API 제출) ──
-  if (step === 'description') {
     return (
-      <div className="flex flex-col h-full bg-white">
-        <button
-          onClick={() => (qIndex > 0 ? setQIndex(qIndex - 1) : setStep('notification'))}
-          className="px-5 pt-6 pb-2 w-fit focus:outline-none"
-          aria-label="뒤로"
-        >
-          <svg width="10" height="16" viewBox="0 0 10 16" fill="none">
-            <path d="M8.5 1.5L1.5 8L8.5 14.5" stroke="#1C1C1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-
-        <div className="flex-1 px-6 pt-4">
-          <p className="text-[13px] text-gray-400 mb-5 leading-snug">
-            {question.caption}
-          </p>
-          <h2 className="text-[24px] font-bold text-gray-900 leading-[1.4] mb-9">
-            {question.title}
-          </h2>
-          <input
-            type="text"
-            value={currentAnswer}
-            onChange={e => setAnswers(a => ({ ...a, [question.key]: e.target.value }))}
-            placeholder="내용을 입력하세요"
-            className={`w-full h-[52px] rounded-xl px-4 text-[15px] text-gray-900 outline-none placeholder:text-gray-300 transition-colors ${
-              hasText
-                ? 'bg-white border-2 border-gray-900'
-                : 'bg-gray-50 border border-gray-200'
-            }`}
-          />
-        </div>
-
-        <div className="px-6 pb-14 flex flex-col gap-4">
-          <button
-            onClick={handleQuestionSubmit}
-            disabled={loading}
-            className={`w-full h-14 rounded-2xl text-base font-semibold text-white transition-colors focus:outline-none ${hasText && !loading ? 'bg-gray-900' : 'bg-gray-300 cursor-default'}`}
-          >
-            {loading ? '분석 중...' : qIndex < QUESTIONS.length - 1 ? '다음' : '입력완료'}
-          </button>
-          <button
-            onClick={() => setStep('done')}
-            className="text-sm text-gray-400 text-center focus:outline-none"
-          >
-            넘어가기
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── 완료 메시지 ──
-  if (step === 'done') {
-    return (
-      <div className="flex flex-col h-full bg-white px-6 justify-center">
-        <p className="text-sm text-gray-400 mb-3 leading-snug">
-          당신보다 우리는 스스로를 정확히 알 수도 있어요
-        </p>
-        <h2 className="text-[22px] font-bold text-gray-900 leading-[1.55]">
-          {aiSentence || (
-            <>
-              그래서 이 앱이 존재해요.<br />
-              당신을 더 잘 이해할 수<br />
-              있도록 도와줄게요.
-            </>
-          )}
-        </h2>
-        <p className="text-gray-300 mt-6">;</p>
-      </div>
-    );
-  }
-
-  // ── 그 문장은 오늘부터 바뀝니다 ──
-  if (step === 'sentenceChange') {
-    return (
-      <SplashSlide
-        heading={
+      <Screen
+        footer={
           <>
-            그 문장은 오늘부터 바뀝니다.
-            <br />
-            당신을 더 잘 이해할 수 있도록
-            <br />
-            도와줄게요
+            <Button variant={isLast ? 'primary' : 'dark'} onClick={next} disabled={!isAnswered(q, answer)}>
+              {isLast ? '답변 마치기' : `다음 (${qIndex + 1}/${total})`}
+            </Button>
+            {!isLast && (
+              <TextButton className="mt-1" onClick={next}>
+                넘어가기
+              </TextButton>
+            )}
           </>
         }
-        onNext={() => setStep('day0')}
-        dotIndex={0}
-        dotCount={3}
-      />
+      >
+        <div className="px-5">
+          <div className="flex items-center justify-between h-14">
+            <BackButton onClick={() => (qIndex === 0 ? setPhase('intro') : setQIndex(qIndex - 1))} />
+            <span className="font-mono text-[13px] text-mute">
+              {qIndex + 1} / {total}
+            </span>
+          </div>
+          <div className="flex gap-2 mt-2">
+            {ONBOARDING_QUESTIONS.map((x, i) => (
+              <span key={x.id} className={`w-1.5 h-1.5 rounded-full ${i === qIndex ? 'bg-primary scale-125' : 'bg-[#D8D8DE]'}`} />
+            ))}
+          </div>
+          {titleFirst && <div className="mt-8">{title}</div>}
+          <div className={`flex justify-center ${titleFirst ? 'mt-8 mb-6' : 'mt-[140px] mb-8'}`}>
+            <Img3D name={q.icon} size={titleFirst ? 100 : 104} />
+          </div>
+          {!titleFirst && title}
+          <div className="mt-4 pb-4">
+            <QuestionBody q={q} answer={answer} setAnswer={setAnswer} />
+          </div>
+        </div>
+      </Screen>
     );
   }
 
-  // ── Day 0 ──
-  if (step === 'day0') {
+  /* 분석 중 */
+  if (phase === 'analyzing') {
     return (
-      <SplashSlide
-        heading="Day 0"
-        body="당신이 스스로 쓴 첫 문장이 저장됐어요"
-        onNext={() => setStep('day1')}
-        dotIndex={1}
-        dotCount={3}
+      <AnalyzingScreen
+        title={
+          <>
+            내 답에 꼭 맞는
+            <br />첫 코그니를 찾고 있어요
+          </>
+        }
+        steps={['내 기록 습관 분석 중', '내 감정 패턴 분석 중', '내 성향 분석 중']}
+        onDone={() => setPhase('result')}
+        onClose={() => setPhase('result')}
       />
     );
   }
 
-  // ── Day 1 ──
-  return (
-    <SplashSlide
-      heading="Day 1"
-      body={
-        <>
-          오늘부터 쌓이는 기록이
+  /* 첫 코그니 결과 */
+  if (phase === 'result') {
+    return (
+      <CogniHero
+        eyebrow={askOpen ? `${MOCK_NICKNAME}님의 첫 코그니는` : undefined}
+        name={
+          askOpen ? (
+            <>
+              꼼꼼한
+              <br />
+              설계자
+            </>
+          ) : undefined
+        }
+        character="cogni-headphone"
+        category="No.01 · 행동 · 습관 패턴"
+        features={[
+          { icon: FeatureIcons.target, text: '계획을 먼저 세워야 마음이 놓여요' },
+          { icon: FeatureIcons.clock, text: '시작 전에 준비가 길어지곤 해요' },
+          { icon: FeatureIcons.bolt, text: '마감이 보이면 확 몰입해요' },
+        ]}
+        counterLabel="온보딩 답 10개에서 발견"
+        counter="01 / 24"
+        primaryLabel="여정 시작하기"
+        onPrimary={() => setPhase('outro')}
+        onBack={() => setPhase('question')}
+        askFriend={() => setAskOpen(true)}
+        overlay={
+          <AskFriendSheet open={askOpen} onClose={() => setAskOpen(false)} myType="설명 장인" onAsk={() => router.push('/mirror/invite')} />
+        }
+      />
+    );
+  }
+
+  /* 아웃트로 */
+  const finish = () => router.push('/main');
+  if (slide === 0)
+    return (
+      <Slide variant="a" dots={[0, 3]} hint="화면을 탭해서 계속" align="center" onNext={() => setSlide(1)}>
+        <h1 className="text-[22px] font-bold text-ink leading-[1.65]">
+          그 문장은 오늘부터 바뀝니다.
           <br />
-          당신의 한 문장을 정확하게 만듭니다
-        </>
-      }
-      chip={
-        <span className="inline-block text-[13px] font-medium text-gray-700 bg-white border border-gray-200 px-4 py-2 rounded-full">
-          정확도 {accuracyPercent}%에서 출발합니다
-        </span>
-      }
-      ctaLabel="여정 시작하기"
-      onNext={() => router.push('/main')}
-      dotIndex={2}
-      dotCount={3}
-    />
+          당신을 더 잘 이해할 수 있도록 도와줄게요
+        </h1>
+      </Slide>
+    );
+  if (slide === 1)
+    return (
+      <Slide variant="b" dots={[1, 3]} hint="화면을 탭해서 계속" align="center" onNext={() => setSlide(2)} onSkip={finish}>
+        <h1 className="text-[36px] font-bold text-ink tracking-tight">Day 0</h1>
+        <p className="text-[15px] text-[#48484F] mt-3">당신이 스스로 쓴 첫 문장이 저장됐어요</p>
+      </Slide>
+    );
+  return (
+    <Slide variant="c" align="center" onNext={finish} onSkip={finish}>
+      <p className="font-mono text-[12px] tracking-[0.25em] text-[#5A5A62]">YOUR JOURNEY BEGINS</p>
+      <h1 className="text-[52px] font-bold text-ink tracking-tight mt-2">Day 1</h1>
+      <p className="text-[16px] text-ink leading-[1.7] mt-2">
+        오늘부터 쌓이는 기록이
+        <br />
+        당신의 한 문장을 정확하게 만듭니다
+      </p>
+      <span className="mt-6 h-9 px-4 rounded-full bg-white text-[13px] font-semibold text-primary inline-flex items-center">
+        정확도 {accuracy}%에서 출발합니다
+      </span>
+    </Slide>
   );
 }

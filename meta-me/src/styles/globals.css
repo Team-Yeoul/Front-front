@@ -43,3 +43,46 @@
 body {
   font-family: 'Pretendard', sans-serif;
 }
+
+/* ── v2 디자인 토큰 (Desktop/UX/metame-v2 시안 기준) ── */
+@theme {
+  --color-primary: #6367ff;
+  --color-primary-soft: #eef0ff;
+  --color-primary-line: #c9cbff;
+  --color-ink: #1a1a1e;
+  --color-surface: #f4f5f8;
+  --color-surface-2: #f2f2f7;
+  --color-card: #fafafc;
+  --color-line: #ececf1;
+  --color-sub: #8e8e95;
+  --color-mute: #b4b4bb;
+  --color-yellow: #ffe066;
+  --color-yellow-soft: #fff9e0;
+  --color-gold: #8a6d00;
+  --color-danger: #e5484d;
+  --color-danger-soft: #fdecec;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-sheet-up { animation: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.animate-fade-in { animation: fade-in 0.2s ease-out; }
+.animate-pop-in { animation: pop-in 0.22s ease-out; }
