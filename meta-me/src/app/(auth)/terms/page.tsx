@@ -1,221 +1,172 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTermsStore } from '@/store';
+import { Screen } from '@/components/ui/Screen';
+import { BackButton, Button, CheckIcon } from '@/components/ui/primitives';
+import { Sheet } from '@/components/ui/overlays';
 
-function CircleCheckbox({ checked }: { checked: boolean }) {
-  return (
-    <div className={`w-[22px] h-[22px] rounded-full flex items-center justify-center shrink-0 transition-colors ${
-      checked ? 'bg-blue-500' : 'border-2 border-gray-300'
-    }`}>
-      {checked && (
-        <svg width="12" height="9" viewBox="0 0 12 9" fill="none">
-          <path d="M1 4L4.5 7.5L11 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      )}
-    </div>
-  );
-}
+type TermsKey = 'service' | 'privacy' | 'marketing';
 
-function ChevronRight() {
-  return (
-    <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
-      <path d="M1 1l6 6-6 6" stroke="#C7C7CC" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-
-type TermsKey = 'service' | 'privacy';
-
-const TERMS_CONTENT: Record<TermsKey, { title: string; body: string }> = {
+const TERMS_CONTENT: Record<TermsKey, { title: string; intro: string; sections: { heading: string; paragraphs: string[] }[] }> = {
   service: {
     title: '서비스 이용 약관',
-    body: `제1조 (목적)
-이 약관은 MetaMe(이하 "회사")가 제공하는 서비스의 이용과 관련하여 회사와 이용자 간의 권리, 의무 및 책임사항을 정함을 목적으로 합니다.
-
-제2조 (정의)
-"서비스"란 회사가 제공하는 기록·리포트·객관화 관련 모든 서비스를 말하며, "이용자"란 이 약관에 따라 서비스를 이용하는 회원을 말합니다.
-
-제3조 (약관의 효력 및 변경)
-이 약관은 서비스 화면에 게시함으로써 효력이 발생하며, 회사는 관련 법령을 위배하지 않는 범위에서 약관을 개정할 수 있습니다.
-
-제4조 (이용자의 의무)
-이용자는 관계 법령, 이 약관의 규정, 이용안내 등 회사가 통지하는 사항을 준수하여야 하며, 타인의 정보를 도용하거나 서비스 운영을 방해하는 행위를 해서는 안 됩니다.
-
-제5조 (서비스의 제공 및 변경)
-회사는 서비스의 내용을 개선하기 위해 필요한 경우 서비스의 전부 또는 일부를 변경할 수 있으며, 사전에 공지합니다.
-
-제6조 (계약 해지)
-이용자는 언제든지 서비스 내 설정을 통해 이용계약 해지(회원탈퇴)를 신청할 수 있습니다.
-
-※ 본 내용은 초안이며, 실제 서비스 출시 전 법무 검토를 거쳐 확정됩니다.`,
+    intro:
+      '이 애플리케이션을 다운로드, 접속 또는 사용함으로써 귀하는 다음 이용 약관에 동의한 것으로 간주됩니다. 만약 동의하지 않으시면, 이 앱을 사용하지 마십시오.',
+    sections: [
+      {
+        heading: '1. 응용 프로그램 사용법',
+        paragraphs: [
+          '메타미는 오락 및 허구적 목적으로만 제작된 도구입니다. 실제 기능을 하는 애플리케이션으로 간주되거나 현실적인 용도로 사용해서는 안 됩니다.',
+          '귀하는 불법적이거나 사기적인 활동에 이 앱을 사용할 권한이 없습니다.',
+          '이 앱의 모든 부분(허구 콘텐츠 포함)을 수정, 복사, 배포 또는 재판매하는 것은 금지되어 있습니다.',
+        ],
+      },
+      {
+        heading: '2. 사용자 책임',
+        paragraphs: [
+          '메타미를 사용함으로써, 귀하는 사용에 따른 모든 위험을 스스로 감수하고 자신의 행동에 대한 책임을 전적으로 부담한다는 데 동의하는 것입니다.',
+          '당사는 앱 사용 또는 제공된 허위 정보로 인해 발생하는 모든 손해, 손실 또는 분쟁에 대해 책임을 지지 않습니다.',
+        ],
+      },
+      {
+        heading: '3. 약관의 변경',
+        paragraphs: ['회사는 관련 법령을 위배하지 않는 범위에서 약관을 개정할 수 있으며, 변경 시 서비스 화면을 통해 사전에 공지합니다.'],
+      },
+    ],
   },
   privacy: {
     title: '개인정보 처리방침',
-    body: `1. 수집하는 개인정보 항목
-회사는 회원가입, 서비스 이용 과정에서 이메일, 비밀번호, 닉네임, 기록 데이터 등을 수집할 수 있습니다.
-
-2. 개인정보의 수집 및 이용 목적
-- 회원 가입 의사 확인 및 본인 인증
-- 서비스 제공, 콘텐츠 및 리포트 생성
-- 부정 이용 방지 및 고지사항 전달
-
-3. 개인정보의 보유 및 이용기간
-회원 탈퇴 시 지체 없이 파기하며, 관계 법령에 따라 보존이 필요한 경우 해당 기간 동안 보관합니다.
-
-4. 개인정보의 제3자 제공
-이용자의 동의가 있거나 법령에 특별한 규정이 있는 경우를 제외하고 개인정보를 제3자에게 제공하지 않습니다.
-
-5. 이용자의 권리
-이용자는 언제든지 자신의 개인정보를 조회, 수정, 삭제, 처리정지를 요청할 수 있습니다.
-
-※ 본 내용은 초안이며, 실제 서비스 출시 전 법무 검토를 거쳐 확정됩니다.`,
+    intro: '메타미는 이용자의 개인정보를 소중히 다루며, 관련 법령에 따라 안전하게 처리합니다.',
+    sections: [
+      { heading: '1. 수집하는 항목', paragraphs: ['회원가입과 서비스 이용 과정에서 이메일, 비밀번호, 닉네임, 기록 데이터 등을 수집할 수 있습니다.'] },
+      {
+        heading: '2. 이용 목적',
+        paragraphs: ['회원 가입 의사 확인 및 본인 인증', '서비스 제공, 콘텐츠 및 리포트 생성', '부정 이용 방지 및 고지사항 전달'],
+      },
+      { heading: '3. 보유 및 이용 기간', paragraphs: ['회원 탈퇴 시 지체 없이 파기하며, 관계 법령에 따라 보존이 필요한 경우 해당 기간 동안 보관합니다.'] },
+      { heading: '4. 이용자의 권리', paragraphs: ['이용자는 언제든지 자신의 개인정보를 조회, 수정, 삭제, 처리정지를 요청할 수 있습니다.'] },
+    ],
+  },
+  marketing: {
+    title: '마케팅 정보 수신',
+    intro: '이벤트, 새로운 기능 소식 등 마케팅 정보를 앱 알림과 이메일로 받아볼 수 있어요.',
+    sections: [{ heading: '안내', paragraphs: ['동의하지 않아도 서비스 이용에는 제한이 없으며, 설정에서 언제든지 변경할 수 있습니다.'] }],
   },
 };
 
-function TermsDetailModal({ termsKey, onClose }: { termsKey: TermsKey; onClose: () => void }) {
-  const { title, body } = TERMS_CONTENT[termsKey];
+const ROWS: { key: TermsKey; label: string }[] = [
+  { key: 'service', label: '서비스 이용 약관' },
+  { key: 'privacy', label: '개인정보 처리방침' },
+  { key: 'marketing', label: '[선택] 마케팅 정보 수신' },
+];
+
+function Box({ checked }: { checked: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
-      <div onClick={onClose} className="absolute inset-0 bg-black/40" />
-      <div className="relative w-full max-h-[80vh] bg-white rounded-t-3xl flex flex-col">
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100 shrink-0">
-          <h2 className="text-[17px] font-bold text-gray-900">{title}</h2>
-          <button onClick={onClose} className="-mr-2 p-2" aria-label="닫기">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M6 6l12 12M18 6L6 18" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          <p className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-line">{body}</p>
-        </div>
-        <div className="px-5 py-4 pb-6 shrink-0">
-          <button
-            onClick={onClose}
-            className="w-full h-12 rounded-2xl bg-gray-900 text-white text-[14px] font-semibold"
-          >
-            확인
-          </button>
-        </div>
-      </div>
-    </div>
+    <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${checked ? 'bg-primary-soft' : 'bg-surface-2'}`}>
+      {checked && <CheckIcon size={18} color="#6367FF" />}
+    </span>
   );
 }
+
+const ArrowRight = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path d="M5 12h14M13 6l6 6-6 6" stroke="#8E8E95" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
 export default function TermsPage() {
   const router = useRouter();
   const setTerms = useTermsStore((s) => s.setTerms);
-  const [service, setService] = useState(false);
-  const [privacy, setPrivacy] = useState(false);
-  const [marketing, setMarketing] = useState(false);
-  const [detailView, setDetailView] = useState<TermsKey | null>(null);
+  const [agreed, setAgreed] = useState<Record<TermsKey, boolean>>({ service: false, privacy: false, marketing: false });
+  const [detail, setDetail] = useState<TermsKey | null>(null);
 
-  const allChecked = service && privacy && marketing;
-  const canContinue = service && privacy;
+  const requiredAll = agreed.service && agreed.privacy;
+  // 전체 동의는 [선택] 마케팅 수신까지 함께 켜고 끈다. 다음 단계 진행 조건은 필수 약관(requiredAll)만 본다.
+  const allAgreed = requiredAll && agreed.marketing;
+  const toggleAll = () => setAgreed({ service: !allAgreed, privacy: !allAgreed, marketing: !allAgreed });
 
-  const handleAllRequired = () => {
-    const next = !allChecked;
-    setService(next);
-    setPrivacy(next);
-    setMarketing(next);
+  const submit = () => {
+    if (!requiredAll) return;
+    setTerms(agreed);
+    router.push('/signup');
   };
 
+  const content = detail ? TERMS_CONTENT[detail] : null;
+
   return (
-    <div className="flex flex-col min-h-full bg-gray-100">
-      {/* 뒤로가기 */}
-      <div className="px-5 pt-4 pb-3">
-        <Link
-          href="/login"
-          className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-gray-100"
-        >
-          <svg width="9" height="15" viewBox="0 0 9 15" fill="none">
-            <path d="M8 1.5L1.5 7.5L8 13.5" stroke="#1C1C1E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </Link>
-      </div>
-
-      {/* 타이틀 */}
-      <div className="px-5 mb-6">
-        <h1 className="text-[28px] font-bold text-gray-900">이용약관</h1>
-        <p className="text-[14px] text-gray-500 mt-2 leading-snug">
-          MetaMe 서비스 이용을 위해<br />약관에 동의해 주세요.
-        </p>
-      </div>
-
-      {/* 약관 카드 */}
-      <div className="mx-5 bg-white rounded-2xl shadow-sm overflow-hidden">
-        {/* 전체 동의 */}
-        <button
-          onClick={handleAllRequired}
-          className="w-full flex items-center gap-3 px-5 py-4"
-        >
-          <CircleCheckbox checked={allChecked} />
-          <span className="text-[15px] font-semibold text-gray-900">필수 약관 전체 동의하기</span>
-        </button>
-
-        <div className="h-px bg-gray-100 mx-0" />
-
-        {/* 서비스 이용 약관 */}
-        <div className="flex items-center gap-3 px-5 py-3.5">
-          <button className="-m-2 p-2" onClick={() => setService(!service)}>
-            <CircleCheckbox checked={service} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setDetailView('service')}
-            className="flex-1 flex items-center gap-3 py-1 text-left"
-          >
-            <span className="flex-1 text-[14px] text-gray-700">서비스 이용 약관</span>
-            <ChevronRight />
-          </button>
-        </div>
-
-        {/* 개인정보 처리방침 */}
-        <div className="flex items-center gap-3 px-5 py-3.5">
-          <button className="-m-2 p-2" onClick={() => setPrivacy(!privacy)}>
-            <CircleCheckbox checked={privacy} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setDetailView('privacy')}
-            className="flex-1 flex items-center gap-3 py-1 text-left"
-          >
-            <span className="flex-1 text-[14px] text-gray-700">개인정보 처리방침</span>
-            <ChevronRight />
-          </button>
-        </div>
-
-        {/* 마케팅 수신 (선택) */}
-        <div className="flex items-center gap-3 px-5 py-3.5">
-          <button className="-m-2 p-2" onClick={() => setMarketing(!marketing)}>
-            <CircleCheckbox checked={marketing} />
-          </button>
-          <span className="flex-1 text-[14px] text-gray-500">[선택] 마케팅 정보 수신</span>
-          <ChevronRight />
-        </div>
-      </div>
-
-      {/* 계속하기 버튼 */}
-      <div className="mt-auto px-5 py-5">
-        <button
-          onClick={() => {
-            if (!canContinue) return;
-            setTerms({ service, privacy, marketing });
-            router.push('/signup');
-          }}
-          disabled={!canContinue}
-          className={`w-full h-[54px] rounded-2xl text-[15px] font-semibold transition-colors ${
-            canContinue ? 'bg-[#1a1a1a] text-white' : 'bg-gray-200 text-gray-400'
-          }`}
-        >
+    <Screen
+      overlay={
+      <Sheet open={!!content} onClose={() => setDetail(null)} height="82%">
+        {content && (
+          <>
+            <div className="flex-1 overflow-y-auto no-scrollbar px-6 pt-5">
+              <h2 className="text-[22px] font-bold text-ink">{content.title}</h2>
+              <p className="text-[15px] text-[#48484F] leading-[1.75] mt-4">{content.intro}</p>
+              {content.sections.map((s) => (
+                <section key={s.heading} className="mt-7">
+                  <h3 className="text-[17px] font-bold text-ink">{s.heading}</h3>
+                  <div className="mt-3 border-l-2 border-line pl-3.5 flex flex-col gap-3">
+                    {s.paragraphs.map((p) => (
+                      <p key={p} className="text-[15px] text-[#5A5A62] leading-[1.75]">
+                        {p}
+                      </p>
+                    ))}
+                  </div>
+                </section>
+              ))}
+              <div className="h-6" />
+            </div>
+            <div className="px-5 pt-3 pb-5 border-t border-line">
+              <Button
+                onClick={() => {
+                  if (detail) setAgreed((a) => ({ ...a, [detail]: true }));
+                  setDetail(null);
+                }}
+              >
+                확인했어요
+              </Button>
+            </div>
+          </>
+        )}
+      </Sheet>
+      }
+      footer={
+        <Button onClick={submit} disabled={!requiredAll}>
           동의하고 계속하기
-        </button>
+        </Button>
+      }
+    >
+      <div className="px-5 pt-2">
+        <BackButton href="/" />
+        <h1 className="text-[30px] font-bold text-ink mt-5">이용약관</h1>
+        <p className="text-[15px] text-sub mt-2 leading-relaxed">
+          MetaMe 서비스 이용을 위해
+          <br />
+          약관에 동의해 주세요.
+        </p>
+
+        <div className="mt-8 rounded-3xl border border-line bg-[#FEFEFF] px-5 py-2">
+          <button onClick={toggleAll} className="w-full flex items-center gap-4 py-4">
+            <Box checked={allAgreed} />
+            <span className="text-[16px] font-semibold text-ink">약관 전체 동의하기</span>
+          </button>
+          <div className="border-t border-dashed border-line" />
+          {ROWS.map(({ key, label }) => (
+            <div key={key} className="flex items-center gap-4 py-2.5">
+              <button onClick={() => setAgreed((a) => ({ ...a, [key]: !a[key] }))} className="flex items-center gap-4 flex-1 text-left">
+                <Box checked={agreed[key]} />
+                <span className="text-[16px] text-ink">{label}</span>
+              </button>
+              <button onClick={() => setDetail(key)} className="p-1" aria-label={`${label} 보기`}>
+                <ArrowRight />
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {detailView && <TermsDetailModal termsKey={detailView} onClose={() => setDetailView(null)} />}
-    </div>
+    </Screen>
   );
 }
