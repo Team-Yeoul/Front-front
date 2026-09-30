@@ -75,10 +75,10 @@ export default function SettingsPage() {
             {confirm === 'withdraw' ? '기록과 도감이 모두 삭제되고 되돌릴 수 없어요.' : '언제든 다시 로그인할 수 있어요.'}
           </p>
           <div className="grid grid-cols-2 gap-2 mt-5">
-            <Button variant="gray" className="h-12" onClick={() => setConfirm(null)}>
+            <Button variant="gray" onClick={() => setConfirm(null)}>
               취소
             </Button>
-            <Button variant={confirm === 'withdraw' ? 'danger' : 'primary'} className="h-12" onClick={run}>
+            <Button variant={confirm === 'withdraw' ? 'danger' : 'primary'} onClick={run}>
               {confirm === 'withdraw' ? '탈퇴하기' : '로그아웃'}
             </Button>
           </div>

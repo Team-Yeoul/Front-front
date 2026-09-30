@@ -153,10 +153,10 @@ export default function MainPage() {
             </p>
             <p className="text-[13px] text-sub mt-2">3 / 5명 응답 · 내가 몰랐던 나를 확인해보세요</p>
             <div className="grid grid-cols-2 gap-2 w-full mt-6">
-              <Button variant="gray" className="h-12 bg-[#E6E6EC]" onClick={() => dismissNotice(false)}>
+              <Button variant="gray" className="bg-[#E6E6EC]" onClick={() => dismissNotice(false)}>
                 나중에
               </Button>
-              <Button className="h-12" onClick={() => dismissNotice(true)}>
+              <Button onClick={() => dismissNotice(true)}>
                 확인하기
               </Button>
             </div>
