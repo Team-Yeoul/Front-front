@@ -33,7 +33,10 @@ export function useCounselingChat(initialSessionId: string | null = null, title?
       const post = async () => {
         const session_id = await ensureSession();
         const res = await createMessage.mutateAsync({ session_id, message });
-        return { reply: res.ai_message.content, sessionId: session_id };
+        // 응답 모양이 명세와 달라 AI 답을 찾지 못하면 실패로 처리한다(화면이 죽지 않게).
+        const reply = res?.ai_message?.content;
+        if (!reply) throw new Error('AI 답변이 비어 있어요');
+        return { reply, sessionId: session_id };
       };
       try {
         return await post();
