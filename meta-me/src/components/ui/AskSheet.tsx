@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useCreateAiCounselingMessage } from '@/entities/system';
+import { counselingErrorText, useCounselingChat } from '@/hooks/useCounselingChat';
 import { useMe } from '@/hooks/useMe';
 import type { SavedChatMessage } from '@/store';
 import { ChevronRight } from './primitives';
@@ -13,7 +13,8 @@ const FAQ = ['이 결과는 어떻게 나온 거예요?', '내 기록 중 어떤
 /** "분석 결과 물어보기" 시트. AI 상담 API로 답하고, 닫을 때 '분석 질문'으로 지난 대화에 저장한다. */
 export function AskSheet({ open, onClose, context }: { open: boolean; onClose: () => void; context: string }) {
   const me = useMe();
-  const sendMessage = useCreateAiCounselingMessage();
+  const counseling = useCounselingChat(null, `${context} 분석 질문`);
+  const resetSession = counseling.reset;
   const [messages, setMessages] = useState<SavedChatMessage[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState(() => new Date().toISOString());
@@ -25,10 +26,11 @@ export function AskSheet({ open, onClose, context }: { open: boolean; onClose: (
     if (open) {
       setMessages([]);
       setSessionId(null);
+      resetSession();
       setInput('');
       setStartedAt(new Date().toISOString());
     }
-  }, [open]);
+  }, [open, resetSession]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
@@ -42,11 +44,11 @@ export function AskSheet({ open, onClose, context }: { open: boolean; onClose: (
     setTyping(true);
     let reply: string;
     try {
-      const res = await sendMessage.mutateAsync({ session_id: sessionId, message: `[${context} 분석에 대한 질문] ${t}` });
-      setSessionId(res.ai_message.session_id);
-      reply = res.ai_message.content;
-    } catch {
-      reply = '지금은 답을 가져오지 못했어요. 잠시 후 다시 물어봐 주세요.';
+      const res = await counseling.send(`[${context} 분석에 대한 질문] ${t}`);
+      setSessionId(res.sessionId);
+      reply = res.reply;
+    } catch (err) {
+      reply = counselingErrorText(err);
     }
     setTyping(false);
     setMessages((m) => [...m, { role: 'ai', text: reply }]);

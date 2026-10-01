@@ -3,10 +3,10 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCreateAiCounselingMessage } from '@/entities/system';
 import { Screen } from '@/components/ui/Screen';
 import { AiBubble, Composer, OutlineChip, TypingBubble, UserBubble } from '@/components/ui/chat';
 import { useMe } from '@/hooks/useMe';
+import { counselingErrorText, useCounselingChat } from '@/hooks/useCounselingChat';
 import type { SavedChatMessage } from '@/store';
 
 const OPENERS = [
@@ -19,7 +19,6 @@ function ChatContent() {
   const router = useRouter();
   const params = useSearchParams();
   const me = useMe();
-  const sendMessage = useCreateAiCounselingMessage();
   const resumeId = params.get('resume');
   const resumed = resumeId ? me.chats.find((c) => c.id === resumeId) : undefined;
 
@@ -28,6 +27,7 @@ function ChatContent() {
   const [opener, setOpener] = useState(0);
   const [messages, setMessages] = useState<SavedChatMessage[]>(() => resumed?.messages ?? [{ role: 'ai', text: OPENERS[0] }]);
   const [sessionId, setSessionId] = useState<string | null>(resumed?.sessionId ?? null);
+  const counseling = useCounselingChat(resumed?.sessionId ?? null, '자유 대화');
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -44,11 +44,11 @@ function ChatContent() {
     setTyping(true);
     let reply: string;
     try {
-      const res = await sendMessage.mutateAsync({ session_id: sessionId, message: t });
-      setSessionId(res.ai_message.session_id);
-      reply = res.ai_message.content;
-    } catch {
-      reply = '지금은 답을 가져오지 못했어요. 잠시 후 다시 이야기해 주세요.';
+      const res = await counseling.send(t);
+      setSessionId(res.sessionId);
+      reply = res.reply;
+    } catch (err) {
+      reply = counselingErrorText(err);
     }
     setTyping(false);
     setMessages((m) => [...m, { role: 'ai', text: reply }]);
@@ -108,6 +108,14 @@ function ChatContent() {
         </Link>
       </div>
       <div className="px-4 pb-4 flex flex-col gap-4">
+        {!resumed && (
+          <div className="rounded-2xl bg-surface-2 px-4 py-3 text-[13px] text-[#48484F] leading-relaxed">
+            기록과 별개로 편하게 이야기하는 공간이에요. 여기 나눈 대화는 다이어리에 저장되지 않아요.{' '}
+            <Link href="/diary/chat" className="font-semibold text-primary whitespace-nowrap">
+              오늘 기록하기 ›
+            </Link>
+          </div>
+        )}
         <p className="text-center text-[12px] text-mute">{timeLabel}</p>
         {messages.map((m, i) => (m.role === 'user' ? <UserBubble key={i}>{m.text}</UserBubble> : <AiBubble key={i}>{m.text}</AiBubble>))}
         {typing && <TypingBubble />}

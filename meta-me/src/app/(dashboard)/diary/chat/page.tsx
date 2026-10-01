@@ -282,9 +282,12 @@ export default function DiaryChatPage() {
       >
         <div className="relative flex items-center justify-center h-14 px-5">
           <BackButton className="absolute left-5" />
-          <span className="text-[14px] text-[#48484F]">
-            {dateLabel} {weekday}요일
-          </span>
+          <div className="text-center">
+            <p className="text-[15px] font-semibold text-ink">오늘의 기록</p>
+            <p className="text-[12px] text-sub mt-0.5">
+              {dateLabel} {weekday}요일
+            </p>
+          </div>
         </div>
         <div className="flex flex-col items-center pt-[110px]">
           <Img3D name="star-pink" size={210} />
@@ -373,7 +376,7 @@ export default function DiaryChatPage() {
         <button onClick={() => router.push('/main')} aria-label="나가기">
           <ChevronLeft size={20} />
         </button>
-        <span className="text-[14px] font-semibold text-ink">오늘의 대화 · {dateLabel}</span>
+        <span className="text-[14px] font-semibold text-ink">오늘의 기록 · {dateLabel}</span>
         <span className="text-[13px] font-semibold text-primary w-8 text-right">
           {turnNumber[turn]} / {totalTurns}
         </span>
