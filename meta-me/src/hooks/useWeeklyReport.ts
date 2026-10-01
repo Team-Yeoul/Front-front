@@ -22,7 +22,9 @@ export function useWeeklyReport() {
   const week = weekRange();
   const { data: weekRecords } = useListDailyRecords({ start_date: week.start, end_date: week.end, size: 50 }, !!token);
   const { data: allRecords } = useListDailyRecords({ size: 100 }, !!token);
-  const { data: reports, isLoading } = useListReports({ report_type: 'WEEK', size: 1 }, !!token);
+  // 목록 필터는 명세상 WEEK인데 서버가 400으로 거절하고, 리포트 자체는 WEEKLY로 내려온다.
+  // 필터 값 불일치를 피하려고 필터 없이 받아 주간 리포트만 고른다.
+  const { data: reports, isLoading } = useListReports({ size: 20 }, !!token);
   const { data: profile } = useGetMyProfile(!!token);
   const generate = useGenerateReport();
 
@@ -41,7 +43,7 @@ export function useWeeklyReport() {
     recordCount,
     streak,
     accuracy: profile?.latest_accuracy?.accuracy_percent ?? 0,
-    report: reports?.reports[0] ?? null,
+    report: reports?.reports.find((r) => r.report_type === 'WEEKLY') ?? null,
     loading: isLoading,
     canGenerate: recordCount >= MIN_RECORDS_FOR_REPORT,
     generating: generate.isPending,

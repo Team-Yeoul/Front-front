@@ -36,6 +36,8 @@ export interface SavedChat {
 export interface UserLocal {
   nickname?: string;
   mySentence?: string;
+  /** 이 기기에서 온보딩 화면을 끝까지 마친 시각. 서버 제출이 실패해도 온보딩을 반복시키지 않는 데 쓴다. */
+  onboardedAt?: string;
   cognis: CollectedCogni[];
   chats: SavedChat[];
 }

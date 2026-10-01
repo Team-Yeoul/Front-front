@@ -4,8 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLogin, userApi } from '@/entities/user';
-import { ApiError } from '@/shared/api';
-import { useAuthStore } from '@/store';
+import { useAuthStore, useLocalStore } from '@/store';
+import { isOnboardingMissing } from '@/lib/onboarding';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button } from '@/components/ui/primitives';
 import { Field, RememberRow } from '@/components/ui/Field';
@@ -29,14 +29,17 @@ export default function LoginPage() {
     try {
       const res = await loginMutation.mutateAsync({ email, password });
       setAuth(res.access_token, res.refresh_token, res.user_id);
-      // 온보딩을 마치지 않은 계정은 프로필이 없어(404) 메인 대신 온보딩으로 보낸다.
-      let onboarded = true;
-      try {
-        await userApi.getOnboardingResult();
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 404) onboarded = false;
+      // 서버에 온보딩 기록이 없고(ONBOARDING_NOT_FOUND) 이 기기에서도 마친 적이 없을 때만 온보딩으로 보낸다.
+      const doneHere = !!useLocalStore.getState().byUser[res.user_id]?.onboardedAt;
+      let missing = false;
+      if (!doneHere) {
+        try {
+          await userApi.getOnboardingResult();
+        } catch (err) {
+          missing = isOnboardingMissing(err);
+        }
       }
-      router.push(onboarded ? '/main' : '/onboarding');
+      router.push(missing ? '/onboarding' : '/main');
     } catch {
       setError('이메일 또는 비밀번호가 올바르지 않습니다.');
     }
