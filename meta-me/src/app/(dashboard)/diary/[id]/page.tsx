@@ -16,7 +16,7 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
   const { data, isError } = useGetDailyRecord(id, !!accessToken);
   const del = useDeleteDailyRecord();
 
-  const q = data?.questions[0];
+  const q = data?.questions?.[0];
   const created = data ? new Date(data.record.recorded_at) : null;
   const detail =
     q && created

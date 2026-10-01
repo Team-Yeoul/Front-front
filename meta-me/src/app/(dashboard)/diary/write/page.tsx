@@ -61,9 +61,9 @@ export default function DiaryWritePage() {
   const createMirror = useCreateObjectiveMirror();
 
   const { data: questionData } = useGetTodayDailyQuestion(!!accessToken);
-  const rawQuestion = questionData?.question.question_text;
+  const rawQuestion = questionData?.question?.question_text;
   const todayQuestion = rawQuestion && /[가-힣]/.test(rawQuestion) ? rawQuestion : FALLBACK_QUESTION;
-  const questionBadge = QUESTION_TYPE_LABEL[questionData?.question.question_type ?? ''] ?? '오늘의 질문';
+  const questionBadge = QUESTION_TYPE_LABEL[questionData?.question?.question_type ?? ''] ?? '오늘의 질문';
   const [step, setStep] = useState(0);
   const [animDone, setAnimDone] = useState(false);
   const [apiDone, setApiDone] = useState(false);
@@ -110,12 +110,12 @@ export default function DiaryWritePage() {
         myself_moment_desc: myself === 'yes' && myselfDesc.trim() ? myselfDesc.trim() : undefined,
       });
       const mirror = await createMirror.mutateAsync({
-        record_id: res.record.record_id,
+        record_id: res?.record?.record_id ?? '',
         original_emotion: result.original,
       });
-      result.mirrorId = mirror.mirror.mirror_id;
-      result.objective = mirror.mirror.objective_fact;
-      result.unlocked = mirror.unlocked_monsters ?? [];
+      result.mirrorId = mirror?.mirror?.mirror_id;
+      result.objective = mirror?.mirror?.objective_fact;
+      result.unlocked = mirror?.unlocked_monsters ?? [];
     } catch {
       // 저장/객관화 실패 시 결과 화면에서 안내한다.
     }
