@@ -45,6 +45,7 @@ function ChatContent() {
     let reply: string;
     try {
       const res = await sendMessage.mutateAsync({ session_id: sessionId, message: t });
+      if (!res?.ai_message?.content) throw new Error('empty reply');
       setSessionId(res.ai_message.session_id);
       reply = res.ai_message.content;
     } catch {

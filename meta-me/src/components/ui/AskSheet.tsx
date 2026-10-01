@@ -43,6 +43,7 @@ export function AskSheet({ open, onClose, context }: { open: boolean; onClose: (
     let reply: string;
     try {
       const res = await sendMessage.mutateAsync({ session_id: sessionId, message: `[${context} 분석에 대한 질문] ${t}` });
+      if (!res?.ai_message?.content) throw new Error('empty reply');
       setSessionId(res.ai_message.session_id);
       reply = res.ai_message.content;
     } catch {

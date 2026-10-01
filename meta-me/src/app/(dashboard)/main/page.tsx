@@ -82,7 +82,7 @@ function RecordRow({ title, date, onClick }: { title: string; date: string; onCl
 function RealRecordRow({ record }: { record: DailyRecord }) {
   const router = useRouter();
   const { data } = useGetDailyRecord(record.record_id);
-  const question = data?.questions[0];
+  const question = data?.questions?.[0];
   const rawTitle = question?.scene_description || question?.emotion_tag;
   const title = rawTitle && /[가-힣]/.test(rawTitle) ? rawTitle : '기록 보기';
   return <RecordRow title={title} date={record.recorded_date.replaceAll('-', '.')} onClick={() => router.push(`/diary/${record.record_id}`)} />;

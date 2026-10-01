@@ -34,7 +34,7 @@ function DiaryCard({ title, date, tags, onClick }: { title: string; date: string
 function RealDiaryCard({ record }: { record: DailyRecord }) {
   const router = useRouter();
   const { data } = useGetDailyRecord(record.record_id);
-  const q = data?.questions[0];
+  const q = data?.questions?.[0];
   const raw = q?.scene_description || q?.user_answer;
   const title = raw && /[가-힣]/.test(raw) ? raw : '기록 보기';
   const tags = (q?.emotion_tag ?? '')

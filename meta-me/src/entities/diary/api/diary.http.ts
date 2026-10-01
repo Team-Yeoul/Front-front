@@ -3,7 +3,7 @@ import type {
   BettingResponse,
   CreateBettingRequest,
   CreateTriggerRequest,
-  DailyQuestionResponse,
+  DailyQuestion,
   DailyRecordListResponse,
   DailyRecordResponse,
   ListDailyRecordsParams,
@@ -15,8 +15,26 @@ import type {
   UpdateTailAnswerRequest,
 } from '../model/types';
 
-export const getTodayDailyQuestion = () =>
-  apiRequest<DailyQuestionResponse>('/v1/daily-questions/today');
+/**
+ * 명세상 응답은 { question: DailyQuestion }이지만, 배포 서버가 다른 모양(질문 객체 그대로,
+ * { data: ... } 감싸기, 빈 응답)으로 줄 때도 화면이 죽지 않도록 여기서 한 번 정리한다.
+ * 질문을 찾지 못하면 question은 null이고, 화면은 기본 질문을 쓴다.
+ */
+function pickQuestion(raw: unknown): DailyQuestion | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  if (o.question && typeof o.question === 'object') return o.question as DailyQuestion;
+  if (typeof o.question_text === 'string') return o as unknown as DailyQuestion;
+  if (o.data) return pickQuestion(o.data);
+  return null;
+}
+
+export const getTodayDailyQuestion = async (): Promise<{ question: DailyQuestion | null }> => {
+  const raw = await apiRequest<unknown>('/v1/daily-questions/today');
+  const question = pickQuestion(raw);
+  if (!question) console.warn('[daily-questions/today] 예상과 다른 응답 형식', raw);
+  return { question };
+};
 
 export const createTailQuestion = (questionId: string) =>
   apiRequest<TailQuestionResponse>(`/v1/daily-questions/${questionId}/tail-questions`, {

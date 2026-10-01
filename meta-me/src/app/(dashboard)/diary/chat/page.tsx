@@ -86,10 +86,10 @@ export default function DiaryChatPage() {
     setAccuracy({ before: current, after: current });
   }, [accessToken, profile]);
 
-  const rawQuestion = questionData?.question.question_text;
+  const rawQuestion = questionData?.question?.question_text;
   const questionText = rawQuestion && /[가-힣]/.test(rawQuestion) ? rawQuestion : FALLBACK_QUESTION;
-  const questionBadge = QUESTION_TYPE_LABEL[questionData?.question.question_type ?? ''];
-  questionIdRef.current = questionData?.question.question_id ?? null;
+  const questionBadge = QUESTION_TYPE_LABEL[questionData?.question?.question_type ?? ''];
+  questionIdRef.current = questionData?.question?.question_id ?? null;
   // 메인 질문이 이미 '나다운 순간'을 물었다면 예/아니오 턴에서 같은 걸 다시 묻지 않는다.
   const mainAsksMyselfMoment = questionText.includes('나답');
   const totalTurns = mainAsksMyselfMoment ? 4 : 5;
@@ -111,8 +111,9 @@ export default function DiaryChatPage() {
     try {
       if (questionIdRef.current) {
         const res = await createTailQuestion.mutateAsync(questionIdRef.current);
-        ref.current = res.tail_question.tail_id;
-        if (res.tail_question.question_text && /[가-힣]/.test(res.tail_question.question_text)) text = res.tail_question.question_text;
+        const tq = res?.tail_question;
+        ref.current = tq?.tail_id ?? null;
+        if (tq?.question_text && /[가-힣]/.test(tq.question_text)) text = tq.question_text;
       }
     } catch {
       // 실패해도 대화는 이어감
