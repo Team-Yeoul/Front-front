@@ -3,18 +3,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  useCreateDailyRecord,
   useCreateTailQuestion,
   useGetTodayDailyQuestion,
   useUpdateTailQuestionAnswer,
 } from '@/entities/diary';
 import { useGetMyProfile } from '@/entities/user';
+import { useSaveTodayRecord } from '@/hooks/useSaveTodayRecord';
 import { useAuthStore } from '@/store';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button, ChevronLeft, Img3D, ProgressBar, TextButton } from '@/components/ui/primitives';
 import { AiBubble, Composer, OutlineChip, TypingBubble, UserBubble } from '@/components/ui/chat';
 import { AccuracyDonut } from '@/components/ui/AccuracyDonut';
-import { MOCK_NICKNAME } from '@/lib/mock';
+import { useMe } from '@/hooks/useMe';
 
 type Mode = 'AI' | 'FREE';
 type TurnKey = 'main' | 'tail1' | 'emotion' | 'yesno' | 'tail2' | 'summary';
@@ -44,11 +44,12 @@ const nextId = () => `m${++uid}`;
 export default function DiaryChatPage() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
+  const { nickname } = useMe();
   const { data: questionData } = useGetTodayDailyQuestion(!!accessToken);
   const { data: profile, refetch: refetchProfile } = useGetMyProfile(!!accessToken);
   const createTailQuestion = useCreateTailQuestion();
   const updateTailAnswer = useUpdateTailQuestionAnswer();
-  const createRecord = useCreateDailyRecord();
+  const createRecord = useSaveTodayRecord();
 
   const [phase, setPhase] = useState<'intro' | 'chat' | 'done'>('intro');
   const [mode, setMode] = useState<Mode>('AI');
@@ -59,7 +60,7 @@ export default function DiaryChatPage() {
   const [input, setInput] = useState('');
   const [emotions, setEmotions] = useState<string[]>([]);
   const [yesNo, setYesNo] = useState<'yes' | 'no' | null>(null);
-  const [accuracy, setAccuracy] = useState<{ before: number; after: number }>({ before: 12, after: 14 });
+  const [accuracy, setAccuracy] = useState<{ before: number; after: number }>({ before: 0, after: 0 });
   const [finding, setFinding] = useState('');
   const [startedAt] = useState(() => new Date());
 
@@ -80,8 +81,7 @@ export default function DiaryChatPage() {
   }, [turn]);
 
   useEffect(() => {
-    // 로그인 상태면 실제 정확도를 기준으로 삼는다(값이 없으면 0). 로그아웃 데모는 시안 값 12 → 14.
-    if (!accessToken) return;
+    // 실제 정확도를 기준으로 삼는다(값이 없으면 0).
     const current = profile?.latest_accuracy?.accuracy_percent ?? 0;
     setAccuracy({ before: current, after: current });
   }, [accessToken, profile]);
@@ -151,7 +151,7 @@ export default function DiaryChatPage() {
 
   const finish = async (lastAnswer: string) => {
     setTyping(true);
-    let after = accessToken ? accuracy.before : 14;
+    let after = accuracy.before;
     try {
       if (tail1IdRef.current && questionIdRef.current) {
         await updateTailAnswer.mutateAsync({
@@ -182,7 +182,7 @@ export default function DiaryChatPage() {
     }
     setTyping(false);
     setAccuracy((a) => ({ ...a, after }));
-    setFinding(emotions.length > 0 ? `'${emotions[0]}' — 3번째로 반복된 패턴이에요.` : '오늘 기록을 바탕으로 문장을 업데이트해둘게요.');
+    setFinding(emotions.length > 0 ? `오늘은 '${emotions.join(', ')}'을(를) 느꼈다고 기록했어요.` : '오늘 기록을 바탕으로 문장을 업데이트해둘게요.');
     setTurn('summary');
   };
 
@@ -289,7 +289,7 @@ export default function DiaryChatPage() {
         <div className="flex flex-col items-center pt-[110px]">
           <Img3D name="star-pink" size={210} />
           <h1 className="text-[22px] font-bold text-ink text-center leading-[1.5] mt-9 whitespace-pre-line">
-            {`${MOCK_NICKNAME}님, ${questionText.replace(/^오늘 하루는 /, '오늘 하루는\n')}`}
+            {`${nickname ? `${nickname}님, ` : ''}${questionText.replace(/^오늘 하루는 /, '오늘 하루는\n')}`}
           </h1>
         </div>
       </Screen>
@@ -452,7 +452,7 @@ export default function DiaryChatPage() {
               </span>
             </div>
             <ProgressBar value={accuracy.after} className="mt-3" track="#DCDDFB" height={6} />
-            <p className="text-[13px] text-[#48484F] mt-3">{finding} 문장에 반영해둘게요.</p>
+            <p className="text-[13px] text-[#48484F] mt-3">{finding}</p>
           </div>
         )}
       </div>

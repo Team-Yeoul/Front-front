@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/primitives';
 import { GoogleIcon, LogoMark } from '@/components/ui/brand';
+import { useAuthStore } from '@/store';
 
 function Splash() {
   return (
@@ -30,12 +31,14 @@ function Splash() {
 
 export default function StartPage() {
   const router = useRouter();
+  const token = useAuthStore((s) => s.accessToken);
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
-    const t = setTimeout(() => setShowSplash(false), 1600);
+    // 이미 로그인한 사용자는 스플래시 후 바로 메인으로 보낸다.
+    const t = setTimeout(() => (token ? router.replace('/main') : setShowSplash(false)), 1600);
     return () => clearTimeout(t);
-  }, []);
+  }, [token, router]);
 
   if (showSplash) return <Splash />;
 

@@ -2,15 +2,22 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { useCreateDailyRecord } from '@/entities/diary';
+import { useGetTodayDailyQuestion } from '@/entities/diary';
+import { useSaveTodayRecord } from '@/hooks/useSaveTodayRecord';
 import { useCreateObjectiveMirror } from '@/entities/objective';
 import { useAuthStore } from '@/store';
 import { Screen } from '@/components/ui/Screen';
 import { Badge, Button, CheckIcon, ChoiceChip, MessageSquareIcon, Segmented, TextButton, TopBar } from '@/components/ui/primitives';
 import { AnalyzingScreen } from '@/components/ui/flows';
+import { saveLastWrite, type LastWrite } from '@/lib/lastWrite';
 
 const TIME_LIMIT = 180;
-const DIFFICULTY = ['생각보다 쉬웠어요', '예상한 만큼', '생각보다 어려웠어요'];
+const QUESTION_TYPE_LABEL: Record<string, string> = {
+  TIME_CONTEXT: '시간 맥락',
+  GROWTH_CONTEXT: '성장 맥락',
+  DISCOVERY_CONTEXT: '발견 맥락',
+};
+const FALLBACK_QUESTION = '오늘 하루는 어떤 장면으로 남았나요?';
 const SCENE_TAGS = ['공부', '일', '관계', '휴식', '이동 중', '혼자 있는 시간'];
 const EMOTIONS = ['답답함', '오기', '뿌듯함', '불안', '지루함', '편안함'];
 const TOTAL = 4;
@@ -50,22 +57,31 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '
 export default function DiaryWritePage() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
-  const createRecord = useCreateDailyRecord();
+  const createRecord = useSaveTodayRecord();
   const createMirror = useCreateObjectiveMirror();
 
+  const { data: questionData } = useGetTodayDailyQuestion(!!accessToken);
+  const rawQuestion = questionData?.question.question_text;
+  const todayQuestion = rawQuestion && /[가-힣]/.test(rawQuestion) ? rawQuestion : FALLBACK_QUESTION;
+  const questionBadge = QUESTION_TYPE_LABEL[questionData?.question.question_type ?? ''] ?? '오늘의 질문';
   const [step, setStep] = useState(0);
+  const [animDone, setAnimDone] = useState(false);
+  const [apiDone, setApiDone] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [mode, setMode] = useState<('text' | 'tag')[]>(['tag', 'text', 'tag']);
-  const [difficulty, setDifficulty] = useState<string | null>(null);
-  const [difficultyWhy, setDifficultyWhy] = useState('');
+  const [mode, setMode] = useState<('text' | 'tag')[]>(['text', 'text', 'tag']);
+  const [answer, setAnswer] = useState('');
   const [scene, setScene] = useState('');
   const [sceneTags, setSceneTags] = useState<string[]>([]);
   const [emotions, setEmotions] = useState<string[]>([]);
   const [emotionWhy, setEmotionWhy] = useState('');
   const [myself, setMyself] = useState<'yes' | 'no' | null>(null);
   const [myselfDesc, setMyselfDesc] = useState('');
-  const [mirrorId, setMirrorId] = useState<string | null>(null);
+
+  // 분석 애니메이션과 API 저장이 모두 끝나면 결과 화면으로 넘어간다.
+  useEffect(() => {
+    if (animDone && apiDone) router.replace('/diary/mirror');
+  }, [animDone, apiDone, router]);
 
   useEffect(() => {
     if (analyzing) return;
@@ -79,11 +95,15 @@ export default function DiaryWritePage() {
   const submit = async () => {
     setAnalyzing(true);
     const sceneText = scene.trim() || sceneTags.join(', ') || '오늘의 한 장면';
+    const result: LastWrite = {
+      original: [answer.trim(), sceneText, emotionWhy.trim()].filter(Boolean).join(' '),
+      emotions,
+      unlocked: [],
+    };
     try {
-      if (!accessToken) return;
       const res = await createRecord.mutateAsync({
         answer_type: 'TEXT',
-        user_answer: sceneText,
+        user_answer: answer.trim() || sceneText,
         emotion_tag: emotions.join(', ') || '기록함',
         scene_description: sceneText,
         is_myself_moment: myself === 'yes',
@@ -91,12 +111,16 @@ export default function DiaryWritePage() {
       });
       const mirror = await createMirror.mutateAsync({
         record_id: res.record.record_id,
-        original_emotion: [emotionWhy, sceneText].filter(Boolean).join(' '),
+        original_emotion: result.original,
       });
-      setMirrorId(mirror.mirror.mirror_id);
+      result.mirrorId = mirror.mirror.mirror_id;
+      result.objective = mirror.mirror.objective_fact;
+      result.unlocked = mirror.unlocked_monsters ?? [];
     } catch {
-      // 실패해도 데모 객관화 결과로 이어감
+      // 저장/객관화 실패 시 결과 화면에서 안내한다.
     }
+    saveLastWrite(result);
+    setApiDone(true);
   };
 
   if (analyzing) {
@@ -109,7 +133,7 @@ export default function DiaryWritePage() {
           </>
         }
         steps={['사실만 추려내기', '관찰자 시점으로 다시 쓰기', '패턴 태깅']}
-        onDone={() => router.replace(mirrorId ? `/diary/mirror?id=${mirrorId}` : '/diary/mirror')}
+        onDone={() => setAnimDone(true)}
         onClose={() => router.push('/diary')}
       />
     );
@@ -117,7 +141,7 @@ export default function DiaryWritePage() {
 
   const next = () => (step < TOTAL - 1 ? setStep(step + 1) : submit());
   const canNext = [
-    mode[0] === 'tag' ? !!difficulty : difficultyWhy.trim().length > 0,
+    answer.trim().length > 0,
     mode[1] === 'text' ? scene.trim().length > 0 : sceneTags.length > 0,
     emotions.length > 0,
     myself !== null,
@@ -161,39 +185,19 @@ export default function DiaryWritePage() {
       <div className="px-5 pt-6 pb-6">
         {step === 0 && (
           <>
-            <div className="flex items-center gap-2">
-              <Badge tone="primary" icon={<TrendIcon />}>
-                성장 맥락
-              </Badge>
-              <span className="text-[12px] text-sub">지난주 메타인지 결과</span>
+            <Badge tone="primary" icon={<TrendIcon />}>
+              {questionBadge}
+            </Badge>
+            <h1 className="text-[21px] font-bold text-ink leading-[1.45] mt-3">{todayQuestion}</h1>
+            <div className="mt-4 rounded-3xl bg-surface px-5 py-5 h-[260px] flex flex-col">
+              <textarea
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                placeholder="떠오르는 대로 적어주세요"
+                className="flex-1 bg-transparent outline-none resize-none text-[15px] text-ink leading-[1.75] placeholder:text-mute caret-primary"
+              />
+              <span className="text-right text-[12px] text-mute">{answer.length}자</span>
             </div>
-            <h1 className="text-[21px] font-bold text-ink leading-[1.45] mt-3">
-              지난주 수학 이해도를 20% 과대평가했어요.
-              <br />
-              오늘 체감 난이도는 어땠나요?
-            </h1>
-            <div className="mt-4 rounded-2xl border border-line px-4 h-12 flex items-center gap-3 text-[13px] text-[#48484F]">
-              <span className="font-mono text-mute">08.01</span>
-              <span>
-                예상 이해도 <b className="text-ink">80%</b> → 실제 정답률 <b className="text-ink">60%</b>
-              </span>
-            </div>
-            <div className="mt-4">
-              <Segmented options={[{ value: 'text', label: '텍스트' }, { value: 'tag', label: '태그' }]} value={mode[0]} onChange={(m) => setStepMode(0, m)} />
-            </div>
-            {mode[0] === 'tag' && (
-              <div className="flex flex-wrap gap-2 mt-4">
-                {DIFFICULTY.map((d) => (
-                  <ChoiceChip key={d} label={d} selected={difficulty === d} onClick={() => setDifficulty(d)} />
-                ))}
-              </div>
-            )}
-            <FollowUp
-              question={difficulty === '생각보다 쉬웠어요' ? '쉽다고 느낀 이유가 뭐였어요?' : difficulty === '예상한 만큼' ? '예상이 맞았던 이유가 뭐였어요?' : '어렵다고 느낀 이유가 뭐였어요?'}
-              value={difficultyWhy}
-              onChange={setDifficultyWhy}
-              placeholder="떠오르는 대로 한 줄이면 돼요"
-            />
           </>
         )}
 
@@ -266,7 +270,6 @@ export default function DiaryWritePage() {
               <Badge tone="primary" icon={<SearchSmall />}>
                 발견 맥락
               </Badge>
-              <span className="text-[12px] text-sub">최근 ‘끝까지 붙잡기’를 3번 언급</span>
             </div>
             <h1 className="text-[21px] font-bold text-ink leading-[1.45] mt-3">
               오늘 나답다고 느낀 순간이
@@ -304,7 +307,7 @@ export default function DiaryWritePage() {
               </div>
               <div className="flex flex-wrap gap-1.5 mt-3">
                 {[
-                  { label: '오늘의 질문 + 이유', on: !!difficulty || !!difficultyWhy },
+                  { label: '오늘의 질문', on: !!answer.trim() },
                   { label: '한 장면', on: !!scene || sceneTags.length > 0 },
                   { label: `감정 ${emotions.length}개${emotionWhy ? ' + 서술' : ''}`, on: emotions.length > 0 },
                   { label: `나다움 ${myself === 'no' ? 'NO' : 'YES'}`, on: myself !== null },
@@ -317,7 +320,7 @@ export default function DiaryWritePage() {
                   ))}
               </div>
               <p className="text-[12px] text-sub leading-relaxed mt-3">
-                {emotionWhy || difficultyWhy || scene
+                {emotionWhy || answer || scene
                   ? '서술이 있어서 기록 깊이가 충분해요. 태그만 남긴 날은 리포트에 ‘기록 깊이 부족’으로 표시돼요.'
                   : '태그만 남긴 날은 리포트에 ‘기록 깊이 부족’으로 표시돼요.'}
               </p>

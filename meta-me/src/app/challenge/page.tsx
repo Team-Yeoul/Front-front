@@ -6,9 +6,6 @@ import { useListDailyRecords } from '@/entities/diary';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, ChevronLeft, ChevronRight, ProgressBar } from '@/components/ui/primitives';
 
-// 로그아웃 데모용: 다이어리를 쓴 날 / 출석만 한 날
-const MOCK_WRITTEN_DAYS = [2, 3, 4, 9, 10, 11, 12, 17, 18, 19, 24, 25];
-const MOCK_ATTENDED_DAYS = [1, 6, 7, 13, 16, 20, 23];
 const CHALLENGE_DAYS = 30;
 const WEEK_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -16,8 +13,7 @@ const toDateKey = (d: Date) => d.toLocaleDateString('sv-SE');
 
 export default function ChallengePage() {
   const accessToken = useAuthStore((s) => s.accessToken);
-  // 로그아웃 데모는 시안과 같은 2025년 6월 26일 기준으로 보여준다.
-  const now = accessToken ? new Date() : new Date(2025, 5, 26);
+  const now = new Date();
   const [cursor, setCursor] = useState<Date | null>(null);
   const shown = cursor ?? new Date(now.getFullYear(), now.getMonth(), 1);
   const year = shown.getFullYear();
@@ -32,12 +28,10 @@ export default function ChallengePage() {
   );
 
   const written = useMemo(() => {
-    if (!accessToken) return new Set(isCurrentMonth ? MOCK_WRITTEN_DAYS : []);
-    if (!data) return new Set<number>();
-    return new Set(data.records.map((r) => new Date(r.created_at).getDate()));
-  }, [accessToken, data, isCurrentMonth]);
-  const isDemoMonth = !accessToken && isCurrentMonth;
-  const attended = useMemo(() => new Set(isDemoMonth ? MOCK_ATTENDED_DAYS : []), [isDemoMonth]);
+    return new Set((data?.records ?? []).map((r) => Number(r.recorded_date.slice(8, 10))));
+  }, [data]);
+  // 출석(앱만 연 날) API가 없어 다이어리를 쓴 날만 표시한다.
+  const attended = useMemo(() => new Set<number>(), []);
 
   const achieved = written.size + attended.size;
   const rate = Math.round((achieved / CHALLENGE_DAYS) * 100);

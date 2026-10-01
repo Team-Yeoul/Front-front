@@ -10,10 +10,11 @@ import {
   useUpdateNotificationSettings,
   useWithdrawAccount,
 } from '@/entities/user';
+import type { NotificationSetting } from '@/entities/user';
 import { Screen } from '@/components/ui/Screen';
 import { Button, ChevronRight, Toggle, TopBar } from '@/components/ui/primitives';
 import { Modal } from '@/components/ui/overlays';
-import { MOCK_NICKNAME } from '@/lib/mock';
+import { useMe } from '@/hooks/useMe';
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -47,12 +48,13 @@ export default function SettingsPage() {
   const updateNoti = useUpdateNotificationSettings();
   const logout = useLogout();
   const withdraw = useWithdrawAccount();
-  const [friendAlert, setFriendAlert] = useState(true);
+  const me = useMe();
+  const alarm = noti?.push_enabled === false ? '꺼짐' : noti?.daily_question_time ? `매일 ${noti.daily_question_time}` : '';
   const [confirm, setConfirm] = useState<'logout' | 'withdraw' | null>(null);
 
-  const reportOn = noti ? noti.report_enabled : true;
-  const setReport = (v: boolean) => {
-    if (noti) updateNoti.mutate({ ...noti, report_enabled: v });
+  // 알림 설정(push_enabled · marketing_consent)은 서버에 저장한다.
+  const setNoti = (patch: Partial<NotificationSetting>) => {
+    if (noti) updateNoti.mutate({ ...noti, ...patch });
   };
 
   const run = async () => {
@@ -88,14 +90,14 @@ export default function SettingsPage() {
       <TopBar title="설정" />
       <div className="px-5 pb-8">
         <Group title="계정">
-          <Row label="프로필 편집" value={MOCK_NICKNAME} />
-          <Row label="이메일" value={account?.user.email ?? 'sohee@metame.app'} />
-          <Row label="연결된 계정" value="카카오" />
+          <Row label="프로필 편집" value={me.nickname || account?.user.username || ''} />
+          <Row label="이메일" value={account?.user.email ?? ''} />
+          <Row label="연결된 계정" value="이메일" />
         </Group>
         <Group title="알림">
-          <Row label="기록 리마인더" value="매일 21:00" onClick={() => router.push('/notifications')} />
-          <Row label="친구 응답 알림" right={<Toggle on={friendAlert} onChange={setFriendAlert} />} />
-          <Row label="주간 리포트 알림" right={<Toggle on={reportOn} onChange={setReport} />} />
+          <Row label="기록 리마인더" value={alarm} onClick={() => router.push('/notifications')} />
+          <Row label="푸시 알림" right={<Toggle on={noti?.push_enabled ?? true} onChange={(v) => setNoti({ push_enabled: v })} />} />
+          <Row label="마케팅 정보 수신" right={<Toggle on={noti?.marketing_consent ?? false} onChange={(v) => setNoti({ marketing_consent: v })} />} />
         </Group>
         <Group title="데이터">
           <Row label="기록 내보내기" />

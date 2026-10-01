@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { Button, CheckIcon, CloseIcon, DownloadIcon, Img3D, TextButton, TopBar, type Asset3D } from './primitives';
+import { Button, CheckIcon, CloseIcon, CogniImg, DownloadIcon, Img3D, TextButton, TopBar, type Asset3D } from './primitives';
 import { GradientBg, Sheet } from './overlays';
 import { Screen } from './Screen';
 
@@ -96,6 +96,7 @@ export function CogniHero({
   eyebrow,
   name,
   character = 'mascot-glasses',
+  imageSrc,
   category,
   features,
   counterLabel,
@@ -112,6 +113,8 @@ export function CogniHero({
   eyebrow?: string;
   name?: ReactNode;
   character?: Asset3D;
+  /** 로컬 에셋 경로 또는 서버 icon_url. 있으면 character보다 우선한다. */
+  imageSrc?: string;
   category: string;
   features: CogniFeature[];
   counterLabel: string;
@@ -147,7 +150,7 @@ export function CogniHero({
           </div>
         )}
         <div className="flex-1 flex flex-col items-center justify-center py-6 min-h-[230px]">
-          <Img3D name={character} size={character === 'cogni-headphone' ? 190 : 180} />
+          {imageSrc ? <CogniImg src={imageSrc} size={180} /> : <Img3D name={character} size={character === 'cogni-headphone' ? 190 : 180} />}
           <span className="mt-3 h-7 px-3 rounded-full bg-white/90 text-[12px] font-semibold text-primary inline-flex items-center">
             {category}
           </span>

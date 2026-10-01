@@ -104,6 +104,14 @@ export function Img3D({ name, size, className = '' }: { name: Asset3D; size: num
   );
 }
 
+/** 코그니 캐릭터 이미지 (로컬 에셋 경로 또는 서버 icon_url). */
+export function CogniImg({ src, size, className = '' }: { src: string; size: number; className?: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt="" width={size} className={`h-auto select-none object-contain ${className}`} draggable={false} />
+  );
+}
+
 /* ── Buttons ───────────────────────────────────────────── */
 
 type Variant = 'primary' | 'dark' | 'gray' | 'white' | 'danger';

@@ -23,7 +23,6 @@ import { Wordmark } from '@/components/ui/brand';
 import { AXES, TYPE_OPTIONS } from '@/lib/mock';
 
 // 타인 평가(친구 응답) API가 아직 없어 응답은 화면 안에서만 흘러간다.
-const OWNER = '소희';
 const RELATIONS = ['학교 · 같은 반', '동아리 · 팀 프로젝트', '가족', '온라인에서 알게 된 사이', '기타'];
 const YEARS = [
   { value: 'lt1', label: '1년 미만' },
@@ -98,8 +97,10 @@ function QTitle({ type, scene, title, caption }: { type: string; scene: string; 
 function FriendFlow() {
   const router = useRouter();
   const params = useSearchParams();
-  // 이미 모인 다른 친구 응답 수 (데모: ?n=1 이면 투표 잠금 화면)
-  const priorResponses = Number(params.get('n') ?? 2);
+  // 링크를 보낸 사람의 닉네임 (/mirror/invite에서 ?n=으로 담는다)
+  const OWNER = params.get('n')?.trim() || '친구';
+  // 친구 응답 API가 없어 이미 모인 다른 친구 응답 수는 알 수 없다(0으로 둔다).
+  const priorResponses = 0;
 
   const [step, setStep] = useState<Step>('landing');
   const [relation, setRelation] = useState(RELATIONS[1]);
@@ -167,7 +168,7 @@ function FriendFlow() {
                 </div>
               ))}
             </div>
-            <p className="text-center font-mono text-[12px] text-sub mt-4">8월 10일 까지 · {priorResponses + 1} / 5명 응답</p>
+
             <Button variant="dark" className="mt-3" onClick={() => go('relation')}>
               답하러 가기
             </Button>

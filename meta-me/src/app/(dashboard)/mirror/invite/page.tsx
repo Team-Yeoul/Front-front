@@ -2,20 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store';
+import { useMe } from '@/hooks/useMe';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button, Toast } from '@/components/ui/primitives';
 
-const RESPONDERS = [
-  { name: '익명 1', color: '#C9CBFF', when: '어제' },
-  { name: '익명 2', color: '#FFE066', when: '어제' },
-  { name: '익명 3', color: '#C9C9D0', when: '3일 전' },
-];
+// 친구 응답 API가 아직 없어 응답 수는 0으로 둔다.
+const RESPONDERS: { name: string; color: string; when: string }[] = [];
+const OPEN_AT = 3;
 
 // 초대 링크 발급 API가 아직 없어 사용자 id로 데모 링크를 만든다.
 export default function MirrorInvitePage() {
   const userId = useAuthStore((s) => s.userId);
   const code = (userId ?? 's0h33').replace(/-/g, '').slice(0, 5);
-  const path = `/m/${code}`;
+  const { nickname } = useMe();
+  // 친구 화면에 내 이름이 보이도록 닉네임을 링크에 담는다.
+  const path = `/m/${code}${nickname ? `?n=${encodeURIComponent(nickname)}` : ''}`;
   const display = `metame.app/mirror/${code}`;
   const [toast, setToast] = useState(false);
 
@@ -45,14 +46,16 @@ export default function MirrorInvitePage() {
         <div className="mt-6 rounded-3xl bg-primary px-5 py-5">
           <div className="flex justify-between text-[13px] text-white/75">
             <span>응답 현황</span>
-            <span>8월 10일까지</span>
+            <span>기한 없음</span>
           </div>
           <div className="flex items-end justify-between mt-4">
             <p className="text-white">
               <span className="text-[40px] font-bold leading-none">{RESPONDERS.length}</span>
               <span className="text-[15px] ml-2">명 응답</span>
             </p>
-            <span className="h-7 px-3 rounded-full bg-yellow text-[12px] font-bold text-ink inline-flex items-center">비교 리포트 열림</span>
+            <span className="h-7 px-3 rounded-full bg-white/20 text-[12px] font-bold text-white inline-flex items-center">
+              {RESPONDERS.length >= OPEN_AT ? '비교 리포트 열림' : `${OPEN_AT - RESPONDERS.length}명 더 모이면 열려요`}
+            </span>
           </div>
           <p className="text-[13px] text-white/85 mt-4">인원 제한 없이 계속 받을 수 있어요</p>
         </div>
@@ -70,6 +73,7 @@ export default function MirrorInvitePage() {
 
         <div className="mt-4 rounded-3xl bg-surface px-5 py-5">
           <p className="text-[16px] font-bold text-ink">응답한 사람</p>
+          {RESPONDERS.length === 0 && <p className="text-[13px] text-sub mt-3">아직 답한 친구가 없어요. 링크를 보내 보세요.</p>}
           <div className="flex flex-col gap-2.5 mt-4">
             {RESPONDERS.map((r) => (
               <div key={r.name} className="flex items-center gap-3 rounded-2xl bg-[#EDEDF2] px-4 h-14">

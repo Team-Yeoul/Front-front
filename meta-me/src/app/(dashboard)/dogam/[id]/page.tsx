@@ -2,39 +2,43 @@
 
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
+import { Screen } from '@/components/ui/Screen';
+import { Button, TopBar } from '@/components/ui/primitives';
 import { CogniHero, FeatureIcons } from '@/components/ui/flows';
-import { MOCK_COGNIS, MOCK_NICKNAME } from '@/lib/mock';
+import { useCollection } from '@/hooks/useCollection';
+import { useMe } from '@/hooks/useMe';
+
+const ICONS = [FeatureIcons.target, FeatureIcons.clock, FeatureIcons.bolt];
 
 export default function CogniDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+  const id = decodeURIComponent(use(params).id);
   const router = useRouter();
-  const cogni = MOCK_COGNIS.find((c) => c.id === id) ?? MOCK_COGNIS[0];
-  const [first, ...rest] = cogni.name.split(' ');
+  const { nickname } = useMe();
+  const collection = useCollection();
+  const index = collection.findIndex((c) => c.id === id);
+  const cogni = collection[index];
 
+  if (!cogni) {
+    return (
+      <Screen footer={<Button onClick={() => router.push('/dogam')}>도감으로</Button>}>
+        <TopBar backHref="/dogam" />
+        <p className="text-center text-[14px] text-sub mt-24">아직 모으지 않은 코그니예요.</p>
+      </Screen>
+    );
+  }
+
+  const lines = cogni.features?.length ? cogni.features : [cogni.desc];
   return (
     <CogniHero
-      eyebrow={`${MOCK_NICKNAME}님 안에서 발견된`}
-      name={
-        rest.length ? (
-          <>
-            {first}
-            <br />
-            {rest.join(' ')}
-          </>
-        ) : (
-          cogni.name
-        )
-      }
-      category={cogni.category.replace('/', ' · ')}
-      features={[
-        { icon: FeatureIcons.cloud, text: '컨디션이 좋지 않을 때 나타나요' },
-        { icon: FeatureIcons.search, text: '분명 주변이 문제인 것 같아요' },
-        { icon: FeatureIcons.sparkle, text: '처음 목격한 코그니예요' },
-      ]}
+      eyebrow={`${nickname ? `${nickname}님` : '나'} 안에서 발견된`}
+      name={cogni.name}
+      imageSrc={cogni.image}
+      category={cogni.category}
+      features={lines.map((text, i) => ({ icon: ICONS[i % ICONS.length], text }))}
       counterLabel="도감에 저장했어요"
-      counter="06 / 24"
+      counter={`${String(index + 1).padStart(2, '0')} / 24`}
       primaryLabel="잡은 순간 확인하기"
-      onPrimary={() => router.push(`/dogam/${cogni.id}/moments`)}
+      onPrimary={() => router.push(`/dogam/${encodeURIComponent(cogni.id)}/moments`)}
       onBack={() => router.back()}
     />
   );

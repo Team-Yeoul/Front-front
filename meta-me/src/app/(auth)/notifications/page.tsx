@@ -45,12 +45,25 @@ export default function NotificationsPage() {
 
   const goOnboarding = () => router.push('/onboarding');
 
+  // 데일리 질문 알림 시각을 서버(daily_question_time, HH:mm)에 저장한다.
+  const saveTime = async () => {
+    if (accessToken) {
+      try {
+        const current = await userApi.getNotificationSettings();
+        await updateSettings.mutateAsync({ ...current, daily_question_time: `${String(hour % 24).padStart(2, '0')}:00` });
+      } catch {
+        // 실패해도 온보딩은 이어간다
+      }
+    }
+    goOnboarding();
+  };
+
   const allow = async (enabled: boolean) => {
     setDialog(false);
     if (accessToken) {
       try {
         const current = await userApi.getNotificationSettings();
-        await updateSettings.mutateAsync({ ...current, daily_question_enabled: enabled });
+        await updateSettings.mutateAsync({ ...current, push_enabled: enabled });
       } catch {
         // 알림 설정 실패는 흐름을 막지 않음
       }
@@ -64,8 +77,7 @@ export default function NotificationsPage() {
       <Screen
         footer={
           <>
-            {/* 알림 시각을 저장하는 API가 아직 없어 선택값은 화면에만 반영된다. */}
-            <Button variant="dark" onClick={goOnboarding}>
+            <Button variant="dark" onClick={saveTime} disabled={updateSettings.isPending}>
               이 시간에 알림 받기
             </Button>
             <TextButton className="mt-1" onClick={goOnboarding}>

@@ -19,10 +19,10 @@ export default function StreakPage() {
   const monday = new Date(today);
   monday.setDate(today.getDate() - mondayOffset);
 
-  let streak = 23;
-  let doneIdx = new Set([0, 1]);
-  if (accessToken && data) {
-    const days = new Set(data.records.map((r) => toDateKey(new Date(r.created_at))));
+  let streak = 0;
+  let doneIdx = new Set<number>();
+  if (data) {
+    const days = new Set(data.records.map((r) => r.recorded_date));
     streak = 0;
     const d = new Date(today);
     while (days.has(toDateKey(d))) {
@@ -37,7 +37,7 @@ export default function StreakPage() {
       }).filter((i) => i >= 0),
     );
   }
-  const todayIdx = accessToken ? mondayOffset : 1;
+  const todayIdx = mondayOffset;
 
   return (
     <Screen footer={<Button onClick={() => router.push('/main')}>돌아가기</Button>}>

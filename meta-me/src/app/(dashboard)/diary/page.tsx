@@ -7,11 +7,9 @@ import { useGetDailyRecord, useListDailyRecords } from '@/entities/diary';
 import type { DailyRecord } from '@/entities/diary';
 import { Screen } from '@/components/ui/Screen';
 import { TopBar } from '@/components/ui/primitives';
-import { MOCK_DIARIES } from '@/lib/mock';
 
 type Filter = 'all' | 'objectified' | 'draft';
 
-const toDot = (iso: string) => new Date(iso).toLocaleDateString('sv-SE').replaceAll('-', '.');
 
 function DiaryCard({ title, date, tags, onClick }: { title: string; date: string; tags: string[]; onClick: () => void }) {
   return (
@@ -44,16 +42,16 @@ function RealDiaryCard({ record }: { record: DailyRecord }) {
     .map((t) => t.trim())
     .filter((t) => t && /[가-힣]/.test(t))
     .slice(0, 3);
-  return <DiaryCard title={title} date={toDot(record.created_at)} tags={tags} onClick={() => router.push(`/diary/${record.record_id}`)} />;
+  return <DiaryCard title={title} date={record.recorded_date.replaceAll('-', '.')} tags={tags} onClick={() => router.push(`/diary/${record.record_id}`)} />;
 }
 
 export default function DiaryListPage() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
-  const { data } = useListDailyRecords({ size: 50 }, !!accessToken);
+  const { data, isError } = useListDailyRecords({ size: 50 }, !!accessToken);
   const [filter, setFilter] = useState<Filter>('all');
 
-  const real = !!accessToken && !!data;
+  const records = useMemo(() => data?.records ?? [], [data]);
 
   const groups = useMemo(() => {
     const map = new Map<string, { key: string; node: React.ReactNode }[]>();
@@ -61,18 +59,14 @@ export default function DiaryListPage() {
       if (!map.has(month)) map.set(month, []);
       map.get(month)!.push({ key, node });
     };
-    if (real) {
-      for (const r of data.records) push(toDot(r.created_at).slice(0, 7), r.record_id, <RealDiaryCard record={r} />);
-    } else {
-      for (const d of MOCK_DIARIES.filter((x) => filter === 'all' || x.status === filter)) {
-        push(d.date.slice(0, 7), d.id, <DiaryCard title={d.title} date={d.date} tags={d.tags} onClick={() => router.push(`/diary/${d.id}`)} />);
-      }
+    // 임시저장 상태는 API에 없어 모든 기록을 객관화 완료로 본다.
+    if (filter !== 'draft') {
+      for (const r of records) push(r.recorded_date.replaceAll('-', '.').slice(0, 7), r.record_id, <RealDiaryCard record={r} />);
     }
     return [...map.entries()];
-  }, [real, data, filter, router]);
+  }, [records, filter]);
 
-  // 임시저장 상태는 API에 없어 로그인 시엔 모든 기록을 객관화 완료로 센다.
-  const counts = real ? { all: data.records.length, objectified: data.records.length, draft: 0 } : { all: 42, objectified: 28, draft: 3 };
+  const counts = { all: data?.page_info?.total_elements ?? records.length, objectified: data?.page_info?.total_elements ?? records.length, draft: 0 };
 
   const FILTERS: { key: Filter; label: string }[] = [
     { key: 'all', label: `전체 ${counts.all}` },
@@ -118,7 +112,13 @@ export default function DiaryListPage() {
             </div>
           </section>
         ))}
-        {groups.length === 0 && <p className="text-center text-[14px] text-sub mt-16">아직 기록이 없어요.</p>}
+        {isError && <p className="text-center text-[14px] text-sub mt-20">기록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</p>}
+        {data && groups.length === 0 && (
+          <div className="text-center mt-20">
+            <p className="text-[15px] font-semibold text-ink">{filter === 'draft' ? '임시저장한 기록이 없어요' : '아직 남긴 기록이 없어요'}</p>
+            <p className="text-[13px] text-sub mt-1.5">+ 버튼을 눌러 첫 기록을 남겨보세요</p>
+          </div>
+        )}
       </div>
     </Screen>
   );

@@ -5,25 +5,20 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store';
 import { useGetMyProfile } from '@/entities/user';
+import { ApiError } from '@/shared/api';
 import { useGetDailyRecord, useListDailyRecords } from '@/entities/diary';
 import type { DailyRecord } from '@/entities/diary';
 import { Screen } from '@/components/ui/Screen';
-import { Button, CheckIcon, ChevronRight, GearIcon, Img3D, ProgressBar } from '@/components/ui/primitives';
-import { Modal } from '@/components/ui/overlays';
-import { MOCK_DIARIES } from '@/lib/mock';
+import { CheckIcon, ChevronRight, CogniImg, GearIcon, ProgressBar } from '@/components/ui/primitives';
+import { useCollection } from '@/hooks/useCollection';
 
 type DayStatus = 'done' | 'missed' | 'today' | 'pending';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-/** 로그아웃 데모: 오늘 이전은 모두 기록, 오늘은 아직 안 씀. */
-const mockWeekFlow = (todayIndex: number): DayStatus[] =>
-  WEEKDAYS.map((_, i) => (i < todayIndex ? 'done' : i === todayIndex ? 'today' : 'pending'));
 const PROMPTS = ['오늘 하루는\n어떤 장면으로 남았나요?', '오늘 가장 크게 흔들린\n감정은 뭐였나요?', '오늘 스스로를 칭찬하고\n싶은 순간이 있었나요?'];
-const FRIEND_NOTICE_KEY = 'metame:friend-notice-seen';
 
 /** Local YYYY-MM-DD, independent of timezone offset formatting quirks. */
 const toDateKey = (d: Date) => d.toLocaleDateString('sv-SE');
-const formatDotDate = (iso: string) => toDateKey(new Date(iso)).replaceAll('-', '.');
 
 function getWeekRange(today: Date) {
   const start = new Date(today);
@@ -39,9 +34,8 @@ function useWeekFlow() {
   const { start, end } = getWeekRange(today);
   const { data } = useListDailyRecords({ start_date: toDateKey(start), end_date: toDateKey(end), size: 50 }, !!accessToken);
 
-  if (!accessToken || !data) return mockWeekFlow(today.getDay());
-
-  const recordedDates = new Set(data.records.map((r) => toDateKey(new Date(r.created_at))));
+  // 실제 기록이 있는 날만 체크한다. 불러오기 전/실패 시에는 아무 날도 체크하지 않는다.
+  const recordedDates = new Set((data?.records ?? []).map((r) => r.recorded_date));
   const todayKey = toDateKey(today);
   return WEEKDAYS.map((_, i) => {
     const day = new Date(start);
@@ -90,7 +84,7 @@ function RealRecordRow({ record }: { record: DailyRecord }) {
   const question = data?.questions[0];
   const rawTitle = question?.scene_description || question?.emotion_tag;
   const title = rawTitle && /[가-힣]/.test(rawTitle) ? rawTitle : '기록 보기';
-  return <RecordRow title={title} date={formatDotDate(record.created_at)} onClick={() => router.push(`/diary/${record.record_id}`)} />;
+  return <RecordRow title={title} date={record.recorded_date.replaceAll('-', '.')} onClick={() => router.push(`/diary/${record.record_id}`)} />;
 }
 
 const PencilIcon = () => (
@@ -102,27 +96,18 @@ const PencilIcon = () => (
 export default function MainPage() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
-  const { data: profile } = useGetMyProfile(!!accessToken);
+  const { data: profile, error: profileError } = useGetMyProfile(!!accessToken);
+
+  // 로그인은 됐지만 온보딩을 마치지 않아 프로필이 없으면(404) 온보딩부터 하게 한다.
+  useEffect(() => {
+    if (profileError instanceof ApiError && profileError.status === 404) router.replace('/onboarding');
+  }, [profileError, router]);
   const { data: recent } = useListDailyRecords({ size: 3 }, !!accessToken);
   const weekFlow = useWeekFlow();
   const [stripOpen, setStripOpen] = useState(true);
-  const [friendNotice, setFriendNotice] = useState(false);
-
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem(FRIEND_NOTICE_KEY)) setFriendNotice(true);
-    } catch {
-      // storage 접근 불가 시 알림 생략
-    }
-  }, []);
-
-  const dismissNotice = (go: boolean) => {
-    try {
-      localStorage.setItem(FRIEND_NOTICE_KEY, '1');
-    } catch {}
-    setFriendNotice(false);
-    if (go) router.push('/mirror/results');
-  };
+  const cognis = useCollection();
+  // 메인 캐릭터 = 가장 최근에 모은 코그니 (온보딩 직후엔 첫 코그니)
+  const character = cognis[cognis.length - 1];
 
   const today = new Date();
   const todayIndex = today.getDay();
@@ -135,34 +120,15 @@ export default function MainPage() {
     for (let i = completedToday ? todayIndex : todayIndex - 1; i >= 0 && weekFlow[i] === 'done'; i--) n++;
     return n;
   })();
-  const accuracy = accessToken ? (profile?.latest_accuracy?.accuracy_percent ?? 0) : 76;
+  const accuracy = profile?.latest_accuracy?.accuracy_percent ?? 0;
   const weekRate = Math.round((doneCount / 7) * 100);
-  const hasRealRecent = !!accessToken && !!recent && recent.records.length > 0;
+  const records = recent?.records ?? [];
+  // 데일리 기록은 하루 1건이라, 오늘 기록이 있으면 새로 쓰는 대신 그 기록을 연다.
+  const todayRecord = records.find((r) => r.recorded_date === toDateKey(today));
 
   return (
     <Screen
       nav
-      overlay={
-        <Modal open={friendNotice} onClose={() => dismissNotice(false)}>
-          <div className="flex flex-col items-center text-center">
-            <Img3D name="megaphone" size={96} />
-            <p className="text-[18px] font-bold text-ink leading-snug mt-3">
-              소희님, 친구의 답이
-              <br />
-              도착했어요
-            </p>
-            <p className="text-[13px] text-sub mt-2">3 / 5명 응답 · 내가 몰랐던 나를 확인해보세요</p>
-            <div className="grid grid-cols-2 gap-2 w-full mt-6">
-              <Button variant="gray" className="bg-[#E6E6EC]" onClick={() => dismissNotice(false)}>
-                나중에
-              </Button>
-              <Button onClick={() => dismissNotice(true)}>
-                확인하기
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      }
     >
       <div className="flex items-center justify-between px-5 h-14">
         <span className="text-[22px] font-bold text-ink tracking-tight">metame</span>
@@ -212,7 +178,15 @@ export default function MainPage() {
             {completedToday ? '오늘 기록을\n완료했어요' : prompt}
           </h1>
           <div className="relative w-[172px] h-[152px] mx-auto mt-3 rounded-full bg-white flex items-center justify-center">
-            <Img3D name="mascot-glasses" size={150} className="-mt-2" />
+            {character ? (
+              <CogniImg src={character.image} size={140} />
+            ) : (
+              <span className="text-[13px] text-mute text-center leading-relaxed">
+                첫 코그니를
+                <br />
+                아직 만나지 못했어요
+              </span>
+            )}
             {completedToday && (
               <span className="absolute right-1 bottom-1 w-10 h-10 rounded-full bg-primary border-[3px] border-white flex items-center justify-center">
                 <CheckIcon size={16} />
@@ -220,10 +194,13 @@ export default function MainPage() {
             )}
           </div>
           {completedToday ? (
-            <button onClick={() => router.push('/diary/write')} className="w-full flex items-center justify-between mt-4 text-left">
+            <button
+              onClick={() => router.push(todayRecord ? `/diary/${todayRecord.record_id}` : '/diary')}
+              className="w-full flex items-center justify-between mt-4 text-left"
+            >
               <div>
                 <p className="text-[13px] font-semibold text-primary">연속 {streak}일 작성 완료</p>
-                <p className="text-[17px] font-bold text-ink mt-1">새로운 기록 남기기</p>
+                <p className="text-[17px] font-bold text-ink mt-1">오늘 기록 다시 보기</p>
               </div>
               <span className="w-10 h-10 rounded-full bg-ink flex items-center justify-center">
                 <ChevronRight size={16} color="#FFFFFF" />
@@ -238,7 +215,9 @@ export default function MainPage() {
                 <PencilIcon />
               </span>
               <span className="flex-1 min-w-0">
-                <span className="block text-[12px] text-sub">아직 오늘 기록하지 않았어요 · 연속 {streak}일째</span>
+                <span className="block text-[12px] text-sub">
+                  아직 오늘 기록하지 않았어요{streak > 0 ? ` · 연속 ${streak}일째` : ''}
+                </span>
                 <span className="block text-[17px] font-bold text-primary mt-0.5">오늘 기록하러 가기</span>
               </span>
               <ChevronRight size={18} color="#8E8E95" />
@@ -268,11 +247,14 @@ export default function MainPage() {
           </div>
         )}
         <div className="flex flex-col gap-2.5">
-          {hasRealRecent
-            ? recent.records.slice(0, completedToday ? 2 : 3).map((r) => <RealRecordRow key={r.record_id} record={r} />)
-            : MOCK_DIARIES.slice(0, completedToday ? 2 : 3).map((d) => (
-                <RecordRow key={d.id} title={d.title} date={d.date} onClick={() => router.push(`/diary/${d.id}`)} />
-              ))}
+          {records.length > 0 ? (
+            records.slice(0, completedToday ? 2 : 3).map((r) => <RealRecordRow key={r.record_id} record={r} />)
+          ) : (
+            <div className="rounded-2xl bg-card border border-dashed border-line px-4 py-6 text-center">
+              <p className="text-[14px] text-sub">아직 남긴 기록이 없어요</p>
+              <p className="text-[12px] text-mute mt-1">오늘의 질문에 답하면 여기에 쌓여요</p>
+            </div>
+          )}
         </div>
       </div>
     </Screen>
