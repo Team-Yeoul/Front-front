@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSubmitOnboarding } from '@/entities/user';
+import { ApiError } from '@/shared/api';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button, CheckIcon, Dots, Img3D, OptionRow, TextButton } from '@/components/ui/primitives';
 import { GradientBg } from '@/components/ui/overlays';
@@ -286,6 +287,8 @@ export default function OnboardingPage() {
   const total = ONBOARDING_QUESTIONS.length;
   const isLast = qIndex === total - 1;
 
+  const [submitted, setSubmitted] = useState(false);
+
   const submit = async () => {
     const byId = (id: string) => labelOf(answers[id], ONBOARDING_QUESTIONS.find((x) => x.id === id)) || '아직 모르겠어요';
     const sentence = labelOf(answers.my_one_sentence);
@@ -299,8 +302,13 @@ export default function OnboardingPage() {
         favorite_thing: byId('curious_about'),
       });
       if (typeof res.accuracy_percent === 'number') setAccuracy(res.accuracy_percent);
-    } catch {
-      // 로그아웃 상태이거나 실패해도 흐름은 이어감
+      setSubmitted(true);
+      return true;
+    } catch (err) {
+      // 이미 제출된 계정(409)은 성공으로 본다. 그 외 실패는 마칠 때 한 번 더 시도한다.
+      const already = err instanceof ApiError && err.code === 'ONBOARDING_ALREADY_SUBMITTED';
+      if (already) setSubmitted(true);
+      return already;
     }
   };
 
@@ -470,7 +478,11 @@ export default function OnboardingPage() {
   }
 
   /* 아웃트로 */
-  const finish = () => router.push('/main');
+  const finish = async () => {
+    if (!submitted) await submit();
+    me.patch((u) => ({ ...u, onboardedAt: new Date().toISOString() }));
+    router.push('/main');
+  };
   if (slide === 0)
     return (
       <Slide variant="a" dots={[0, 3]} hint="화면을 탭해서 계속" align="center" onNext={() => setSlide(1)}>

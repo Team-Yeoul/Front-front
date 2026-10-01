@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store';
-import { useGetMyProfile } from '@/entities/user';
-import { ApiError } from '@/shared/api';
+import { useGetMyProfile, useGetOnboardingResult } from '@/entities/user';
+import { isOnboardingMissing } from '@/lib/onboarding';
+import { useMe } from '@/hooks/useMe';
 import { useGetDailyRecord, useListDailyRecords } from '@/entities/diary';
 import type { DailyRecord } from '@/entities/diary';
 import { Screen } from '@/components/ui/Screen';
@@ -96,12 +97,14 @@ const PencilIcon = () => (
 export default function MainPage() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
-  const { data: profile, error: profileError } = useGetMyProfile(!!accessToken);
+  const { data: profile } = useGetMyProfile(!!accessToken);
+  const { onboardedAt } = useMe();
+  const { error: onboardingError } = useGetOnboardingResult(!!accessToken && !onboardedAt);
 
-  // 로그인은 됐지만 온보딩을 마치지 않아 프로필이 없으면(404) 온보딩부터 하게 한다.
+  // 로그인된 채로 다시 열었는데 온보딩을 안 한 계정이면 온보딩부터 하게 한다.
   useEffect(() => {
-    if (profileError instanceof ApiError && profileError.status === 404) router.replace('/onboarding');
-  }, [profileError, router]);
+    if (!onboardedAt && isOnboardingMissing(onboardingError)) router.replace('/onboarding');
+  }, [onboardedAt, onboardingError, router]);
   const { data: recent } = useListDailyRecords({ size: 3 }, !!accessToken);
   const weekFlow = useWeekFlow();
   const [stripOpen, setStripOpen] = useState(true);
