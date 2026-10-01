@@ -1,9 +1,32 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import { useStatusBarStore } from '@/store';
+
+/**
+ * 화면 전환: 상태바와 콘텐츠에 같은 페이드를 동시에 걸어 둘이 한 화면처럼 바뀌게 한다.
+ * (콘텐츠만 페이드하면 상태바와의 경계가 드러난다)
+ */
+const ROUTE_FADE = { from: 0.7, ms: 180 };
 
 export function PhoneFrame({ children }: { children: React.ReactNode }) {
   const theme = useStatusBarStore((s) => s.theme);
+  const pathname = usePathname();
+  const statusRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const firstRender = useRef(true);
+
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    for (const el of [statusRef.current, contentRef.current]) {
+      el?.animate([{ opacity: ROUTE_FADE.from }, { opacity: 1 }], { duration: ROUTE_FADE.ms, easing: 'ease-out' });
+    }
+  }, [pathname]);
   const iconColor = theme.fg === 'light' ? '#ffffff' : '#000000';
 
   return (
@@ -20,7 +43,8 @@ export function PhoneFrame({ children }: { children: React.ReactNode }) {
 
         {/* 상태바 - 데스크톱 전용. 배경색은 현재 페이지가 useStatusBarTheme으로 지정 */}
         <div
-          className="hidden md:flex h-[59px] shrink-0 items-end justify-between px-7 pb-2 relative z-10 transition-colors"
+          ref={statusRef}
+          className="hidden md:flex h-[59px] shrink-0 items-end justify-between px-7 pb-2 relative z-10"
           style={{ backgroundColor: theme.bg }}
         >
           <span className="text-[15px] font-semibold" style={{ color: iconColor }}>9:41</span>
@@ -46,7 +70,9 @@ export function PhoneFrame({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* 페이지 콘텐츠 */}
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <div ref={contentRef} className="flex-1 overflow-y-auto">
+          {children}
+        </div>
 
         {/* 홈 인디케이터 - 데스크톱 전용 */}
         <div className="hidden md:flex h-[34px] shrink-0 items-center justify-center">

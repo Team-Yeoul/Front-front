@@ -85,4 +85,10 @@ body {
 }
 .animate-sheet-up { animation: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .animate-fade-in { animation: fade-in 0.2s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-up,
+  .animate-pop-in,
+  .animate-fade-in { animation: none; }
+}
 .animate-pop-in { animation: pop-in 0.22s ease-out; }
