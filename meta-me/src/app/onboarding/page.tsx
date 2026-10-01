@@ -2,7 +2,8 @@
 
 import { useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSubmitOnboarding } from '@/entities/user';
+import { useGetMyAccount, useSubmitOnboarding } from '@/entities/user';
+import { useAuthStore } from '@/store';
 import { ApiError } from '@/shared/api';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button, CheckIcon, Dots, Img3D, OptionRow, TextButton } from '@/components/ui/primitives';
@@ -281,6 +282,10 @@ export default function OnboardingPage() {
   const [askOpen, setAskOpen] = useState(false);
   const [accuracy, setAccuracy] = useState(12);
   const me = useMe();
+  // 표시 이름: 가입 때 입력한 닉네임 → 서버 계정 이름(username) → 이메일 앞부분
+  const token = useAuthStore((s) => s.accessToken);
+  const { data: account } = useGetMyAccount(!!token && !me.nickname);
+  const displayName = me.nickname || account?.user.username || account?.user.email?.split('@')[0];
 
   const q = ONBOARDING_QUESTIONS[qIndex];
   const total = ONBOARDING_QUESTIONS.length;
@@ -446,7 +451,7 @@ export default function OnboardingPage() {
   if (phase === 'result') {
     return (
       <CogniHero
-        eyebrow={me.nickname ? `${me.nickname}님의 첫 코그니는` : '나의 첫 코그니는'}
+        eyebrow={displayName ? `${displayName}님의 첫 코그니는` : '나의 첫 코그니는'}
         name={
           <>
             꼼꼼한
