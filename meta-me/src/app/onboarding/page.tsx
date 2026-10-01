@@ -281,7 +281,6 @@ export default function OnboardingPage() {
   const [askOpen, setAskOpen] = useState(false);
   const [accuracy, setAccuracy] = useState(12);
   const me = useMe();
-  const nickname = me.nickname ?? '나';
 
   const q = ONBOARDING_QUESTIONS[qIndex];
   const total = ONBOARDING_QUESTIONS.length;
@@ -447,15 +446,13 @@ export default function OnboardingPage() {
   if (phase === 'result') {
     return (
       <CogniHero
-        eyebrow={askOpen ? `${nickname}님의 첫 코그니는` : undefined}
+        eyebrow={me.nickname ? `${me.nickname}님의 첫 코그니는` : '나의 첫 코그니는'}
         name={
-          askOpen ? (
-            <>
-              꼼꼼한
-              <br />
-              설계자
-            </>
-          ) : undefined
+          <>
+            꼼꼼한
+            <br />
+            설계자
+          </>
         }
         character="cogni-headphone"
         category="No.01 · 행동 · 습관 패턴"
