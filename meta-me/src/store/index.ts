@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type { DiaryEntry, User } from '@/types';
 
 interface AuthStore {
@@ -9,13 +10,22 @@ interface AuthStore {
   clearAuth: () => void;
 }
 
-export const useAuthStore = create<AuthStore>((set) => ({
-  accessToken: null,
-  refreshToken: null,
-  userId: null,
-  setAuth: (accessToken, refreshToken, userId) => set({ accessToken, refreshToken, userId }),
-  clearAuth: () => set({ accessToken: null, refreshToken: null, userId: null }),
-}));
+// 새로고침해도 로그인이 유지되도록 localStorage에 저장한다.
+// SSR과 첫 렌더가 어긋나지 않게 skipHydration 후 <AuthGate>에서 rehydrate한다.
+export const useAuthStore = create<AuthStore>()(
+  persist(
+    (set) => ({
+      accessToken: null,
+      refreshToken: null,
+      userId: null,
+      setAuth: (accessToken, refreshToken, userId) => set({ accessToken, refreshToken, userId }),
+      clearAuth: () => set({ accessToken: null, refreshToken: null, userId: null }),
+    }),
+    { name: 'metame-auth', storage: createJSONStorage(() => localStorage), skipHydration: true },
+  ),
+);
+
+export * from './local';
 
 interface DiaryStore {
   entries: DiaryEntry[];

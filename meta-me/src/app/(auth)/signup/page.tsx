@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSignup, userApi } from '@/entities/user';
 import { ApiError } from '@/shared/api';
-import { useAuthStore, useTermsStore } from '@/store';
+import { useAuthStore, useLocalStore, useTermsStore } from '@/store';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button } from '@/components/ui/primitives';
 import { Field, RememberRow } from '@/components/ui/Field';
@@ -36,7 +36,7 @@ export default function SignupPage() {
 
   const passwordError = password.length > 0 && !PASSWORD_RULE.test(password) ? '영문·숫자 조합 8자 이상으로 입력해 주세요' : undefined;
   const canSubmit =
-    email.includes('@') && email.includes('.') && PASSWORD_RULE.test(password) && birthDate.length > 0 && service && privacy;
+    nickname.trim().length > 0 && email.includes('@') && email.includes('.') && PASSWORD_RULE.test(password) && birthDate.length > 0 && service && privacy;
 
   const handleSubmit = async () => {
     if (!canSubmit || loading) return;
@@ -44,9 +44,11 @@ export default function SignupPage() {
     try {
       const res = await signupMutation.mutateAsync({ email, password, birth_date: birthDate });
       setAuth(res.access_token, res.refresh_token, res.user_id);
+      // 가입 API가 닉네임을 받지 않아 기기에 저장해 마이페이지 등에서 쓴다.
+      if (nickname.trim()) useLocalStore.getState().update(res.user_id, (u) => ({ ...u, nickname: nickname.trim() }));
       try {
         const current = await userApi.getNotificationSettings();
-        await userApi.updateNotificationSettings({ ...current, marketing_enabled: marketing });
+        await userApi.updateNotificationSettings({ ...current, marketing_consent: marketing });
       } catch {
         // 알림 설정 저장 실패는 가입 자체를 막지 않음
       }

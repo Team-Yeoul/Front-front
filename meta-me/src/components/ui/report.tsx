@@ -163,3 +163,72 @@ export function Radar({ labels, values, color, fill, size = 170 }: { labels: rea
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <div className={`rounded-3xl bg-surface px-5 py-5 ${className}`}>{children}</div>;
 }
+
+/** 이번 주 리포트가 아직 없을 때: 기록 진행도와 '리포트 만들기' / '기록하러 가기'. */
+export function ReportLocked({
+  recordCount,
+  min,
+  canGenerate,
+  generating,
+  onGenerate,
+}: {
+  recordCount: number;
+  min: number;
+  canGenerate: boolean;
+  generating: boolean;
+  onGenerate: () => void;
+}) {
+  return (
+    <div className="rounded-3xl bg-surface px-5 py-7 flex flex-col items-center text-center">
+      <span className="w-12 h-12 rounded-full bg-primary-soft flex items-center justify-center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="4.5" y="10" width="15" height="11" rx="2.5" fill="#6367FF" />
+          <path d="M8 10V7.5a4 4 0 0 1 8 0V10" stroke="#6367FF" strokeWidth="2.2" />
+        </svg>
+      </span>
+      <p className="text-[16px] font-bold text-ink mt-4">이번 주 리포트가 아직 없어요</p>
+      <p className="text-[13px] text-sub mt-1.5 leading-relaxed">
+        이번 주 기록이 {min}개 쌓이면
+        <br />
+        AI가 한 주를 정리해 드려요
+      </p>
+      <div className="flex items-center gap-3 w-full mt-5">
+        <div className="flex-1 h-1.5 rounded-full bg-[#E4E4EA] overflow-hidden">
+          <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (recordCount / min) * 100)}%` }} />
+        </div>
+        <span className="font-mono text-[13px] font-semibold text-primary">
+          {Math.min(recordCount, min)} / {min}
+        </span>
+      </div>
+      {canGenerate ? (
+        <button onClick={onGenerate} disabled={generating} className="mt-5 h-11 px-5 rounded-xl bg-primary text-white text-[14px] font-semibold disabled:opacity-50">
+          {generating ? '리포트 만드는 중...' : '이번 주 리포트 만들기'}
+        </button>
+      ) : (
+        <Link href="/diary/chat" className="mt-5 h-11 px-5 rounded-xl bg-white border border-line text-[14px] font-semibold text-ink inline-flex items-center">
+          오늘 기록하러 가기
+        </Link>
+      )}
+    </div>
+  );
+}
+
+/** 리포트 content에서 뽑은 문장 목록. 비어 있으면 안내 문구. */
+export function ContentList({ title, items, empty = '이번 리포트에는 이 항목이 없어요' }: { title: string; items: string[]; empty?: string }) {
+  return (
+    <Card>
+      <p className="text-[16px] font-bold text-ink">{title}</p>
+      {items.length > 0 ? (
+        <div className="divide-y divide-[#E6E6EC] mt-1">
+          {items.map((t) => (
+            <p key={t} className="py-3 text-[15px] text-ink leading-relaxed">
+              {t}
+            </p>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[13px] text-sub mt-3">{empty}</p>
+      )}
+    </Card>
+  );
+}

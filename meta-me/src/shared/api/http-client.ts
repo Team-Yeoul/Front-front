@@ -47,7 +47,34 @@ export interface RequestConfig {
  * Reads the access token from the zustand auth store, throws {@link ApiError}
  * on non-2xx responses using the backend's ErrorResponse shape.
  */
-export async function apiRequest<T>(path: string, config: RequestConfig = {}): Promise<T> {
+let refreshing: Promise<boolean> | null = null;
+
+/** 저장된 refresh token으로 access token을 한 번 갱신한다. 동시에 여러 요청이 401을 받아도 한 번만 시도한다. */
+function refreshAccessToken(): Promise<boolean> {
+  if (refreshing) return refreshing;
+  refreshing = (async () => {
+    const { refreshToken, setAuth } = useAuthStore.getState();
+    if (!refreshToken) return false;
+    try {
+      const res = await fetch(`${BASE_URL}/v1/auth/token/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!res.ok) return false;
+      const data = (await res.json()) as components['schemas']['AuthResponse'];
+      setAuth(data.access_token, data.refresh_token, data.user_id);
+      return true;
+    } catch {
+      return false;
+    }
+  })().finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+}
+
+export async function apiRequest<T>(path: string, config: RequestConfig = {}, retried = false): Promise<T> {
   const { method = 'GET', body, query, auth = true } = config;
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -61,6 +88,12 @@ export async function apiRequest<T>(path: string, config: RequestConfig = {}): P
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+
+  // 로그인이 유지되는 동안 토큰이 만료되면 한 번 갱신해 재시도하고, 실패하면 로그아웃한다.
+  if (res.status === 401 && auth && !retried) {
+    if (await refreshAccessToken()) return apiRequest<T>(path, config, true);
+    useAuthStore.getState().clearAuth();
+  }
 
   if (!res.ok) {
     const errorBody = (await res.json().catch(() => ({}))) as Partial<ErrorResponse>;

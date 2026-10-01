@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useDeleteDailyRecord, useGetDailyRecord } from '@/entities/diary';
 import { useAuthStore } from '@/store';
 import { Screen } from '@/components/ui/Screen';
-import { Button, ChevronRight, TopBar } from '@/components/ui/primitives';
-import { MOCK_DIARY_DETAIL } from '@/lib/mock';
+import { Button, TopBar } from '@/components/ui/primitives';
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -14,12 +13,11 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params);
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
-  const isMock = id.startsWith('d');
-  const { data } = useGetDailyRecord(id, !!accessToken && !isMock);
+  const { data, isError } = useGetDailyRecord(id, !!accessToken);
   const del = useDeleteDailyRecord();
 
   const q = data?.questions[0];
-  const created = data ? new Date(data.record.created_at) : null;
+  const created = data ? new Date(data.record.recorded_at) : null;
   const detail =
     q && created
       ? {
@@ -30,20 +28,26 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
           // 객관화 문장 API가 기록 상세에 아직 연결되지 않아 장면 묘사를 대신 보여준다.
           objectified: q.scene_description,
           patterns: q.emotion_tag.split(',').map((t) => t.trim()).filter(Boolean),
-          cogni: MOCK_DIARY_DETAIL.cogni,
         }
-      : MOCK_DIARY_DETAIL;
+      : null;
 
   const remove = async () => {
-    if (!isMock && accessToken) {
-      try {
-        await del.mutateAsync(id);
-      } catch {
-        return;
-      }
+    try {
+      await del.mutateAsync(id);
+    } catch {
+      return;
     }
     router.push('/diary');
   };
+
+  if (!detail) {
+    return (
+      <Screen>
+        <TopBar />
+        <p className="text-center text-[14px] text-sub mt-24">{isError ? '기록을 불러오지 못했어요.' : '불러오는 중...'}</p>
+      </Screen>
+    );
+  }
 
   return (
     <Screen
@@ -81,22 +85,6 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
           ))}
         </div>
 
-        <button
-          onClick={() => router.push(`/dogam/${detail.cogni.id}`)}
-          className="w-full mt-6 flex items-center gap-3 rounded-2xl bg-yellow-soft px-4 py-3.5 text-left"
-        >
-          <span className="w-10 h-10 rounded-xl bg-yellow flex items-center justify-center shrink-0">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <rect x="4" y="4" width="16" height="16" rx="1.5" stroke="#6367FF" strokeWidth="1.6" />
-              <path d="M4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16" stroke="#6367FF" strokeWidth="1.6" />
-            </svg>
-          </span>
-          <span className="flex-1 min-w-0">
-            <span className="block text-[15px] font-bold text-ink">이 기록에서 발급된 코그니</span>
-            <span className="block text-[13px] text-gold mt-0.5">{detail.cogni.name} · 도감에서 보기</span>
-          </span>
-          <ChevronRight size={18} color="#8A6D00" />
-        </button>
       </div>
     </Screen>
   );

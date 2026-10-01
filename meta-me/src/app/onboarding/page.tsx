@@ -8,7 +8,7 @@ import { BackButton, Button, CheckIcon, Dots, Img3D, OptionRow, TextButton } fro
 import { GradientBg } from '@/components/ui/overlays';
 import { AnalyzingScreen, AskFriendSheet, CogniHero, FeatureIcons } from '@/components/ui/flows';
 import { HourSlider } from '@/components/ui/HourSlider';
-import { MOCK_NICKNAME } from '@/lib/mock';
+import { FIRST_COGNI, useMe } from '@/hooks/useMe';
 import { ONBOARDING_QUESTIONS, type OnboardingQuestion } from './questions';
 
 type Phase = 'intro' | 'question' | 'analyzing' | 'result' | 'outro';
@@ -279,6 +279,8 @@ export default function OnboardingPage() {
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [askOpen, setAskOpen] = useState(false);
   const [accuracy, setAccuracy] = useState(12);
+  const me = useMe();
+  const nickname = me.nickname ?? '나';
 
   const q = ONBOARDING_QUESTIONS[qIndex];
   const total = ONBOARDING_QUESTIONS.length;
@@ -286,6 +288,8 @@ export default function OnboardingPage() {
 
   const submit = async () => {
     const byId = (id: string) => labelOf(answers[id], ONBOARDING_QUESTIONS.find((x) => x.id === id)) || '아직 모르겠어요';
+    const sentence = labelOf(answers.my_one_sentence);
+    if (sentence) me.patch((u) => ({ ...u, mySentence: sentence }));
     try {
       // v2 온보딩 질문은 API 필드(4개 문장)와 1:1로 맞지 않아 가장 가까운 답을 묶어서 보낸다.
       const res = await submitOnboarding.mutateAsync({
@@ -298,6 +302,12 @@ export default function OnboardingPage() {
     } catch {
       // 로그아웃 상태이거나 실패해도 흐름은 이어감
     }
+  };
+
+  // 온보딩에서 발견한 첫 코그니를 도감(기기 저장)에 넣는다. 메인·마이페이지 캐릭터도 이걸 쓴다.
+  const discover = () => {
+    me.addCogni({ ...FIRST_COGNI, foundAt: new Date().toISOString() });
+    setPhase('result');
   };
 
   const next = () => {
@@ -419,8 +429,8 @@ export default function OnboardingPage() {
           </>
         }
         steps={['내 기록 습관 분석 중', '내 감정 패턴 분석 중', '내 성향 분석 중']}
-        onDone={() => setPhase('result')}
-        onClose={() => setPhase('result')}
+        onDone={discover}
+        onClose={discover}
       />
     );
   }
@@ -429,7 +439,7 @@ export default function OnboardingPage() {
   if (phase === 'result') {
     return (
       <CogniHero
-        eyebrow={askOpen ? `${MOCK_NICKNAME}님의 첫 코그니는` : undefined}
+        eyebrow={askOpen ? `${nickname}님의 첫 코그니는` : undefined}
         name={
           askOpen ? (
             <>
@@ -453,7 +463,7 @@ export default function OnboardingPage() {
         onBack={() => setPhase('question')}
         askFriend={() => setAskOpen(true)}
         overlay={
-          <AskFriendSheet open={askOpen} onClose={() => setAskOpen(false)} myType="설명 장인" onAsk={() => router.push('/mirror/invite')} />
+          <AskFriendSheet open={askOpen} onClose={() => setAskOpen(false)} myType={FIRST_COGNI.name} onAsk={() => router.push('/mirror/invite')} />
         }
       />
     );
