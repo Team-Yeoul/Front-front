@@ -109,10 +109,10 @@ export default function SettingsPage() {
           <Row label="버전" value="1.0.3" />
         </Group>
         <div className="flex gap-5 px-1 mt-6">
-          <button onClick={() => setConfirm('logout')} className="text-[13px] text-danger">
+          <button onClick={() => setConfirm('logout')} className="text-[15px] text-danger">
             로그아웃
           </button>
-          <button onClick={() => setConfirm('withdraw')} className="text-[13px] text-danger">
+          <button onClick={() => setConfirm('withdraw')} className="text-[15px] text-danger">
             회원탈퇴
           </button>
         </div>
