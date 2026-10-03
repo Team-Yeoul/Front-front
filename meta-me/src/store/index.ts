@@ -85,6 +85,8 @@ export interface StatusBarTheme {
   bg: string;
   /** Icon/text color scheme — 'light' = white icons for a colored/dark bg. */
   fg: 'light' | 'dark';
+  /** Home indicator color — 'light' = white bar for a page whose background fills the bottom edge. */
+  indicator?: 'light' | 'dark';
 }
 
 interface StatusBarStore {
