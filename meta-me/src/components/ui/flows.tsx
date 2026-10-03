@@ -129,18 +129,23 @@ export function CogniHero({
   overlay?: ReactNode;
 }) {
   return (
-    <Screen statusBg="#E9E8FB" background={<GradientBg variant="a" />} overlay={overlay}>
+    <Screen bleed background={<GradientBg variant="a" />} overlay={overlay}>
       <div className="flex flex-col min-h-full">
         <div className="flex items-center justify-between px-5 h-14">
-          <button
-            onClick={onBack}
-            className="w-10 h-10 rounded-full bg-white/80 flex items-center justify-center"
-            aria-label="뒤로가기"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M15 5l-7 7 7 7" stroke="#1A1A1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+          {/* onBack을 안 주면 뒤로가기 버튼을 숨긴다(자리는 남겨 제목 위치 유지). */}
+          {onBack ? (
+            <button
+              onClick={onBack}
+              className="w-10 h-10 rounded-full bg-white/80 flex items-center justify-center"
+              aria-label="뒤로가기"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M15 5l-7 7 7 7" stroke="#1A1A1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          ) : (
+            <span className="w-10 h-10" />
+          )}
           {topRight}
         </div>
         {(eyebrow || name) && (
