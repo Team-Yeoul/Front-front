@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTermsStore } from '@/store';
 import { Screen } from '@/components/ui/Screen';
-import { BackButton, Button, CheckIcon } from '@/components/ui/primitives';
+import { BackButton, Button } from '@/components/ui/primitives';
 import { Sheet } from '@/components/ui/overlays';
 
 type TermsKey = 'service' | 'privacy' | 'marketing';
@@ -65,7 +65,8 @@ const ROWS: { key: TermsKey; label: string }[] = [
 function Box({ checked }: { checked: boolean }) {
   return (
     <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${checked ? 'bg-primary-soft' : 'bg-surface-2'}`}>
-      {checked && <CheckIcon size={18} color="#6367FF" />}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {checked && <img src="/check.png" alt="" width={15} height={12} draggable={false} />}
     </span>
   );
 }
