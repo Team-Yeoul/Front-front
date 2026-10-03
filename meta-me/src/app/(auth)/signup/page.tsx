@@ -8,11 +8,12 @@ import { ApiError } from '@/shared/api';
 import { useAuthStore, useLocalStore, useTermsStore } from '@/store';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button } from '@/components/ui/primitives';
-import { Field, RememberRow } from '@/components/ui/Field';
+import { Field } from '@/components/ui/Field';
 import { BirthDateField } from '@/components/ui/BirthDateField';
 import { Wordmark } from '@/components/ui/brand';
 
 const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+const EMAIL_RULE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SignupPage() {
   const router = useRouter();
@@ -25,7 +26,6 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   // v2 시안에는 생년월일 칸이 없지만, 가입 API(/v1/auth/signup)가 birth_date를 필수로 받아서 유지한다.
   const [birthDate, setBirthDate] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const loading = signupMutation.isPending;
   const submittedRef = useRef(false);
@@ -34,9 +34,10 @@ export default function SignupPage() {
     if (!submittedRef.current && (!service || !privacy)) router.replace('/terms');
   }, [service, privacy, router]);
 
+  const emailError = email.length > 0 && !EMAIL_RULE.test(email) ? '올바른 이메일 형식으로 입력해 주세요' : undefined;
   const passwordError = password.length > 0 && !PASSWORD_RULE.test(password) ? '영문·숫자 조합 8자 이상으로 입력해 주세요' : undefined;
   const canSubmit =
-    nickname.trim().length > 0 && email.includes('@') && email.includes('.') && PASSWORD_RULE.test(password) && birthDate.length > 0 && service && privacy;
+    nickname.trim().length > 0 && EMAIL_RULE.test(email) && PASSWORD_RULE.test(password) && birthDate.length > 0 && service && privacy;
 
   const handleSubmit = async () => {
     if (!canSubmit || loading) return;
@@ -86,19 +87,16 @@ export default function SignupPage() {
 
         <div className="flex flex-col gap-6 mt-12">
           <Field label="닉네임" value={nickname} onChange={setNickname} maxLength={10} placeholder="사용할 이름을 작성해 주세요" />
-          <Field label="이메일" type="email" value={email} onChange={setEmail} placeholder="이메일을 입력해 주세요" autoComplete="email" />
-          <div className="flex flex-col gap-4">
-            <Field
-              label="비밀번호"
-              type="password"
-              value={password}
-              onChange={setPassword}
-              placeholder="비밀번호를 입력해 주세요"
-              autoComplete="new-password"
-              error={passwordError}
-            />
-            <RememberRow checked={rememberMe} onChange={setRememberMe} />
-          </div>
+          <Field label="이메일" type="email" value={email} onChange={setEmail} placeholder="이메일을 입력해 주세요" autoComplete="email" error={emailError} />
+          <Field
+            label="비밀번호"
+            type="password"
+            value={password}
+            onChange={setPassword}
+            placeholder="비밀번호를 입력해 주세요"
+            autoComplete="new-password"
+            error={passwordError}
+          />
           <BirthDateField value={birthDate} onChange={setBirthDate} />
           {error && <p className="text-[13px] text-danger -mt-2">{error}</p>}
         </div>
