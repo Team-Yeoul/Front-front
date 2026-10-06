@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGetMyAccount, useSubmitOnboarding } from '@/entities/user';
 import { useAuthStore } from '@/store';
 import { ApiError } from '@/shared/api';
 import { Screen } from '@/components/ui/Screen';
-import { BackButton, Button, CheckIcon, Dots, Img3D, OptionRow, TextButton } from '@/components/ui/primitives';
-import { GradientBg } from '@/components/ui/overlays';
-import { AnalyzingScreen, AskFriendSheet, CogniHero, FeatureIcons } from '@/components/ui/flows';
+import { BackButton, Button, CheckIcon, Dots, Img3D, OptionRow } from '@/components/ui/primitives';
+import { AnalyzingScreen, CogniHero, FeatureIcons } from '@/components/ui/flows';
 import { HourSlider } from '@/components/ui/HourSlider';
 import { FIRST_COGNI, useMe } from '@/hooks/useMe';
 import { ONBOARDING_QUESTIONS, type OnboardingQuestion } from './questions';
@@ -18,28 +17,108 @@ type Answer = string | string[] | number | undefined;
 
 /* ── 인트로 / 아웃트로 슬라이드 ─────────────────────────── */
 
+/** 이 거리(px) 이상 가로로 밀어야 넘어간다. */
+const SWIPE_MIN = 10;
+
+type SwipeDir = 'next' | 'prev';
+type SlideVariant = 'a' | 'b' | 'c';
+
+/** `spread`: 중심 진하기는 그대로 두고, 중간(45% 지점)에 남는 진하기 비율. 클수록 퍼진 부분이 진하다. */
+const blob = (w: number, h: number, x: number, y: number, rgb: string, a: number, spread = 0.3) =>
+  `radial-gradient(${w}% ${h}% at ${x}% ${y}%, rgba(${rgb},${a}) 0%, rgba(${rgb},${a * spread}) 45%, rgba(${rgb},0) 85%)`;
+const PURPLE = '160,164,255';
+const LAVENDER = '200,202,255';
+const YELLOW = '255,230,150';
+const CREAM = '255,240,195';
+
+const SLIDE_BG: Record<SlideVariant, string[]> = {
+  a: [blob(100, 48, 0, 0, PURPLE, 0.9, 0.5), blob(65, 42, 100, 22, YELLOW, 0.85, 0.5), blob(90, 52, 75, 75, LAVENDER, 0.9)],
+  b: [blob(100, 62, 60, 0, YELLOW, 0.9), blob(100, 50, 0, 90, PURPLE, 0.8), blob(80, 82, 90, 66, LAVENDER, 0.8)],
+  c: [blob(80, 62, 15, 20, YELLOW, 0.9), blob(80, 50, 100, 32, PURPLE, 0.9), blob(50, 30, 25, 70, CREAM, 0.75), blob(75, 32, 100, 90, LAVENDER, 2)],
+};
+
+function SlideBackdrop({ variant }: { variant: SlideVariant }) {
+  return (
+    <div className="absolute inset-0 bg-[#FCFCFF]">
+      {(Object.keys(SLIDE_BG) as SlideVariant[]).map((v) => (
+        <div
+          key={v}
+          className="absolute inset-0 transition-opacity duration-500 ease-out motion-reduce:transition-none"
+          style={{ backgroundImage: SLIDE_BG[v].join(','), opacity: v === variant ? 1 : 0 }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function Slide({
   variant,
   children,
+  eyebrow,
   align = 'left',
   hint,
   dots,
   onNext,
   onSkip,
   cta,
+  swipe,
+  enterFrom,
 }: {
-  variant: 'a' | 'b' | 'c';
+  variant: SlideVariant;
   children: ReactNode;
+  /** 제목 위의 작은 라벨. 제목 위치를 밀어내지 않도록 제목 위에 따로 띄운다. */
+  eyebrow?: string;
   align?: 'left' | 'center';
   hint?: string;
   dots?: [number, number];
   onNext: () => void;
   onSkip?: () => void;
   cta?: string;
+  /** 주면 탭 대신 스와이프로 넘긴다: 오른쪽→왼쪽은 next, 왼쪽→오른쪽은 prev. */
+  swipe?: { next?: () => void; prev?: () => void };
+  /** 스와이프로 들어온 방향. 그쪽에서 살짝 밀려 들어오며 나타난다. */
+  enterFrom?: SwipeDir;
 }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const start = useRef<{ x: number; y: number } | null>(null);
+
+  const slideIndex = dots?.[0];
+  useEffect(() => {
+    if (!enterFrom || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // 장이 바뀔 때마다(dots 변경) 들어오는 애니메이션을 다시 건다. 배경이 이어지도록 Slide 자체는 다시 마운트하지 않는다.
+    const dx = enterFrom === 'next' ? 40 : -40;
+    contentRef.current?.animate(
+      [
+        { transform: `translateX(${dx}px)`, opacity: 0 },
+        { transform: 'translateX(0)', opacity: 1 },
+      ],
+      { duration: 280, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+    );
+  }, [enterFrom, slideIndex]);
+
+  const onPointerDown = (e: PointerEvent) => {
+    start.current = { x: e.clientX, y: e.clientY };
+  };
+  const onPointerUp = (e: PointerEvent) => {
+    if (!start.current || !swipe) return;
+    const dx = e.clientX - start.current.x;
+    const dy = e.clientY - start.current.y;
+    start.current = null;
+    // 세로 스크롤이나 짧은 터치는 무시하고, 가로로 충분히 밀었을 때만 넘긴다.
+    if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx < 0) swipe.next?.();
+    else swipe.prev?.();
+  };
+
   return (
-    <Screen statusBg={variant === 'c' ? '#FFF6D8' : '#E6E6FF'} background={<GradientBg variant={variant} />}>
-      <div className="relative h-full flex flex-col" onClick={cta ? undefined : onNext}>
+    <Screen bleed background={<SlideBackdrop variant={variant} />}>
+      <div
+        className={`relative h-full flex flex-col ${swipe ? 'touch-pan-y select-none' : ''}`}
+        onClick={cta || swipe ? undefined : onNext}
+        onPointerDown={swipe ? onPointerDown : undefined}
+        onPointerUp={swipe ? onPointerUp : undefined}
+        onPointerCancel={() => (start.current = null)}
+      >
         <div className="h-10 flex items-center justify-end px-6">
           {onSkip && (
             <button
@@ -53,9 +132,20 @@ function Slide({
             </button>
           )}
         </div>
-        <div className={`flex-1 flex flex-col justify-center px-10 ${align === 'center' ? 'items-center text-center' : ''}`}>
-          {children}
-        </div>
+        {align === 'left' ? (
+          // 장마다 본문 길이·하단 버튼이 달라도 제목 첫 줄이 항상 같은 높이에 오도록, 화면 전체 높이 기준으로 위치를 고정한다.
+          <>
+            <div className="flex-1" />
+            <div ref={contentRef} className="absolute inset-x-0 top-[38%] px-8 flex flex-col">
+              {eyebrow && <p className="absolute bottom-full mb-6 font-mono text-[12px] tracking-[0.2em] text-[#5A5A62]">{eyebrow}</p>}
+              {children}
+            </div>
+          </>
+        ) : (
+          <div ref={contentRef} className="flex-1 flex flex-col justify-center px-10 items-center text-center">
+            {children}
+          </div>
+        )}
         <div className="flex flex-col items-center gap-5 pb-8 px-5">
           {hint && (
             <p className="text-[13px] text-[#48484F] flex items-center gap-2">
@@ -75,7 +165,7 @@ function Slide({
   );
 }
 
-const slideTitle = 'text-[26px] font-bold text-ink leading-[1.55]';
+const slideTitle = 'text-[30px] font-semibold text-ink leading-[1.5] tracking-[-0.02em]';
 
 /* ── 질문 본문 ─────────────────────────────────────────── */
 
@@ -277,9 +367,9 @@ export default function OnboardingPage() {
   const submitOnboarding = useSubmitOnboarding();
   const [phase, setPhase] = useState<Phase>('intro');
   const [slide, setSlide] = useState(0);
+  const [slideDir, setSlideDir] = useState<SwipeDir>();
   const [qIndex, setQIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
-  const [askOpen, setAskOpen] = useState(false);
   const [accuracy, setAccuracy] = useState(12);
   const me = useMe();
   // 표시 이름: 가입 때 입력한 닉네임 → 서버 계정 이름(username) → 이메일 앞부분
@@ -335,11 +425,19 @@ export default function OnboardingPage() {
   if (phase === 'intro') {
     const go = () => (slide < 2 ? setSlide(slide + 1) : (setPhase('question'), setSlide(0)));
     const skip = () => (setPhase('question'), setSlide(0));
+    const swipeTo = (to: number) => {
+      setSlideDir(to > slide ? 'next' : 'prev');
+      setSlide(to);
+    };
+    // 마지막 장은 '첫 질문 보기' 버튼으로만 시작하고, 스와이프로는 앞 장으로만 돌아간다.
+    const swipe = {
+      next: slide < 2 ? () => swipeTo(slide + 1) : undefined,
+      prev: slide > 0 ? () => swipeTo(slide - 1) : undefined,
+    };
     if (slide === 0)
       return (
-        <Slide variant="a" dots={[0, 3]} hint="옆으로 밀어서 계속" onNext={go}>
-          <p className="font-mono text-[12px] tracking-[0.2em] text-[#5A5A62]">METAME</p>
-          <h1 className={`${slideTitle} mt-6`}>
+        <Slide variant="a" eyebrow="METAME" dots={[0, 3]} hint="옆으로 밀어서 계속" onNext={go} swipe={swipe} enterFrom={slideDir}>
+          <h1 className={slideTitle}>
             안녕하세요.
             <br />
             처음부터 무거운 질문은
@@ -350,7 +448,7 @@ export default function OnboardingPage() {
       );
     if (slide === 1)
       return (
-        <Slide variant="b" dots={[1, 3]} hint="옆으로 밀어서 계속" onNext={go} onSkip={skip}>
+        <Slide variant="b" dots={[1, 3]} hint="옆으로 밀어서 계속" onNext={go} onSkip={skip} swipe={swipe} enterFrom={slideDir}>
           <h1 className={slideTitle}>
             앞으로 당신을 더 잘 이해해서
             <br />
@@ -364,7 +462,7 @@ export default function OnboardingPage() {
         </Slide>
       );
     return (
-      <Slide variant="c" dots={[2, 3]} onNext={go} onSkip={skip} cta="첫 질문 보기">
+      <Slide variant="c" dots={[2, 3]} onNext={go} onSkip={skip} cta="첫 질문 보기" swipe={swipe} enterFrom={slideDir}>
         <h1 className={slideTitle}>
           잘 모르겠으면
           <br />
@@ -393,36 +491,32 @@ export default function OnboardingPage() {
     return (
       <Screen
         footer={
-          <>
-            <Button variant={isLast ? 'primary' : 'dark'} onClick={next} disabled={!isAnswered(q, answer)}>
-              {isLast ? '답변 마치기' : `다음 (${qIndex + 1}/${total})`}
-            </Button>
-            {!isLast && (
-              <TextButton className="mt-1" onClick={next}>
-                넘어가기
-              </TextButton>
-            )}
-          </>
+          <Button variant={isLast ? 'primary' : 'dark'} onClick={next} disabled={!isAnswered(q, answer)}>
+            {isLast ? '답변 마치기' : '다음'}
+          </Button>
         }
       >
-        <div className="px-5">
-          <div className="flex items-center justify-between h-14">
-            <BackButton onClick={() => (qIndex === 0 ? setPhase('intro') : setQIndex(qIndex - 1))} />
+        {/* 머리·아이콘·질문은 고정하고, 선택지 칸 안에서만 스크롤한다. */}
+        <div className="px-5 h-full flex flex-col">
+          <div className="shrink-0 flex items-center justify-between h-14">
+            {/* 첫 질문에서는 이전으로 돌아가지 않는다. 오른쪽 숫자 위치가 흔들리지 않게 빈 자리는 남긴다. */}
+            {qIndex === 0 ? <span className="w-10 h-10" /> : <BackButton onClick={() => setQIndex(qIndex - 1)} />}
             <span className="font-mono text-[13px] text-mute">
               {qIndex + 1} / {total}
             </span>
           </div>
-          <div className="flex gap-2 mt-2">
+          <div className="shrink-0 flex gap-2 mt-2">
             {ONBOARDING_QUESTIONS.map((x, i) => (
               <span key={x.id} className={`w-1.5 h-1.5 rounded-full ${i === qIndex ? 'bg-primary scale-125' : 'bg-[#D8D8DE]'}`} />
             ))}
           </div>
-          {titleFirst && <div className="mt-8">{title}</div>}
-          <div className={`flex justify-center ${titleFirst ? 'mt-8 mb-6' : 'mt-[140px] mb-8'}`}>
+          {titleFirst && <div className="shrink-0 mt-8">{title}</div>}
+          <div className={`shrink-0 flex justify-center ${titleFirst ? 'mt-8 mb-6' : 'mt-[140px] mb-8'}`}>
             <Img3D name={q.icon} size={titleFirst ? 100 : 104} />
           </div>
-          {!titleFirst && title}
-          <div className="mt-4 pb-4">
+          {!titleFirst && <div className="shrink-0">{title}</div>}
+          {/* 선택 테두리가 잘리지 않도록 좌우에 1px 여유를 둔다. 질문이 바뀌면 key로 스크롤을 맨 위로 되돌린다. */}
+          <div key={q.id} className="flex-1 min-h-0 overflow-y-auto no-scrollbar mt-4 -mx-1 px-1 pt-px pb-4">
             <QuestionBody q={q} answer={answer} setAnswer={setAnswer} />
           </div>
         </div>
@@ -470,11 +564,6 @@ export default function OnboardingPage() {
         counter="01 / 24"
         primaryLabel="여정 시작하기"
         onPrimary={() => setPhase('outro')}
-        onBack={() => setPhase('question')}
-        askFriend={() => setAskOpen(true)}
-        overlay={
-          <AskFriendSheet open={askOpen} onClose={() => setAskOpen(false)} myType={FIRST_COGNI.name} onAsk={() => router.push('/mirror/invite')} />
-        }
       />
     );
   }

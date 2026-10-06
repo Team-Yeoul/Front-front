@@ -36,7 +36,8 @@ export function PhoneFrame({ children }: { children: React.ReactNode }) {
       <div className="hidden md:block absolute -inset-[14px] rounded-[60px] bg-[#1c1c2e] shadow-[0_0_0_2px_#2e2e5c,0_0_0_5px_#151525,0_50px_100px_rgba(0,0,0,0.85)]" />
 
       {/* 스크린 영역 */}
-      <div className="relative h-full flex flex-col overflow-hidden bg-white md:rounded-[44px] [transform:translateZ(0)]">
+      {/* 스플래시처럼 상태바·홈 인디케이터 뒤까지 꽉 채워야 하는 화면은 #phone-screen에 포털로 그린다. */}
+      <div id="phone-screen" className="relative h-full flex flex-col overflow-hidden bg-white md:rounded-[44px] [transform:translateZ(0)]">
 
         {/* 다이나믹 아일랜드 - 데스크톱 전용 */}
         <div className="hidden md:block absolute top-[14px] left-1/2 -translate-x-1/2 w-[126px] h-[37px] bg-black rounded-full z-20" />
@@ -75,8 +76,11 @@ export function PhoneFrame({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* 홈 인디케이터 - 데스크톱 전용 */}
-        <div className="hidden md:flex h-[34px] shrink-0 items-center justify-center">
-          <div className="w-[134px] h-[5px] bg-black/20 rounded-full" />
+        <div className="hidden md:flex h-[34px] shrink-0 items-center justify-center relative z-10">
+          <div
+            className="w-[134px] h-[5px] rounded-full transition-colors duration-300"
+            style={{ backgroundColor: theme.indicator === 'light' ? '#ffffff' : 'rgba(0,0,0,0.2)' }}
+          />
         </div>
       </div>
 
