@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/store';
+import { useAuthStore, useLocalStore } from '@/store';
 import {
   useGetMyAccount,
   useGetNotificationSettings,
@@ -12,7 +12,7 @@ import {
 } from '@/entities/user';
 import type { NotificationSetting } from '@/entities/user';
 import { Screen } from '@/components/ui/Screen';
-import { Button, ChevronRight, Toggle, TopBar } from '@/components/ui/primitives';
+import { Button, ChevronRight, Toast, Toggle, TopBar } from '@/components/ui/primitives';
 import { Modal } from '@/components/ui/overlays';
 import { useMe } from '@/hooks/useMe';
 
@@ -42,7 +42,9 @@ function Row({ label, value, right, onClick }: { label: string; value?: string; 
 export default function SettingsPage() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
+  const userId = useAuthStore((s) => s.userId);
   const clearAuth = useAuthStore((s) => s.clearAuth);
+  const removeLocal = useLocalStore((s) => s.remove);
   const { data: account } = useGetMyAccount(!!accessToken);
   const { data: noti } = useGetNotificationSettings(!!accessToken);
   const updateNoti = useUpdateNotificationSettings();
@@ -51,18 +53,39 @@ export default function SettingsPage() {
   const me = useMe();
   const alarm = noti?.push_enabled === false ? '꺼짐' : noti?.daily_question_time ? `매일 ${noti.daily_question_time}` : '';
   const [confirm, setConfirm] = useState<'logout' | 'withdraw' | null>(null);
+  const [toast, setToast] = useState('');
+  const busy = logout.isPending || withdraw.isPending;
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(''), 2500);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   // 알림 설정(push_enabled · marketing_consent)은 서버에 저장한다.
   const setNoti = (patch: Partial<NotificationSetting>) => {
-    if (noti) updateNoti.mutate({ ...noti, ...patch });
+    if (!noti) return;
+    updateNoti.mutate({ ...noti, ...patch }, { onError: () => setToast('알림 설정을 바꾸지 못했어요') });
   };
 
   const run = async () => {
-    try {
-      if (confirm === 'withdraw') await withdraw.mutateAsync();
-      else if (accessToken) await logout.mutateAsync();
-    } catch {
-      // 서버 실패와 관계없이 로컬 세션은 정리
+    if (busy) return;
+    if (confirm === 'withdraw') {
+      // 탈퇴는 서버에서 실패하면 계정이 남아 있으므로 세션을 유지하고 다시 시도하게 한다.
+      try {
+        await withdraw.mutateAsync();
+      } catch {
+        setConfirm(null);
+        setToast('탈퇴하지 못했어요. 잠시 후 다시 시도해 주세요');
+        return;
+      }
+      if (userId) removeLocal(userId);
+    } else if (accessToken) {
+      try {
+        await logout.mutateAsync();
+      } catch {
+        // 로그아웃은 서버 실패와 관계없이 로컬 세션을 정리
+      }
     }
     clearAuth();
     router.push('/');
@@ -71,6 +94,8 @@ export default function SettingsPage() {
   return (
     <Screen
       overlay={
+        <>
+        {toast && <Toast message={toast} />}
         <Modal open={!!confirm} onClose={() => setConfirm(null)}>
           <p className="text-[17px] font-bold text-ink text-center">{confirm === 'withdraw' ? '정말 탈퇴할까요?' : '로그아웃할까요?'}</p>
           <p className="text-[13px] text-sub text-center mt-2">
@@ -80,11 +105,12 @@ export default function SettingsPage() {
             <Button variant="gray" onClick={() => setConfirm(null)}>
               취소
             </Button>
-            <Button variant={confirm === 'withdraw' ? 'danger' : 'primary'} onClick={run}>
-              {confirm === 'withdraw' ? '탈퇴하기' : '로그아웃'}
+            <Button variant={confirm === 'withdraw' ? 'danger' : 'primary'} onClick={run} disabled={busy}>
+              {busy ? '처리 중...' : confirm === 'withdraw' ? '탈퇴하기' : '로그아웃'}
             </Button>
           </div>
         </Modal>
+        </>
       }
     >
       <TopBar title="설정" />
@@ -96,8 +122,8 @@ export default function SettingsPage() {
         </Group>
         <Group title="알림">
           <Row label="기록 리마인더" value={alarm} onClick={() => router.push('/notifications')} />
-          <Row label="푸시 알림" right={<Toggle on={noti?.push_enabled ?? true} onChange={(v) => setNoti({ push_enabled: v })} />} />
-          <Row label="마케팅 정보 수신" right={<Toggle on={noti?.marketing_consent ?? false} onChange={(v) => setNoti({ marketing_consent: v })} />} />
+          <Row label="푸시 알림" right={<Toggle on={noti?.push_enabled ?? true} disabled={!noti} onChange={(v) => setNoti({ push_enabled: v })} />} />
+          <Row label="마케팅 정보 수신" right={<Toggle on={noti?.marketing_consent ?? false} disabled={!noti} onChange={(v) => setNoti({ marketing_consent: v })} />} />
         </Group>
         <Group title="데이터">
           <Row label="기록 내보내기" />

@@ -107,7 +107,16 @@ export const useUpdateNotificationSettings = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: NotificationSetting) => userApi.updateNotificationSettings(body),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: userKeys.notificationSettings() }),
+    // 토글이 바로 반응하도록 먼저 캐시를 바꾸고, 실패하면 되돌린다.
+    onMutate: async (body) => {
+      await queryClient.cancelQueries({ queryKey: userKeys.notificationSettings() });
+      const previous = queryClient.getQueryData<NotificationSetting>(userKeys.notificationSettings());
+      queryClient.setQueryData(userKeys.notificationSettings(), body);
+      return { previous };
+    },
+    onError: (_err, _body, context) => {
+      if (context?.previous) queryClient.setQueryData(userKeys.notificationSettings(), context.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: userKeys.notificationSettings() }),
   });
 };

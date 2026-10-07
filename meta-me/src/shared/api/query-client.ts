@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { useAuthStore } from '@/store';
 import { ApiError } from './http-client';
 
 export const queryClient = new QueryClient({
@@ -9,4 +10,9 @@ export const queryClient = new QueryClient({
       retry: (failureCount, error) => !(error instanceof ApiError && error.status >= 400 && error.status < 500) && failureCount < 1,
     },
   },
+});
+
+// 쿼리 키에 사용자 구분이 없으므로, 로그인한 사용자가 바뀌면(로그아웃·탈퇴·다른 계정 로그인) 이전 사용자의 캐시를 비운다.
+useAuthStore.subscribe((state, prev) => {
+  if (state.userId !== prev.userId) queryClient.clear();
 });

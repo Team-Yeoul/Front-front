@@ -92,6 +92,7 @@ export default function ReportHubPage() {
               canGenerate={r.canGenerate}
               generating={r.generating}
               onGenerate={r.generate}
+              error={r.error}
             />
           </div>
         )}

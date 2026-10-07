@@ -341,11 +341,12 @@ export function ProgressBar({ value, className = '', track = '#E9EAF0', fill = '
   );
 }
 
-export function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+export function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <button
       onClick={() => onChange(!on)}
-      className={`relative w-[44px] h-[26px] rounded-full transition-colors ${on ? 'bg-primary' : 'bg-[#DADAE0]'}`}
+      disabled={disabled}
+      className={`relative w-[44px] h-[26px] rounded-full transition-colors disabled:opacity-50 ${on ? 'bg-primary' : 'bg-[#DADAE0]'}`}
       aria-pressed={on}
     >
       <span className={`absolute top-[3px] w-5 h-5 rounded-full bg-white shadow transition-all ${on ? 'left-[21px]' : 'left-[3px]'}`} />

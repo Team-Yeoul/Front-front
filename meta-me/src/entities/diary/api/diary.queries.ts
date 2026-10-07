@@ -14,7 +14,9 @@ import type {
 export const diaryKeys = {
   all: ['diary'] as const,
   todayQuestion: () => [...diaryKeys.all, 'today-question'] as const,
-  records: (params?: ListDailyRecordsParams) => [...diaryKeys.all, 'records', params] as const,
+  // 파라미터와 관계없이 목록 전체를 무효화할 때 쓰는 접두 키
+  recordLists: () => [...diaryKeys.all, 'records'] as const,
+  records: (params?: ListDailyRecordsParams) => [...diaryKeys.recordLists(), params] as const,
   record: (recordId: string) => [...diaryKeys.all, 'record', recordId] as const,
   triggerReport: (triggerId: string) => [...diaryKeys.all, 'trigger-report', triggerId] as const,
 };
@@ -71,7 +73,7 @@ export const useUpdateDailyRecord = () => {
       diaryApi.updateDailyRecord(recordId, body),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: diaryKeys.record(variables.recordId) });
-      queryClient.invalidateQueries({ queryKey: diaryKeys.records() });
+      queryClient.invalidateQueries({ queryKey: diaryKeys.recordLists() });
     },
   });
 };

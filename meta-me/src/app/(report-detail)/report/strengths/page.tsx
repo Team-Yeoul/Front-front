@@ -15,7 +15,7 @@ export default function ReportStrengthsPage() {
         </>
       ) : (
         !r.loading && (
-          <ReportLocked recordCount={r.recordCount} min={MIN_RECORDS_FOR_REPORT} canGenerate={r.canGenerate} generating={r.generating} onGenerate={r.generate} />
+          <ReportLocked recordCount={r.recordCount} min={MIN_RECORDS_FOR_REPORT} canGenerate={r.canGenerate} generating={r.generating} onGenerate={r.generate} error={r.error} />
         )
       )}
     </ReportScreen>

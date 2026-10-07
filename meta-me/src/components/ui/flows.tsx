@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, CheckIcon, CloseIcon, CogniImg, DownloadIcon, Img3D, TextButton, TopBar, type Asset3D } from './primitives';
 import { GradientBg, Sheet } from './overlays';
 import { Screen } from './Screen';
@@ -21,15 +21,20 @@ export function AnalyzingScreen({
   stepMs?: number;
 }) {
   const [done, setDone] = useState(0);
+  // 부모가 매 렌더마다 새 onDone을 넘겨도 단계 타이머가 처음부터 다시 돌지 않게 ref로 붙잡아 둔다.
+  const onDoneRef = useRef(onDone);
+  useEffect(() => {
+    onDoneRef.current = onDone;
+  });
 
   useEffect(() => {
     if (done >= steps.length) {
-      const t = setTimeout(onDone, 400);
+      const t = setTimeout(() => onDoneRef.current(), 400);
       return () => clearTimeout(t);
     }
     const t = setTimeout(() => setDone((d) => d + 1), stepMs);
     return () => clearTimeout(t);
-  }, [done, steps.length, onDone, stepMs]);
+  }, [done, steps.length, stepMs]);
 
   const progress = Math.min(1, (done + 0.6) / steps.length);
   const R = 70;

@@ -26,7 +26,7 @@ export default function ReportGrowthPage() {
         <ContentList title="이번 주 핵심 발견" items={pickContent(c, ['findings', 'key_findings', 'insights', 'growth'])} />
       ) : (
         !r.loading && (
-          <ReportLocked recordCount={r.recordCount} min={MIN_RECORDS_FOR_REPORT} canGenerate={r.canGenerate} generating={r.generating} onGenerate={r.generate} />
+          <ReportLocked recordCount={r.recordCount} min={MIN_RECORDS_FOR_REPORT} canGenerate={r.canGenerate} generating={r.generating} onGenerate={r.generate} error={r.error} />
         )
       )}
     </ReportScreen>

@@ -1,11 +1,12 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDeleteDailyRecord, useGetDailyRecord } from '@/entities/diary';
 import { useAuthStore } from '@/store';
 import { Screen } from '@/components/ui/Screen';
 import { Button, TopBar } from '@/components/ui/primitives';
+import { Modal } from '@/components/ui/overlays';
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -15,6 +16,8 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
   const accessToken = useAuthStore((s) => s.accessToken);
   const { data, isError } = useGetDailyRecord(id, !!accessToken);
   const del = useDeleteDailyRecord();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const q = data?.questions?.[0];
   const created = data ? new Date(data.record.recorded_at) : null;
@@ -32,31 +35,52 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
       : null;
 
   const remove = async () => {
+    if (del.isPending) return;
+    setDeleteError('');
     try {
       await del.mutateAsync(id);
     } catch {
+      setConfirmDelete(false);
+      setDeleteError('기록을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.');
       return;
     }
     router.push('/diary');
   };
 
   if (!detail) {
+    // 응답은 왔는데 질문이 없는 기록이면 '불러오는 중'에 멈추지 않게 따로 안내한다.
+    const message = isError ? '기록을 불러오지 못했어요.' : data ? '표시할 내용이 없는 기록이에요.' : '불러오는 중...';
     return (
       <Screen>
         <TopBar />
-        <p className="text-center text-[14px] text-sub mt-24">{isError ? '기록을 불러오지 못했어요.' : '불러오는 중...'}</p>
+        <p className="text-center text-[14px] text-sub mt-24">{message}</p>
       </Screen>
     );
   }
 
   return (
     <Screen
+      overlay={
+        <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)}>
+          <p className="text-[17px] font-bold text-ink text-center">이 기록을 삭제할까요?</p>
+          <p className="text-[13px] text-sub text-center mt-2">삭제한 기록은 되돌릴 수 없어요.</p>
+          <div className="grid grid-cols-2 gap-2 mt-5">
+            <Button variant="gray" onClick={() => setConfirmDelete(false)}>
+              취소
+            </Button>
+            <Button variant="danger" onClick={remove} disabled={del.isPending}>
+              {del.isPending ? '삭제 중...' : '삭제'}
+            </Button>
+          </div>
+        </Modal>
+      }
       footer={
         <div className="grid grid-cols-2 gap-2.5">
-          <Button variant="danger" onClick={remove}>
+          {deleteError && <p className="col-span-2 text-[13px] text-danger text-center">{deleteError}</p>}
+          <Button variant="danger" onClick={() => setConfirmDelete(true)}>
             삭제
           </Button>
-          <Button variant="gray" onClick={() => router.push('/diary/write')}>
+          <Button variant="gray" onClick={() => router.push(`/diary/write?edit=${id}`)}>
             수정
           </Button>
         </div>
