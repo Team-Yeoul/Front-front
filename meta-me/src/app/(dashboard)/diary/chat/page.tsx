@@ -36,6 +36,9 @@ const QUESTION_TYPE_LABEL: Record<string, string> = {
 const FALLBACK_QUESTION = '오늘 하루는 어떤 장면으로 남았나요?';
 const FALLBACK_TAIL_1 = '그 장면을 조금 더 자세히 들려줄 수 있나요? 그렇게 느낀 이유까지 알려주세요.';
 const FALLBACK_TAIL_2 = '이 조합, 어떤 상황이었나요?';
+// 명세상 최대 길이: user_answer 2000자, scene_description 1000자
+const MAX_ANSWER = 2000;
+const MAX_SCENE = 1000;
 const EMOTION_CHIPS = ['몰입', '조급함', '뿌듯함', '지침', '무던함', '편안함', '설렘', '답답함'];
 
 let uid = 0;
@@ -62,6 +65,8 @@ export default function DiaryChatPage() {
   const [yesNo, setYesNo] = useState<'yes' | 'no' | null>(null);
   const [accuracy, setAccuracy] = useState<{ before: number; after: number }>({ before: 0, after: 0 });
   const [finding, setFinding] = useState('');
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [freeError, setFreeError] = useState('');
   const [startedAt] = useState(() => new Date());
 
   const answers = useRef({ main: '', tail1: '', tail2: '', myselfMoment: '' });
@@ -80,11 +85,14 @@ export default function DiaryChatPage() {
     return () => clearTimeout(t);
   }, [turn]);
 
+  // 기록 전 정확도를 처음 한 번만 잡아 둔다. 저장 후 프로필을 다시 불러와도 before가 덮어써지지 않게 한다.
+  const baselineSet = useRef(false);
   useEffect(() => {
-    // 실제 정확도를 기준으로 삼는다(값이 없으면 0).
-    const current = profile?.latest_accuracy?.accuracy_percent ?? 0;
+    if (baselineSet.current || !profile) return;
+    baselineSet.current = true;
+    const current = profile.latest_accuracy?.accuracy_percent ?? 0;
     setAccuracy({ before: current, after: current });
-  }, [accessToken, profile]);
+  }, [profile]);
 
   const rawQuestion = questionData?.question?.question_text;
   const questionText = rawQuestion && /[가-힣]/.test(rawQuestion) ? rawQuestion : FALLBACK_QUESTION;
@@ -150,36 +158,43 @@ export default function DiaryChatPage() {
     setTurn('tail2');
   };
 
-  const finish = async (lastAnswer: string) => {
+  const finish = async () => {
     setTyping(true);
+    setSaveFailed(false);
     let after = accuracy.before;
+    // 꼬리 질문 답변은 부가 정보라 실패해도 기록 저장은 계속한다. 건너뛴 답은 보내지 않는다.
+    const tails: [string | null, string][] = [
+      [tail1IdRef.current, answers.current.tail1],
+      [tail2IdRef.current, answers.current.tail2],
+    ];
+    for (const [tailId, answer] of tails) {
+      if (!tailId || !answer || !questionIdRef.current) continue;
+      try {
+        await updateTailAnswer.mutateAsync({ questionId: questionIdRef.current, tailId, body: { user_answer: answer } });
+      } catch {
+        // 무시
+      }
+    }
     try {
-      if (tail1IdRef.current && questionIdRef.current) {
-        await updateTailAnswer.mutateAsync({
-          questionId: questionIdRef.current,
-          tailId: tail1IdRef.current,
-          body: { user_answer: answers.current.tail1 || '패스' },
-        });
-      }
-      if (tail2IdRef.current && questionIdRef.current) {
-        await updateTailAnswer.mutateAsync({
-          questionId: questionIdRef.current,
-          tailId: tail2IdRef.current,
-          body: { user_answer: lastAnswer || '패스' },
-        });
-      }
       await createRecord.mutateAsync({
         answer_type: 'TEXT',
         user_answer: answers.current.main,
-        emotion_tag: emotions.join(', ') || '기록함',
-        scene_description: answers.current.tail1 || answers.current.main,
+        emotion_tag: emotions.join(', '),
+        scene_description: (answers.current.tail1 || answers.current.main).slice(0, MAX_SCENE),
         is_myself_moment: !!answers.current.myselfMoment,
-        myself_moment_desc: answers.current.myselfMoment || undefined,
+        myself_moment_desc: answers.current.myselfMoment ? answers.current.myselfMoment.slice(0, MAX_SCENE) : undefined,
       });
+    } catch {
+      // 저장에 실패하면 완료로 안내하지 않고 다시 시도하게 한다. 답변은 그대로 남아 있다.
+      setTyping(false);
+      setSaveFailed(true);
+      return;
+    }
+    try {
       const refreshed = await refetchProfile();
       if (refreshed.data?.latest_accuracy?.accuracy_percent != null) after = refreshed.data.latest_accuracy.accuracy_percent;
     } catch {
-      // 실패해도 완료 화면은 보여줌
+      // 정확도 갱신 실패는 표시만 이전 값으로 둔다.
     }
     setTyping(false);
     setAccuracy((a) => ({ ...a, after }));
@@ -214,37 +229,36 @@ export default function DiaryChatPage() {
       answers.current.tail2 = text;
       appendUser(text);
       setInput('');
-      await finish(text);
+      await finish();
     }
   };
 
+  // 메인 질문의 답은 기록의 본문(필수)이라 건너뛸 수 없다. 꼬리 질문만 건너뛸 수 있다.
   const skip = async () => {
-    if (turn === 'main') {
-      answers.current.main = '오늘은 특별히 떠오르는 게 없어요';
-      appendUser('건너뛰기');
-      await goTail1();
-    } else if (turn === 'tail1') {
+    if (turn === 'tail1') {
       appendUser('건너뛰기');
       goEmotion();
     } else if (turn === 'tail2') {
       appendUser('건너뛰기');
-      await finish('');
+      await finish();
     }
   };
 
   const submitFree = async () => {
     const text = freeText.trim();
-    if (!text) return;
+    if (!text || createRecord.isPending) return;
+    setFreeError('');
     try {
       await createRecord.mutateAsync({
         answer_type: 'TEXT',
         user_answer: text,
         emotion_tag: '자유 기록',
-        scene_description: text,
+        scene_description: text.slice(0, MAX_SCENE),
         is_myself_moment: false,
       });
     } catch {
-      // 실패해도 완료 화면은 보여줌
+      setFreeError('기록을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
+      return;
     }
     setFinding('자유롭게 남겨주신 기록, 잘 저장해뒀어요.');
     setPhase('done');
@@ -259,7 +273,8 @@ export default function DiaryChatPage() {
             value={mode === 'FREE' ? freeText : ''}
             onChange={setFreeText}
             onSend={mode === 'AI' ? begin : submitFree}
-            sendEnabled={mode === 'AI' || freeText.trim().length > 0}
+            sendEnabled={mode === 'AI' || (freeText.trim().length > 0 && !createRecord.isPending)}
+            maxLength={MAX_ANSWER}
             placeholder={mode === 'AI' ? '첫 질문을 기다리는 중' : '오늘을 자유롭게 적어보세요'}
             chips={
               <>
@@ -295,6 +310,7 @@ export default function DiaryChatPage() {
           <h1 className="text-[22px] font-bold text-ink text-center leading-[1.5] mt-9 whitespace-pre-line">
             {`${nickname ? `${nickname}님, ` : ''}${questionText.replace(/^오늘 하루는 /, '오늘 하루는\n')}`}
           </h1>
+          {mode === 'FREE' && freeError && <p className="text-[13px] text-danger mt-4">{freeError}</p>}
         </div>
       </Screen>
     );
@@ -347,7 +363,7 @@ export default function DiaryChatPage() {
 
   /* ── 대화 ── */
   const lastAiId = [...messages].reverse().find((m) => m.role === 'ai')?.id;
-  const composerDisabled = typing || turn === 'summary';
+  const composerDisabled = typing || turn === 'summary' || saveFailed;
   const canSend =
     turn === 'emotion' ? emotions.length > 0 : turn === 'yesno' ? yesNo === 'no' || (yesNo === 'yes' && input.trim().length > 0) : input.trim().length > 0;
 
@@ -362,12 +378,13 @@ export default function DiaryChatPage() {
             sendEnabled={canSend}
             placeholder={turn === 'yesno' && yesNo === 'yes' ? '어떤 순간이었나요?' : turn === 'emotion' ? '위에서 감정을 골라주세요' : '답을 적어보세요'}
             disabled={composerDisabled}
+            maxLength={turn === 'tail1' ? MAX_SCENE : MAX_ANSWER}
             disabledLabel="metame가 질문을 쓰는 중이에요"
             disabledHint="질문이 도착하면 입력창이 열려요"
             chips={
               <>
-                <OutlineChip onClick={() => turn !== 'emotion' && goEmotion()}>태그로 답하기</OutlineChip>
-                {(turn === 'main' || turn === 'tail1' || turn === 'tail2') && <OutlineChip onClick={skip}>건너뛰기</OutlineChip>}
+                {turn === 'tail1' && <OutlineChip onClick={goEmotion}>태그로 답하기</OutlineChip>}
+                {(turn === 'tail1' || turn === 'tail2') && <OutlineChip onClick={skip}>건너뛰기</OutlineChip>}
               </>
             }
           />
@@ -447,6 +464,15 @@ export default function DiaryChatPage() {
           ),
         )}
         {typing && <TypingBubble />}
+        {saveFailed && (
+          <div className="rounded-3xl bg-surface-2 px-5 py-5 animate-fade-in text-center">
+            <p className="text-[15px] font-bold text-ink">기록을 저장하지 못했어요</p>
+            <p className="text-[13px] text-sub mt-1">답변은 그대로 남아 있어요. 다시 시도해 주세요.</p>
+            <Button className="mt-4" onClick={finish}>
+              다시 시도
+            </Button>
+          </div>
+        )}
         {turn === 'summary' && (
           <div className="rounded-3xl bg-surface-2 px-5 py-5 animate-fade-in">
             <div className="flex items-center justify-between">

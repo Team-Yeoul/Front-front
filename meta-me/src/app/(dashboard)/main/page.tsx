@@ -12,6 +12,7 @@ import type { DailyRecord } from '@/entities/diary';
 import { Screen } from '@/components/ui/Screen';
 import { CheckIcon, ChevronRight, CogniImg, GearIcon, ProgressBar } from '@/components/ui/primitives';
 import { useCollection } from '@/hooks/useCollection';
+import { countStreak } from '@/lib/streak';
 
 type DayStatus = 'done' | 'missed' | 'today' | 'pending';
 
@@ -38,7 +39,8 @@ function useWeekFlow() {
   // 실제 기록이 있는 날만 체크한다. 불러오기 전/실패 시에는 아무 날도 체크하지 않는다.
   const recordedDates = new Set((data?.records ?? []).map((r) => r.recorded_date));
   const todayKey = toDateKey(today);
-  return WEEKDAYS.map((_, i) => {
+  const todayRecord = data?.records.find((r) => r.recorded_date === todayKey);
+  const flow = WEEKDAYS.map((_, i) => {
     const day = new Date(start);
     day.setDate(start.getDate() + i);
     const dayKey = toDateKey(day);
@@ -46,6 +48,7 @@ function useWeekFlow() {
     if (day > today) return 'pending' as const;
     return recordedDates.has(dayKey) ? ('done' as const) : ('missed' as const);
   });
+  return { flow, todayRecord };
 }
 
 function WeekdayPill({ status, label, isToday }: { status: DayStatus; label: string; isToday: boolean }) {
@@ -106,7 +109,9 @@ export default function MainPage() {
     if (!onboardedAt && isOnboardingMissing(onboardingError)) router.replace('/onboarding');
   }, [onboardedAt, onboardingError, router]);
   const { data: recent } = useListDailyRecords({ size: 3 }, !!accessToken);
-  const weekFlow = useWeekFlow();
+  const { flow: weekFlow, todayRecord } = useWeekFlow();
+  // 연속 기록일은 주를 넘어 이어지므로 이번 주가 아니라 최근 기록 전체로 센다(스트릭 화면과 같은 값).
+  const { data: streakData } = useListDailyRecords({ size: 100 }, !!accessToken);
   const [stripOpen, setStripOpen] = useState(true);
   const cognis = useCollection();
   // 메인 캐릭터 = 가장 최근에 모은 코그니 (온보딩 직후엔 첫 코그니)
@@ -118,16 +123,11 @@ export default function MainPage() {
   const prompt = PROMPTS[today.getDate() % PROMPTS.length];
   const completedToday = weekFlow[todayIndex] === 'done';
   const doneCount = weekFlow.filter((s) => s === 'done').length;
-  const streak = (() => {
-    let n = 0;
-    for (let i = completedToday ? todayIndex : todayIndex - 1; i >= 0 && weekFlow[i] === 'done'; i--) n++;
-    return n;
-  })();
+  const streak = countStreak((streakData?.records ?? []).map((r) => r.recorded_date), today);
   const accuracy = profile?.latest_accuracy?.accuracy_percent ?? 0;
   const weekRate = Math.round((doneCount / 7) * 100);
   const records = recent?.records ?? [];
-  // 데일리 기록은 하루 1건이라, 오늘 기록이 있으면 새로 쓰는 대신 그 기록을 연다.
-  const todayRecord = records.find((r) => r.recorded_date === toDateKey(today));
+  // 데일리 기록은 하루 1건이라, 오늘 기록이 있으면 새로 쓰는 대신 그 기록을 연다(todayRecord는 이번 주 목록에서 찾는다).
 
   return (
     <Screen

@@ -86,6 +86,7 @@ export function Composer({
   disabledLabel,
   disabledHint,
   sendEnabled,
+  maxLength,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -97,6 +98,7 @@ export function Composer({
   disabledHint?: string;
   /** Override for turns where sending doesn't depend on the text (e.g. a picked chip). */
   sendEnabled?: boolean;
+  maxLength?: number;
 }) {
   const canSend = !disabled && (sendEnabled ?? value.trim().length > 0);
   return (
@@ -114,6 +116,7 @@ export function Composer({
             if (e.key === 'Enter' && !e.nativeEvent.isComposing && canSend) onSend();
           }}
           placeholder={placeholder}
+          maxLength={maxLength}
           className="w-full h-7 bg-transparent outline-none text-[15px] text-ink placeholder:text-mute"
         />
       )}

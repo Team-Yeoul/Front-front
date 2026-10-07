@@ -47,6 +47,8 @@ const EMPTY: UserLocal = { cognis: [], chats: [] };
 interface LocalStore {
   byUser: Record<string, UserLocal>;
   update: (userId: string, fn: (u: UserLocal) => UserLocal) => void;
+  /** 탈퇴한 사용자의 기기 데이터를 지운다. */
+  remove: (userId: string) => void;
 }
 
 export const useLocalStore = create<LocalStore>()(
@@ -54,6 +56,12 @@ export const useLocalStore = create<LocalStore>()(
     (set) => ({
       byUser: {},
       update: (userId, fn) => set((s) => ({ byUser: { ...s.byUser, [userId]: fn(s.byUser[userId] ?? EMPTY) } })),
+      remove: (userId) =>
+        set((s) => {
+          const byUser = { ...s.byUser };
+          delete byUser[userId];
+          return { byUser };
+        }),
     }),
     { name: 'metame-local', storage: createJSONStorage(() => localStorage), skipHydration: true },
   ),

@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store';
 import { useListDailyRecords } from '@/entities/diary';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button, CheckIcon, Img3D } from '@/components/ui/primitives';
+import { countStreak } from '@/lib/streak';
 
 const WEEK = ['월', '화', '수', '목', '금', '토', '일'];
 const toDateKey = (d: Date) => d.toLocaleDateString('sv-SE');
@@ -23,12 +24,7 @@ export default function StreakPage() {
   let doneIdx = new Set<number>();
   if (data) {
     const days = new Set(data.records.map((r) => r.recorded_date));
-    streak = 0;
-    const d = new Date(today);
-    while (days.has(toDateKey(d))) {
-      streak++;
-      d.setDate(d.getDate() - 1);
-    }
+    streak = countStreak(days, today);
     doneIdx = new Set(
       WEEK.map((_, i) => {
         const x = new Date(monday);

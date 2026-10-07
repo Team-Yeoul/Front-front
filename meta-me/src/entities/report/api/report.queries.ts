@@ -12,9 +12,12 @@ import type {
 
 export const reportKeys = {
   all: ['report'] as const,
-  quests: (params?: ListQuestsParams) => [...reportKeys.all, 'quests', params] as const,
+  // 파라미터와 관계없이 목록 전체를 무효화할 때 쓰는 접두 키
+  questLists: () => [...reportKeys.all, 'quests'] as const,
+  quests: (params?: ListQuestsParams) => [...reportKeys.questLists(), params] as const,
   quest: (questId: string) => [...reportKeys.all, 'quest', questId] as const,
-  reports: (params?: ListReportsParams) => [...reportKeys.all, 'list', params] as const,
+  reportLists: () => [...reportKeys.all, 'list'] as const,
+  reports: (params?: ListReportsParams) => [...reportKeys.reportLists(), params] as const,
   report: (reportId: string) => [...reportKeys.all, 'detail', reportId] as const,
 };
 
@@ -55,7 +58,7 @@ export const useCompleteQuest = () => {
     }) => reportApi.completeQuest(questId, body),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: reportKeys.quest(variables.questId) });
-      queryClient.invalidateQueries({ queryKey: reportKeys.quests() });
+      queryClient.invalidateQueries({ queryKey: reportKeys.questLists() });
     },
   });
 };
@@ -64,7 +67,7 @@ export const useGenerateReport = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: GenerateReportRequest) => reportApi.generateReport(body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: reportKeys.reports() }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: reportKeys.reportLists() }),
   });
 };
 

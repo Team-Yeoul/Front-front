@@ -171,13 +171,26 @@ export function ReportLocked({
   canGenerate,
   generating,
   onGenerate,
+  error,
 }: {
   recordCount: number;
   min: number;
   canGenerate: boolean;
   generating: boolean;
   onGenerate: () => void;
+  /** 목록 조회·생성 실패 문구. 있으면 진행도 대신 오류와 재시도 버튼을 보여준다. */
+  error?: string;
 }) {
+  if (error) {
+    return (
+      <div className="rounded-3xl bg-surface px-5 py-7 flex flex-col items-center text-center">
+        <p className="text-[16px] font-bold text-ink">{error}</p>
+        <button onClick={onGenerate} disabled={generating} className="mt-5 h-11 px-5 rounded-xl bg-primary text-white text-[14px] font-semibold disabled:opacity-50">
+          {generating ? '다시 시도하는 중...' : '다시 시도'}
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="rounded-3xl bg-surface px-5 py-7 flex flex-col items-center text-center">
       <span className="w-12 h-12 rounded-full bg-primary-soft flex items-center justify-center">
@@ -220,8 +233,8 @@ export function ContentList({ title, items, empty = '이번 리포트에는 이 
       <p className="text-[16px] font-bold text-ink">{title}</p>
       {items.length > 0 ? (
         <div className="divide-y divide-[#E6E6EC] mt-1">
-          {items.map((t) => (
-            <p key={t} className="py-3 text-[15px] text-ink leading-relaxed">
+          {items.map((t, i) => (
+            <p key={`${i}-${t}`} className="py-3 text-[15px] text-ink leading-relaxed">
               {t}
             </p>
           ))}

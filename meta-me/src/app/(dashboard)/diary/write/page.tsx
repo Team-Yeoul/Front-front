@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
-import { useGetTodayDailyQuestion } from '@/entities/diary';
+import { Suspense, useEffect, useState, type ReactNode } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useGetDailyRecord, useGetTodayDailyQuestion, useUpdateDailyRecord } from '@/entities/diary';
 import { useSaveTodayRecord } from '@/hooks/useSaveTodayRecord';
 import { useCreateObjectiveMirror } from '@/entities/objective';
 import { useAuthStore } from '@/store';
 import { Screen } from '@/components/ui/Screen';
-import { Badge, Button, CheckIcon, ChoiceChip, MessageSquareIcon, Segmented, TextButton, TopBar } from '@/components/ui/primitives';
+import { Badge, Button, CheckIcon, ChoiceChip, MessageSquareIcon, Segmented, TopBar } from '@/components/ui/primitives';
 import { AnalyzingScreen } from '@/components/ui/flows';
 import { saveLastWrite, type LastWrite } from '@/lib/lastWrite';
 
@@ -21,6 +21,9 @@ const FALLBACK_QUESTION = '오늘 하루는 어떤 장면으로 남았나요?';
 const SCENE_TAGS = ['공부', '일', '관계', '휴식', '이동 중', '혼자 있는 시간'];
 const EMOTIONS = ['답답함', '오기', '뿌듯함', '불안', '지루함', '편안함'];
 const TOTAL = 4;
+// 명세상 최대 길이 (SubmitDailyRecordRequest)
+const MAX_ANSWER = 2000;
+const MAX_SCENE = 1000;
 
 const TrendIcon = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
@@ -34,7 +37,7 @@ const SearchSmall = () => (
   </svg>
 );
 
-function FollowUp({ question, value, onChange, placeholder }: { question: ReactNode; value: string; onChange: (v: string) => void; placeholder: string }) {
+function FollowUp({ question, value, onChange, placeholder, maxLength }: { question: ReactNode; value: string; onChange: (v: string) => void; placeholder: string; maxLength?: number }) {
   return (
     <div className="rounded-3xl bg-surface px-4 py-4 mt-4">
       <p className="flex items-center gap-1.5 text-[12px] font-semibold text-primary">
@@ -45,6 +48,7 @@ function FollowUp({ question, value, onChange, placeholder }: { question: ReactN
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        maxLength={maxLength}
         rows={2}
         className="w-full mt-3 rounded-2xl bg-white px-4 py-3.5 text-[15px] text-ink leading-relaxed outline-none resize-none placeholder:text-mute caret-primary"
       />
@@ -55,15 +59,28 @@ function FollowUp({ question, value, onChange, placeholder }: { question: ReactN
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 export default function DiaryWritePage() {
+  return (
+    <Suspense>
+      <DiaryWrite />
+    </Suspense>
+  );
+}
+
+function DiaryWrite() {
   const router = useRouter();
+  // ?edit=<record_id>: 기존 기록을 불러와 수정한다. 없으면 오늘 기록을 새로 쓴다.
+  const editId = useSearchParams().get('edit');
   const accessToken = useAuthStore((s) => s.accessToken);
   const createRecord = useSaveTodayRecord();
+  const updateRecord = useUpdateDailyRecord();
   const createMirror = useCreateObjectiveMirror();
 
-  const { data: questionData } = useGetTodayDailyQuestion(!!accessToken);
-  const rawQuestion = questionData?.question?.question_text;
+  const { data: questionData } = useGetTodayDailyQuestion(!!accessToken && !editId);
+  const { data: editing, isError: editLoadFailed } = useGetDailyRecord(editId ?? '', !!accessToken && !!editId);
+  const editQuestion = editing?.questions?.[0];
+  const rawQuestion = editId ? editQuestion?.question_text : questionData?.question?.question_text;
   const todayQuestion = rawQuestion && /[가-힣]/.test(rawQuestion) ? rawQuestion : FALLBACK_QUESTION;
-  const questionBadge = QUESTION_TYPE_LABEL[questionData?.question?.question_type ?? ''] ?? '오늘의 질문';
+  const questionBadge = QUESTION_TYPE_LABEL[(editId ? editQuestion?.question_type : questionData?.question?.question_type) ?? ''] ?? '오늘의 질문';
   const [step, setStep] = useState(0);
   const [animDone, setAnimDone] = useState(false);
   const [apiDone, setApiDone] = useState(false);
@@ -77,6 +94,19 @@ export default function DiaryWritePage() {
   const [emotionWhy, setEmotionWhy] = useState('');
   const [myself, setMyself] = useState<'yes' | 'no' | null>(null);
   const [myselfDesc, setMyselfDesc] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [prefilled, setPrefilled] = useState(false);
+
+  // 수정 모드: 기존 기록 내용을 한 번만 폼에 채운다.
+  useEffect(() => {
+    if (!editQuestion || prefilled) return;
+    setAnswer(editQuestion.user_answer ?? '');
+    setScene(editQuestion.scene_description ?? '');
+    setEmotions(editQuestion.emotion_tag.split(',').map((t) => t.trim()).filter(Boolean));
+    setMyself(editQuestion.is_myself_moment ? 'yes' : 'no');
+    setMyselfDesc(editQuestion.myself_moment_desc ?? '');
+    setPrefilled(true);
+  }, [editQuestion, prefilled]);
 
   // 분석 애니메이션과 API 저장이 모두 끝나면 결과 화면으로 넘어간다.
   useEffect(() => {
@@ -92,32 +122,55 @@ export default function DiaryWritePage() {
   const setStepMode = (i: number, m: 'text' | 'tag') => setMode((prev) => prev.map((x, j) => (j === i ? m : x)));
   const toggle = (list: string[], set: (v: string[]) => void, v: string) => set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
+  const sceneText = mode[1] === 'text' ? scene.trim() : sceneTags.join(', ');
+  const body = {
+    answer_type: 'TEXT' as const,
+    user_answer: answer.trim(),
+    emotion_tag: emotions.join(', '),
+    scene_description: sceneText,
+    is_myself_moment: myself === 'yes',
+    myself_moment_desc: myself === 'yes' ? myselfDesc.trim() : undefined,
+  };
+
   const submit = async () => {
+    setSaveError('');
+    if (editId) {
+      try {
+        await updateRecord.mutateAsync({ recordId: editId, body });
+      } catch {
+        setSaveError('기록을 수정하지 못했어요. 잠시 후 다시 시도해 주세요.');
+        return;
+      }
+      router.replace(`/diary/${editId}`);
+      return;
+    }
+
     setAnalyzing(true);
-    const sceneText = scene.trim() || sceneTags.join(', ') || '오늘의 한 장면';
     const result: LastWrite = {
       original: [answer.trim(), sceneText, emotionWhy.trim()].filter(Boolean).join(' '),
       emotions,
       unlocked: [],
     };
+    let recordId: string | undefined;
     try {
-      const res = await createRecord.mutateAsync({
-        answer_type: 'TEXT',
-        user_answer: answer.trim() || sceneText,
-        emotion_tag: emotions.join(', ') || '기록함',
-        scene_description: sceneText,
-        is_myself_moment: myself === 'yes',
-        myself_moment_desc: myself === 'yes' && myselfDesc.trim() ? myselfDesc.trim() : undefined,
-      });
-      const mirror = await createMirror.mutateAsync({
-        record_id: res?.record?.record_id ?? '',
-        original_emotion: result.original,
-      });
-      result.mirrorId = mirror?.mirror?.mirror_id;
-      result.objective = mirror?.mirror?.objective_fact;
-      result.unlocked = mirror?.unlocked_monsters ?? [];
+      const res = await createRecord.mutateAsync(body);
+      recordId = res?.record?.record_id;
     } catch {
-      // 저장/객관화 실패 시 결과 화면에서 안내한다.
+      // 기록 저장에 실패하면 입력을 그대로 두고 작성 화면으로 돌아간다.
+      setAnalyzing(false);
+      setAnimDone(false);
+      setSaveError('기록을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+    if (recordId) {
+      try {
+        const mirror = await createMirror.mutateAsync({ record_id: recordId, original_emotion: result.original });
+        result.mirrorId = mirror?.mirror?.mirror_id;
+        result.objective = mirror?.mirror?.objective_fact;
+        result.unlocked = mirror?.unlocked_monsters ?? [];
+      } catch {
+        // 기록은 저장됐고 객관화만 실패한 경우: 결과 화면이 객관화 문장 없이 안내한다.
+      }
     }
     saveLastWrite(result);
     setApiDone(true);
@@ -139,17 +192,29 @@ export default function DiaryWritePage() {
     );
   }
 
+  const saving = createRecord.isPending || updateRecord.isPending;
   const next = () => (step < TOTAL - 1 ? setStep(step + 1) : submit());
+  // 서버에 가짜 값을 채워 보내지 않도록, 필수 항목(답변·장면·감정·나다움)은 입력해야 넘어갈 수 있다.
+  // 나다움 YES는 명세상 상세 서술이 함께 필요하다.
   const canNext = [
     answer.trim().length > 0,
-    mode[1] === 'text' ? scene.trim().length > 0 : sceneTags.length > 0,
+    sceneText.length > 0,
     emotions.length > 0,
-    myself !== null,
+    myself === 'no' || (myself === 'yes' && myselfDesc.trim().length > 0),
   ][step];
+
+  if (editId && !prefilled) {
+    return (
+      <Screen>
+        <TopBar title="기록 수정" />
+        <p className="text-center text-[14px] text-sub mt-24">{editLoadFailed ? '기록을 불러오지 못했어요.' : '불러오는 중...'}</p>
+      </Screen>
+    );
+  }
 
   const header = (
     <>
-      <TopBar title="데일리 다이어리" onBack={() => (step === 0 ? router.back() : setStep(step - 1))} right={<span className="font-mono text-[13px] text-mute">{step + 1} / {TOTAL}</span>} />
+      <TopBar title={editId ? '기록 수정' : '데일리 다이어리'} onBack={() => (step === 0 ? router.back() : setStep(step - 1))} right={<span className="font-mono text-[13px] text-mute">{step + 1} / {TOTAL}</span>} />
       <div className="flex items-center justify-between px-5 mt-1">
         <div className="flex gap-2">
           {Array.from({ length: TOTAL }, (_, i) => (
@@ -165,18 +230,16 @@ export default function DiaryWritePage() {
 
   const footer =
     step === TOTAL - 1 ? (
-      <Button onClick={next} disabled={!canNext}>
-        객관화 미러로 보내기
-      </Button>
-    ) : (
       <>
-        <Button variant="dark" onClick={next} disabled={!canNext}>
-          다음
+        {saveError && <p className="text-[13px] text-danger text-center mb-2">{saveError}</p>}
+        <Button onClick={next} disabled={!canNext || saving}>
+          {saving ? '저장 중...' : editId ? '수정 완료' : '객관화 미러로 보내기'}
         </Button>
-        <TextButton className="mt-1" onClick={() => setStep(step + 1)}>
-          넘어가기
-        </TextButton>
       </>
+    ) : (
+      <Button variant="dark" onClick={next} disabled={!canNext}>
+        다음
+      </Button>
     );
 
   return (
@@ -193,10 +256,11 @@ export default function DiaryWritePage() {
               <textarea
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
+                maxLength={MAX_ANSWER}
                 placeholder="떠오르는 대로 적어주세요"
                 className="flex-1 bg-transparent outline-none resize-none text-[15px] text-ink leading-[1.75] placeholder:text-mute caret-primary"
               />
-              <span className="text-right text-[12px] text-mute">{answer.length}자</span>
+              <span className="text-right text-[12px] text-mute">{answer.length} / {MAX_ANSWER}자</span>
             </div>
           </>
         )}
@@ -218,10 +282,11 @@ export default function DiaryWritePage() {
                 <textarea
                   value={scene}
                   onChange={(e) => setScene(e.target.value)}
+                  maxLength={MAX_SCENE}
                   placeholder="예: 수학 문제 세 번째에서 30분 멈춰 있었다."
                   className="flex-1 bg-transparent outline-none resize-none text-[15px] text-ink leading-[1.75] placeholder:text-mute caret-primary"
                 />
-                <span className="text-right text-[12px] text-mute">{scene.length}자</span>
+                <span className="text-right text-[12px] text-mute">{scene.length} / {MAX_SCENE}자</span>
               </div>
             ) : (
               <div className="flex flex-wrap gap-2 mt-4">
@@ -288,12 +353,13 @@ export default function DiaryWritePage() {
               ))}
             </div>
             <p className="text-[14px] font-semibold text-ink mt-5">
-              어떤 순간이었나요? <span className="font-normal text-sub">(선택)</span>
+              어떤 순간이었나요? {myself === 'no' && <span className="font-normal text-sub">(선택)</span>}
             </p>
             <textarea
               value={myselfDesc}
               onChange={(e) => setMyselfDesc(e.target.value)}
               disabled={myself === 'no'}
+              maxLength={MAX_SCENE}
               placeholder="떠오르는 대로 적어주세요"
               rows={3}
               className="w-full mt-2.5 rounded-2xl bg-surface px-4 py-4 text-[15px] text-ink outline-none resize-none placeholder:text-mute disabled:opacity-50 caret-primary"

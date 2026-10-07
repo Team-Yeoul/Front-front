@@ -49,25 +49,27 @@ export interface RequestConfig {
  */
 let refreshing: Promise<boolean> | null = null;
 
-/** 저장된 refresh token으로 access token을 한 번 갱신한다. 동시에 여러 요청이 401을 받아도 한 번만 시도한다. */
+/**
+ * 저장된 refresh token으로 access token을 한 번 갱신한다. 동시에 여러 요청이 401을 받아도 한 번만 시도한다.
+ * 서버가 갱신을 거부하면 false, 네트워크 오류는 그대로 throw해서 일시적인 오류로 로그아웃되지 않게 한다.
+ */
 function refreshAccessToken(): Promise<boolean> {
   if (refreshing) return refreshing;
   refreshing = (async () => {
     const { refreshToken, setAuth } = useAuthStore.getState();
     if (!refreshToken) return false;
-    try {
-      const res = await fetch(`${BASE_URL}/v1/auth/token/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      });
-      if (!res.ok) return false;
-      const data = (await res.json()) as components['schemas']['AuthResponse'];
-      setAuth(data.access_token, data.refresh_token, data.user_id);
-      return true;
-    } catch {
+    const res = await fetch(`${BASE_URL}/v1/auth/token/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!res.ok) {
+      if (res.status >= 500) throw new ApiError(res.status, await res.json().catch(() => ({})));
       return false;
     }
+    const data = (await res.json()) as components['schemas']['AuthResponse'];
+    setAuth(data.access_token, data.refresh_token, data.user_id);
+    return true;
   })().finally(() => {
     refreshing = null;
   });
