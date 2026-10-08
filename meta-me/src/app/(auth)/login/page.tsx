@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLogin, userApi } from '@/entities/user';
+import { ApiError } from '@/shared/api';
 import { useAuthStore, useLocalStore } from '@/store';
 import { isOnboardingMissing } from '@/lib/onboarding';
 import { Screen } from '@/components/ui/Screen';
@@ -33,7 +34,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
-  const loading = loginMutation.isPending;
+  // 로그인 API 뒤에 비밀번호 저장·온보딩 확인까지 기다리므로, 처리 전체를 기준으로 버튼을 막는다.
+  const [submitting, setSubmitting] = useState(false);
+  const loading = submitting || loginMutation.isPending;
 
   // 지난번에 '기억하기'로 로그인했다면 이메일을 미리 채운다.
   useEffect(() => {
@@ -45,10 +48,11 @@ export default function LoginPage() {
     }
   }, []);
 
-  const canSubmit = email.includes('@') && email.includes('.') && password.length >= 6;
+  const canSubmit = email.includes('@') && email.includes('.') && password.length >= 8; // 명세상 비밀번호는 8자 이상
 
   const handleSubmit = async () => {
     if (!canSubmit || loading) return;
+    setSubmitting(true);
     setError('');
     try {
       const res = await loginMutation.mutateAsync({ email, password });
@@ -71,8 +75,14 @@ export default function LoginPage() {
         }
       }
       router.push(missing ? '/onboarding' : '/main');
-    } catch {
-      setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+    } catch (err) {
+      setSubmitting(false);
+      // 인증 실패(401)와 서버·네트워크 오류를 구분해 안내한다.
+      setError(
+        err instanceof ApiError && (err.status === 401 || err.status === 400)
+          ? '이메일 또는 비밀번호가 올바르지 않습니다.'
+          : '로그인하지 못했어요. 잠시 후 다시 시도해 주세요.',
+      );
     }
   };
 

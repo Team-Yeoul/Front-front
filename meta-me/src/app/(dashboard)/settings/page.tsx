@@ -96,13 +96,14 @@ export default function SettingsPage() {
       overlay={
         <>
         {toast && <Toast message={toast} />}
-        <Modal open={!!confirm} onClose={() => setConfirm(null)}>
+        {/* 요청이 진행 중이면 닫아도 로그아웃·탈퇴는 계속되므로, 그동안은 닫을 수 없게 한다. */}
+        <Modal open={!!confirm} onClose={() => !busy && setConfirm(null)}>
           <p className="text-[17px] font-bold text-ink text-center">{confirm === 'withdraw' ? '정말 탈퇴할까요?' : '로그아웃할까요?'}</p>
           <p className="text-[13px] text-sub text-center mt-2">
             {confirm === 'withdraw' ? '기록과 도감이 모두 삭제되고 되돌릴 수 없어요.' : '언제든 다시 로그인할 수 있어요.'}
           </p>
           <div className="grid grid-cols-2 gap-2 mt-5">
-            <Button variant="gray" onClick={() => setConfirm(null)}>
+            <Button variant="gray" onClick={() => setConfirm(null)} disabled={busy}>
               취소
             </Button>
             <Button variant={confirm === 'withdraw' ? 'danger' : 'primary'} onClick={run} disabled={busy}>
