@@ -111,9 +111,11 @@ export function GoogleLoginButton() {
           </span>
           {busy ? '로그인 중...' : 'Google로 시작하기'}
         </Button>
+        {/* opacity-0이면 데스크톱 폰 프레임(둥근 모서리로 잘린 #phone-screen) 안에서 Chrome이 공식 버튼 클릭을 버린다.
+            눈에 띄지 않을 만큼만 남겨 둔다. */}
         <div
           ref={overlayRef}
-          className={`absolute inset-0 flex items-center justify-center overflow-hidden opacity-0 ${busy ? 'pointer-events-none' : ''}`}
+          className={`absolute inset-0 flex items-center justify-center overflow-hidden opacity-[0.01] ${busy ? 'pointer-events-none' : ''}`}
         />
       </div>
       {error && <p className="text-center text-[13px] text-danger">{error}</p>}
