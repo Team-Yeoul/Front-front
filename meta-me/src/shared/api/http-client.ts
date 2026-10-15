@@ -58,10 +58,10 @@ function refreshAccessToken(): Promise<boolean> {
   refreshing = (async () => {
     const { refreshToken, setAuth } = useAuthStore.getState();
     if (!refreshToken) return false;
+    // 백엔드는 refresh token을 body가 아니라 Authorization 헤더에서 읽는다.
     const res = await fetch(`${BASE_URL}/v1/auth/token/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      headers: { Authorization: `Bearer ${refreshToken}` },
     });
     if (!res.ok) {
       if (res.status >= 500) throw new ApiError(res.status, await res.json().catch(() => ({})));
