@@ -56,7 +56,7 @@ let refreshing: Promise<boolean> | null = null;
 function refreshAccessToken(): Promise<boolean> {
   if (refreshing) return refreshing;
   refreshing = (async () => {
-    const { refreshToken, setAuth } = useAuthStore.getState();
+    const { refreshToken } = useAuthStore.getState();
     if (!refreshToken) return false;
     // 백엔드는 refresh token을 body가 아니라 Authorization 헤더에서 읽는다.
     const res = await fetch(`${BASE_URL}/v1/auth/token/refresh`, {
@@ -68,7 +68,10 @@ function refreshAccessToken(): Promise<boolean> {
       return false;
     }
     const data = (await res.json()) as components['schemas']['AuthResponse'];
-    setAuth(data.access_token, data.refresh_token, data.user_id);
+    // 갱신하는 동안 로그아웃·탈퇴(또는 다른 계정 로그인)가 있었다면 그 세션을 되살리지 않는다.
+    const current = useAuthStore.getState();
+    if (current.refreshToken !== refreshToken) return !!current.accessToken;
+    current.setAuth(data.access_token, data.refresh_token, data.user_id);
     return true;
   })().finally(() => {
     refreshing = null;
@@ -80,10 +83,8 @@ export async function apiRequest<T>(path: string, config: RequestConfig = {}, re
   const { method = 'GET', body, query, auth = true } = config;
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (auth) {
-    const token = useAuthStore.getState().accessToken;
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
+  const token = auth ? useAuthStore.getState().accessToken : null;
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(`${BASE_URL}${path}${buildQueryString(query)}`, {
     method,
@@ -92,8 +93,14 @@ export async function apiRequest<T>(path: string, config: RequestConfig = {}, re
   });
 
   // 로그인이 유지되는 동안 토큰이 만료되면 한 번 갱신해 재시도하고, 실패하면 로그아웃한다.
-  if (res.status === 401 && auth && !retried) {
-    if (await refreshAccessToken()) return apiRequest<T>(path, config, true);
+  if (res.status === 401 && auth) {
+    if (!retried) {
+      // 이 요청을 보낸 뒤 다른 요청이 이미 토큰을 갱신했다면, 다시 갱신하지 않고 새 토큰으로 재시도한다.
+      const latest = useAuthStore.getState().accessToken;
+      if (latest && latest !== token) return apiRequest<T>(path, config, true);
+      if (await refreshAccessToken()) return apiRequest<T>(path, config, true);
+    }
+    // 갱신이 거부됐거나, 갱신한 토큰으로도 401이면 세션을 정리한다.
     useAuthStore.getState().clearAuth();
   }
 

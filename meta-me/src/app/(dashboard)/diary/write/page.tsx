@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useGetDailyRecord, useGetTodayDailyQuestion, useUpdateDailyRecord } from '@/entities/diary';
-import { useSaveTodayRecord } from '@/hooks/useSaveTodayRecord';
+import { TodayRecordExistsError, useSaveTodayRecord, useTodayRecord } from '@/hooks/useSaveTodayRecord';
+import { TodayRecordExists } from '@/components/ui/TodayRecordExists';
 import { useCreateObjectiveMirror } from '@/entities/objective';
 import { useAuthStore } from '@/store';
 import { Screen } from '@/components/ui/Screen';
@@ -74,6 +75,9 @@ function DiaryWrite() {
   const createRecord = useSaveTodayRecord();
   const updateRecord = useUpdateDailyRecord();
   const createMirror = useCreateObjectiveMirror();
+  const todayRecord = useTodayRecord(!editId);
+  // 저장 시점에 409로 오늘 기록이 있다는 걸 알게 된 경우(undefined = 해당 없음)
+  const [existingId, setExistingId] = useState<string | null | undefined>(undefined);
 
   const { data: questionData } = useGetTodayDailyQuestion(!!accessToken && !editId);
   const { data: editing, isError: editLoadFailed } = useGetDailyRecord(editId ?? '', !!accessToken && !!editId);
@@ -129,7 +133,8 @@ function DiaryWrite() {
     emotion_tag: emotions.join(', '),
     scene_description: sceneText,
     is_myself_moment: myself === 'yes',
-    myself_moment_desc: myself === 'yes' ? myselfDesc.trim() : undefined,
+    // 수정(PATCH)은 보낸 필드만 바뀌므로, NO로 바꿨으면 예전 설명을 빈 값으로 지운다.
+    myself_moment_desc: myself === 'yes' ? myselfDesc.trim() : editId ? '' : undefined,
   };
 
   const submit = async () => {
@@ -155,11 +160,12 @@ function DiaryWrite() {
     try {
       const res = await createRecord.mutateAsync(body);
       recordId = res?.record?.record_id;
-    } catch {
+    } catch (err) {
       // 기록 저장에 실패하면 입력을 그대로 두고 작성 화면으로 돌아간다.
       setAnalyzing(false);
       setAnimDone(false);
-      setSaveError('기록을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
+      if (err instanceof TodayRecordExistsError) setExistingId(err.recordId);
+      else setSaveError('기록을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
       return;
     }
     if (recordId) {
@@ -203,11 +209,23 @@ function DiaryWrite() {
     myself === 'no' || (myself === 'yes' && myselfDesc.trim().length > 0),
   ][step];
 
+  if (existingId !== undefined) return <TodayRecordExists recordId={existingId} />;
+  if (!editId && todayRecord.record) return <TodayRecordExists recordId={todayRecord.record.record_id} />;
+  if (!editId && todayRecord.isLoading) {
+    return (
+      <Screen>
+        <TopBar title="데일리 다이어리" />
+        <p className="text-center text-[14px] text-sub mt-24">불러오는 중...</p>
+      </Screen>
+    );
+  }
+
   if (editId && !prefilled) {
+    const message = editLoadFailed ? '기록을 불러오지 못했어요.' : editing ? '수정할 내용이 없는 기록이에요.' : '불러오는 중...';
     return (
       <Screen>
         <TopBar title="기록 수정" />
-        <p className="text-center text-[14px] text-sub mt-24">{editLoadFailed ? '기록을 불러오지 못했어요.' : '불러오는 중...'}</p>
+        <p className="text-center text-[14px] text-sub mt-24">{message}</p>
       </Screen>
     );
   }
@@ -309,7 +327,8 @@ function DiaryWrite() {
               <Segmented options={[{ value: 'text', label: '텍스트' }, { value: 'tag', label: '태그' }]} value={mode[2]} onChange={(m) => setStepMode(2, m)} />
             </div>
             <div className="flex flex-wrap gap-2 mt-4">
-              {EMOTIONS.map((e) => (
+              {/* 다른 화면(대화형 기록)에서 고른 감정도 보이고 해제할 수 있게 함께 그린다. */}
+              {[...new Set([...EMOTIONS, ...emotions])].map((e) => (
                 <ChoiceChip key={e} label={e} selected={emotions.includes(e)} onClick={() => toggle(emotions, setEmotions, e)} />
               ))}
               <ChoiceChip label="+ 직접 입력" selected={false} />
@@ -345,7 +364,10 @@ function DiaryWrite() {
               {(['yes', 'no'] as const).map((v) => (
                 <button
                   key={v}
-                  onClick={() => setMyself(v)}
+                  onClick={() => {
+                    setMyself(v);
+                    if (v === 'no') setMyselfDesc('');
+                  }}
                   className={`h-14 rounded-2xl text-[16px] font-bold ${myself === v ? 'bg-primary text-white' : 'bg-surface-2 text-[#48484F]'}`}
                 >
                   {v.toUpperCase()}
