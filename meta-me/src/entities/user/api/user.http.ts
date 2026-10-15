@@ -27,6 +27,10 @@ export const login = (body: LoginRequest) =>
 export const signup = (body: SignUpRequest) =>
   apiRequest<AuthResponse>('/v1/auth/signup', { method: 'POST', body, auth: false });
 
+/** Google ID Token으로 로그인한다. 처음 쓰는 Google 계정이면 서버가 자동으로 가입시킨다. */
+export const googleLogin = (idToken: string) =>
+  apiRequest<AuthResponse>('/v1/auth/google', { method: 'POST', body: { id_token: idToken }, auth: false });
+
 export const logout = () => apiRequest<MessageResponse>('/v1/auth/logout', { method: 'POST' });
 
 export const refreshToken = (body: RefreshTokenRequest) =>
