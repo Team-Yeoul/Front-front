@@ -8,7 +8,8 @@ import {
   useUpdateTailQuestionAnswer,
 } from '@/entities/diary';
 import { useGetMyProfile } from '@/entities/user';
-import { useSaveTodayRecord } from '@/hooks/useSaveTodayRecord';
+import { TodayRecordExistsError, useSaveTodayRecord, useTodayRecord } from '@/hooks/useSaveTodayRecord';
+import { TodayRecordExists } from '@/components/ui/TodayRecordExists';
 import { useAuthStore } from '@/store';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button, ChevronLeft, Img3D, ProgressBar, TextButton } from '@/components/ui/primitives';
@@ -53,6 +54,9 @@ export default function DiaryChatPage() {
   const createTailQuestion = useCreateTailQuestion();
   const updateTailAnswer = useUpdateTailQuestionAnswer();
   const createRecord = useSaveTodayRecord();
+  const todayRecord = useTodayRecord();
+  // 저장 시점에 409로 오늘 기록이 있다는 걸 알게 된 경우(undefined = 해당 없음)
+  const [existingId, setExistingId] = useState<string | null | undefined>(undefined);
 
   const [phase, setPhase] = useState<'intro' | 'chat' | 'done'>('intro');
   const [mode, setMode] = useState<Mode>('AI');
@@ -184,9 +188,13 @@ export default function DiaryChatPage() {
         is_myself_moment: !!answers.current.myselfMoment,
         myself_moment_desc: answers.current.myselfMoment ? answers.current.myselfMoment.slice(0, MAX_SCENE) : undefined,
       });
-    } catch {
-      // 저장에 실패하면 완료로 안내하지 않고 다시 시도하게 한다. 답변은 그대로 남아 있다.
+    } catch (err) {
       setTyping(false);
+      if (err instanceof TodayRecordExistsError) {
+        setExistingId(err.recordId);
+        return;
+      }
+      // 저장에 실패하면 완료로 안내하지 않고 다시 시도하게 한다. 답변은 그대로 남아 있다.
       setSaveFailed(true);
       return;
     }
@@ -256,13 +264,18 @@ export default function DiaryChatPage() {
         scene_description: text.slice(0, MAX_SCENE),
         is_myself_moment: false,
       });
-    } catch {
-      setFreeError('기록을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } catch (err) {
+      if (err instanceof TodayRecordExistsError) setExistingId(err.recordId);
+      else setFreeError('기록을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
       return;
     }
     setFinding('자유롭게 남겨주신 기록, 잘 저장해뒀어요.');
     setPhase('done');
   };
+
+  if (existingId !== undefined) return <TodayRecordExists recordId={existingId} />;
+  // 이미 오늘 기록이 있으면 대화를 시작하기 전에 수정으로 안내한다(저장 후 완료 화면에서는 보여주지 않는다).
+  if (phase === 'intro' && todayRecord.record) return <TodayRecordExists recordId={todayRecord.record.record_id} />;
 
   /* ── 인트로 ── */
   if (phase === 'intro') {

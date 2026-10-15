@@ -71,8 +71,21 @@ export const useUpdateMyAccount = () => {
 
 export const useWithdrawAccount = () => useMutation({ mutationFn: userApi.withdrawAccount });
 
+// 명세상 accuracy_percent·xp_delta는 정수가 아닌 number라, 화면에 42.857%처럼 찍히지 않게 여기서 반올림한다.
+const roundProfile = (p: Awaited<ReturnType<typeof userApi.getMyProfile>>) =>
+  p?.latest_accuracy
+    ? {
+        ...p,
+        latest_accuracy: {
+          ...p.latest_accuracy,
+          accuracy_percent: Math.round(p.latest_accuracy.accuracy_percent),
+          xp_delta: Math.round(p.latest_accuracy.xp_delta),
+        },
+      }
+    : p;
+
 export const useGetMyProfile = (enabled = true) =>
-  useQuery({ queryKey: userKeys.profile(), queryFn: userApi.getMyProfile, enabled });
+  useQuery({ queryKey: userKeys.profile(), queryFn: userApi.getMyProfile, select: roundProfile, enabled });
 
 export const useGetMyAccuracy = (enabled = true) =>
   useQuery({ queryKey: userKeys.accuracy(), queryFn: userApi.getMyAccuracy, enabled });

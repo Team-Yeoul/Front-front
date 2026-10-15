@@ -369,7 +369,10 @@ export default function OnboardingPage() {
   const [slide, setSlide] = useState(0);
   const [slideDir, setSlideDir] = useState<SwipeDir>();
   const [qIndex, setQIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  // 척도·시간 질문은 화면이 가운데 값(2)을 선택된 것처럼 그리므로, 건드리지 않고 넘어가도 보이는 값이 저장되게 미리 채운다.
+  const [answers, setAnswers] = useState<Record<string, Answer>>(() =>
+    Object.fromEntries(ONBOARDING_QUESTIONS.filter((x) => x.kind === 'scale' || x.kind === 'hours').map((x) => [x.id, 2])),
+  );
   const [accuracy, setAccuracy] = useState(12);
   const me = useMe();
   // 표시 이름: 가입 때 입력한 닉네임 → 서버 계정 이름(username) → 이메일 앞부분
@@ -382,6 +385,8 @@ export default function OnboardingPage() {
   const isLast = qIndex === total - 1;
 
   const [submitted, setSubmitted] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState(false);
 
   const submit = async () => {
     const byId = (id: string) => labelOf(answers[id], ONBOARDING_QUESTIONS.find((x) => x.id === id)) || '아직 모르겠어요';
@@ -395,7 +400,7 @@ export default function OnboardingPage() {
         others_feedback: byId('repeating_pattern'),
         favorite_thing: byId('curious_about'),
       });
-      if (typeof res.accuracy_percent === 'number') setAccuracy(res.accuracy_percent);
+      if (typeof res.accuracy_percent === 'number') setAccuracy(Math.round(res.accuracy_percent));
       setSubmitted(true);
       return true;
     } catch (err) {
@@ -569,8 +574,18 @@ export default function OnboardingPage() {
   }
 
   /* 아웃트로 */
+  // 서버 제출이 끝까지 실패하면 완료로 기록하지 않는다. 완료로 기록하면 다시 제출할 기회가 사라진다.
   const finish = async () => {
-    if (!submitted) await submit();
+    if (finishing) return;
+    setFinishing(true);
+    setFinishError(false);
+    const ok = submitted || (await submit());
+    if (!ok) {
+      setFinishing(false);
+      setFinishError(true);
+      setSlide(2);
+      return;
+    }
     me.patch((u) => ({ ...u, onboardedAt: new Date().toISOString() }));
     router.push('/main');
   };
@@ -600,9 +615,19 @@ export default function OnboardingPage() {
         <br />
         당신의 한 문장을 정확하게 만듭니다
       </p>
-      <span className="mt-6 h-9 px-4 rounded-full bg-white text-[13px] font-semibold text-primary inline-flex items-center">
-        정확도 {accuracy}%에서 출발합니다
-      </span>
+      {submitted && (
+        <span className="mt-6 h-9 px-4 rounded-full bg-white text-[13px] font-semibold text-primary inline-flex items-center">
+          정확도 {accuracy}%에서 출발합니다
+        </span>
+      )}
+      {finishing && <p className="mt-4 text-[13px] text-sub">저장하는 중...</p>}
+      {finishError && !finishing && (
+        <p className="mt-4 text-[13px] text-danger">
+          답변을 저장하지 못했어요.
+          <br />
+          화면을 탭해서 다시 시도해 주세요.
+        </p>
+      )}
     </Slide>
   );
 }

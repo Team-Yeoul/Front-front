@@ -12,7 +12,8 @@ import { Field } from '@/components/ui/Field';
 import { BirthDateField } from '@/components/ui/BirthDateField';
 import { Wordmark } from '@/components/ui/brand';
 
-const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+// 명세상 비밀번호는 8~64자
+const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,64}$/;
 const EMAIL_RULE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SignupPage() {
@@ -27,7 +28,9 @@ export default function SignupPage() {
   // v2 시안에는 생년월일 칸이 없지만, 가입 API(/v1/auth/signup)가 birth_date를 필수로 받아서 유지한다.
   const [birthDate, setBirthDate] = useState('');
   const [error, setError] = useState('');
-  const loading = signupMutation.isPending;
+  // 가입 API 뒤에 알림 설정 저장까지 기다리므로, mutation 상태가 아니라 처리 전체를 기준으로 버튼을 막는다.
+  const [submitting, setSubmitting] = useState(false);
+  const loading = submitting || signupMutation.isPending;
   const submittedRef = useRef(false);
 
   useEffect(() => {
@@ -35,12 +38,13 @@ export default function SignupPage() {
   }, [service, privacy, router]);
 
   const emailError = email.length > 0 && !EMAIL_RULE.test(email) ? '올바른 이메일 형식으로 입력해 주세요' : undefined;
-  const passwordError = password.length > 0 && !PASSWORD_RULE.test(password) ? '영문·숫자 조합 8자 이상으로 입력해 주세요' : undefined;
+  const passwordError = password.length > 0 && !PASSWORD_RULE.test(password) ? '영문·숫자 조합 8~64자로 입력해 주세요' : undefined;
   const canSubmit =
     nickname.trim().length > 0 && EMAIL_RULE.test(email) && PASSWORD_RULE.test(password) && birthDate.length > 0 && service && privacy;
 
   const handleSubmit = async () => {
     if (!canSubmit || loading) return;
+    setSubmitting(true);
     setError('');
     try {
       const res = await signupMutation.mutateAsync({ email, password, birth_date: birthDate });
@@ -57,6 +61,7 @@ export default function SignupPage() {
       resetTerms();
       router.push('/notifications');
     } catch (err) {
+      setSubmitting(false);
       setError(err instanceof ApiError ? err.message : '회원가입에 실패했습니다. 다시 시도해주세요.');
     }
   };
