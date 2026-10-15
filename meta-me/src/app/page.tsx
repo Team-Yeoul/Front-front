@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/primitives';
-import { GoogleIcon, LogoMark } from '@/components/ui/brand';
+import { LogoMark } from '@/components/ui/brand';
+import { GoogleLoginButton } from '@/components/GoogleLoginButton';
 import { useAuthStore } from '@/store';
 
 /** 스플래시를 보여주는 시간(ms) */
@@ -134,12 +135,7 @@ export default function StartPage() {
           <Reveal show={revealed} delay={450}>
             <div className="flex flex-col gap-3">
               <Button onClick={() => router.push('/login')}>로그인</Button>
-              <Button variant="gray" className="relative font-medium">
-                <span className="absolute left-7">
-                  <GoogleIcon />
-                </span>
-                Google로 시작하기
-              </Button>
+              <GoogleLoginButton />
               <p className="text-center text-[13px] text-sub mt-1">
                 계정이 존재하지 않는다면?{' '}
                 <Link href="/terms" className="text-primary font-semibold">

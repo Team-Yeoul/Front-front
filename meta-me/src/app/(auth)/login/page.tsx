@@ -3,14 +3,15 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useLogin, userApi } from '@/entities/user';
+import { useLogin } from '@/entities/user';
 import { ApiError } from '@/shared/api';
-import { useAuthStore, useLocalStore } from '@/store';
-import { isOnboardingMissing } from '@/lib/onboarding';
+import { useAuthStore } from '@/store';
+import { loginDestination } from '@/lib/onboarding';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button } from '@/components/ui/primitives';
 import { Field, RememberRow } from '@/components/ui/Field';
-import { GoogleIcon, Wordmark } from '@/components/ui/brand';
+import { Wordmark } from '@/components/ui/brand';
+import { GoogleLoginButton } from '@/components/GoogleLoginButton';
 
 /** '기억하기'로 저장해 두는 이메일. 비밀번호는 앱이 직접 저장하지 않고 브라우저 비밀번호 관리자에 맡긴다. */
 const REMEMBERED_EMAIL_KEY = 'metame-remembered-email';
@@ -64,17 +65,7 @@ export default function LoginPage() {
         // 저장소를 못 쓰는 환경은 무시
       }
       if (rememberMe) await storeCredential(email, password);
-      // 서버에 온보딩 기록이 없고(ONBOARDING_NOT_FOUND) 이 기기에서도 마친 적이 없을 때만 온보딩으로 보낸다.
-      const doneHere = !!useLocalStore.getState().byUser[res.user_id]?.onboardedAt;
-      let missing = false;
-      if (!doneHere) {
-        try {
-          await userApi.getOnboardingResult();
-        } catch (err) {
-          missing = isOnboardingMissing(err);
-        }
-      }
-      router.push(missing ? '/onboarding' : '/main');
+      router.push(await loginDestination(res.user_id));
     } catch (err) {
       setSubmitting(false);
       // 인증 실패(401)와 서버·네트워크 오류를 구분해 안내한다.
@@ -93,12 +84,7 @@ export default function LoginPage() {
           <Button onClick={handleSubmit} disabled={!canSubmit || loading}>
             {loading ? '로그인 중...' : '로그인'}
           </Button>
-          <Button variant="gray" className="relative font-medium">
-            <span className="absolute left-7">
-              <GoogleIcon />
-            </span>
-            Google로 시작하기
-          </Button>
+          <GoogleLoginButton />
           <p className="text-center text-[14px] font-semibold text-ink mt-1">
             계정이 존재하지 않는다면?
             <Link href="/terms" className="text-primary">

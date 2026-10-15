@@ -1,0 +1,122 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useGoogleLogin } from '@/entities/user';
+import { ApiError } from '@/shared/api';
+import { useAuthStore } from '@/store';
+import { loginDestination } from '@/lib/onboarding';
+import { Button } from '@/components/ui/primitives';
+import { GoogleIcon } from '@/components/ui/brand';
+
+const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '';
+const GSI_SRC = 'https://accounts.google.com/gsi/client';
+
+interface GoogleId {
+  initialize(config: { client_id: string; callback: (res: { credential?: string }) => void; ux_mode?: 'popup' }): void;
+  renderButton(parent: HTMLElement, options: Record<string, unknown>): void;
+  prompt(): void;
+}
+type GoogleWindow = Window & { google?: { accounts: { id: GoogleId } } };
+
+let gsiLoading: Promise<GoogleId> | null = null;
+
+/** Google Identity Services 스크립트를 한 번만 불러온다. */
+function loadGsi(): Promise<GoogleId> {
+  const w = window as GoogleWindow;
+  if (w.google?.accounts?.id) return Promise.resolve(w.google.accounts.id);
+  gsiLoading ??= new Promise<GoogleId>((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = GSI_SRC;
+    script.async = true;
+    script.onload = () => (w.google?.accounts?.id ? resolve(w.google.accounts.id) : reject(new Error('GSI unavailable')));
+    script.onerror = () => {
+      gsiLoading = null;
+      reject(new Error('GSI load failed'));
+    };
+    document.head.appendChild(script);
+  });
+  return gsiLoading;
+}
+
+/**
+ * "Google로 시작하기" 버튼. Google이 준 ID Token을 /v1/auth/google로 보내 로그인한다.
+ * 처음 쓰는 Google 계정이면 서버가 자동으로 가입시킨다.
+ * ID Token은 Google 공식 버튼으로만 받을 수 있어서, 공식 버튼을 투명하게 우리 버튼 위에 겹쳐 둔다.
+ */
+export function GoogleLoginButton() {
+  const router = useRouter();
+  const setAuth = useAuthStore((s) => s.setAuth);
+  const googleLogin = useGoogleLogin();
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const [gsi, setGsi] = useState<GoogleId | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  // 콜백은 initialize 때 한 번만 넘기므로 최신 핸들러를 ref로 들고 있는다.
+  const onCredential = useRef<(idToken: string) => void>(() => {});
+  onCredential.current = async (idToken: string) => {
+    setBusy(true);
+    setError('');
+    try {
+      const res = await googleLogin.mutateAsync(idToken);
+      setAuth(res.access_token, res.refresh_token, res.user_id);
+      router.push(await loginDestination(res.user_id));
+    } catch (err) {
+      setBusy(false);
+      setError(
+        err instanceof ApiError && err.status === 401
+          ? 'Google 계정을 확인하지 못했어요. 다시 시도해 주세요.'
+          : '로그인하지 못했어요. 잠시 후 다시 시도해 주세요.',
+      );
+    }
+  };
+
+  useEffect(() => {
+    if (!CLIENT_ID) return;
+    let cancelled = false;
+    loadGsi()
+      .then((id) => {
+        if (cancelled || !overlayRef.current) return;
+        id.initialize({
+          client_id: CLIENT_ID,
+          ux_mode: 'popup',
+          callback: ({ credential }) => credential && onCredential.current(credential),
+        });
+        id.renderButton(overlayRef.current, {
+          type: 'standard',
+          size: 'large',
+          width: Math.min(400, overlayRef.current.offsetWidth || 400),
+        });
+        setGsi(id);
+      })
+      .catch(() => !cancelled && setError('Google 로그인을 불러오지 못했어요.'));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="relative w-full max-w-[382px] mx-auto">
+        {/* 투명한 공식 버튼이 클릭을 받는다. 공식 버튼이 닿지 않는 가장자리를 누르면 One Tap을 띄운다. */}
+        <Button
+          variant="gray"
+          className="relative font-medium"
+          disabled={busy || !CLIENT_ID}
+          onClick={() => gsi?.prompt()}
+        >
+          <span className="absolute left-7">
+            <GoogleIcon />
+          </span>
+          {busy ? '로그인 중...' : 'Google로 시작하기'}
+        </Button>
+        <div
+          ref={overlayRef}
+          className={`absolute inset-0 flex items-center justify-center overflow-hidden opacity-0 ${busy ? 'pointer-events-none' : ''}`}
+        />
+      </div>
+      {error && <p className="text-center text-[13px] text-danger">{error}</p>}
+    </div>
+  );
+}

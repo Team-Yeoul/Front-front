@@ -28,6 +28,8 @@ export const userKeys = {
 
 export const useLogin = () => useMutation({ mutationFn: (body: LoginRequest) => userApi.login(body) });
 
+export const useGoogleLogin = () => useMutation({ mutationFn: (idToken: string) => userApi.googleLogin(idToken) });
+
 export const useSignup = () => useMutation({ mutationFn: (body: SignUpRequest) => userApi.signup(body) });
 
 export const useLogout = () => useMutation({ mutationFn: userApi.logout });
