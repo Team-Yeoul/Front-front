@@ -61,7 +61,8 @@ export function GoogleLoginButton() {
     try {
       const res = await googleLogin.mutateAsync(idToken);
       setAuth(res.access_token, res.refresh_token, res.user_id);
-      router.push(await loginDestination(res.user_id));
+      // 방금 가입한 계정은 온보딩 기록이 있을 수 없으니 확인하지 않고 바로 온보딩으로 보낸다.
+      router.push(res.is_new_user ? '/onboarding' : await loginDestination(res.user_id));
     } catch (err) {
       setBusy(false);
       setError(
