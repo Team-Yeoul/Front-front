@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { counselingErrorText, useCounselingChat } from '@/hooks/useCounselingChat';
 import { useMe } from '@/hooks/useMe';
+import { analysisMessage, analysisSessionTitle } from '@/lib/serverChats';
 import type { SavedChatMessage } from '@/store';
 import { ChevronRight } from './primitives';
 import { Sheet } from './overlays';
@@ -13,7 +14,7 @@ const FAQ = ['이 결과는 어떻게 나온 거예요?', '내 기록 중 어떤
 /** "분석 결과 물어보기" 시트. AI 상담 API로 답하고, 닫을 때 '분석 질문'으로 지난 대화에 저장한다. */
 export function AskSheet({ open, onClose, context }: { open: boolean; onClose: () => void; context: string }) {
   const me = useMe();
-  const counseling = useCounselingChat(null, `${context} 분석 질문`);
+  const counseling = useCounselingChat(null, analysisSessionTitle(context));
   const resetSession = counseling.reset;
   const [messages, setMessages] = useState<SavedChatMessage[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -44,7 +45,7 @@ export function AskSheet({ open, onClose, context }: { open: boolean; onClose: (
     setTyping(true);
     let reply: string;
     try {
-      const res = await counseling.send(`[${context} 분석에 대한 질문] ${t}`);
+      const res = await counseling.send(analysisMessage(context, t));
       setSessionId(res.sessionId);
       reply = res.reply;
     } catch (err) {

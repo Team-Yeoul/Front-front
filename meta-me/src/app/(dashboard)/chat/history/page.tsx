@@ -4,15 +4,15 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Screen } from '@/components/ui/Screen';
 import { ChevronRight, SearchIcon, TopBar } from '@/components/ui/primitives';
-import { useMe } from '@/hooks/useMe';
+import { useChatHistory } from '@/hooks/useChatHistory';
 import { chatKindLabel, chatPreview, chatTitle, dayGroup, hhmm } from '@/lib/chatLabels';
 
 type Filter = 'all' | 'free' | 'analysis';
 
-// 대화 세션 목록 API가 없어 이 기기에 저장한 대화만 보여준다.
+// 이 기기에 저장한 대화와 서버의 상담 세션(다른 기기·브라우저에서 나눈 대화)을 함께 보여준다.
 export default function ChatHistoryPage() {
   const router = useRouter();
-  const { chats } = useMe();
+  const { chats, loading } = useChatHistory();
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
 
@@ -85,7 +85,7 @@ export default function ChatHistoryPage() {
             </div>
           </section>
         ))}
-        {items.length === 0 && (
+        {items.length === 0 && !loading && (
           <div className="text-center mt-20">
             <p className="text-[15px] font-semibold text-ink">{chats.length === 0 ? '아직 마친 대화가 없어요' : '검색 결과가 없어요'}</p>
             {chats.length === 0 && <p className="text-[13px] text-sub mt-1.5">대화를 나누고 ‘대화 마치기’를 누르면 여기에 저장돼요</p>}
