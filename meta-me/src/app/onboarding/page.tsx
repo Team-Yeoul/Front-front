@@ -9,8 +9,9 @@ import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button, CheckIcon, Dots, Img3D, OptionRow } from '@/components/ui/primitives';
 import { AnalyzingScreen, CogniHero, FeatureIcons } from '@/components/ui/flows';
 import { HourSlider } from '@/components/ui/HourSlider';
-import { FIRST_COGNI, useMe } from '@/hooks/useMe';
+import { useMe } from '@/hooks/useMe';
 import { ONBOARDING_QUESTIONS, type OnboardingQuestion } from './questions';
+import { pickOnboardingCogni } from './cogni';
 
 type Phase = 'intro' | 'question' | 'analyzing' | 'result' | 'outro';
 type Answer = string | string[] | number | undefined;
@@ -411,9 +412,12 @@ export default function OnboardingPage() {
     }
   };
 
-  // 온보딩에서 발견한 첫 코그니를 도감(기기 저장)에 넣는다. 메인·마이페이지 캐릭터도 이걸 쓴다.
+  // 온보딩 답으로 고른 첫 코그니를 도감(기기 저장)에 넣는다. 메인·마이페이지 캐릭터도 이걸 쓴다.
+  const [found, setFound] = useState<ReturnType<typeof pickOnboardingCogni>>();
   const discover = () => {
-    me.addCogni({ ...FIRST_COGNI, foundAt: new Date().toISOString() });
+    const picked = pickOnboardingCogni(answers);
+    me.addCogni({ ...picked.cogni, foundAt: new Date().toISOString() });
+    setFound(picked);
     setPhase('result');
   };
 
@@ -547,26 +551,26 @@ export default function OnboardingPage() {
   }
 
   /* 첫 코그니 결과 */
-  if (phase === 'result') {
+  if (phase === 'result' && found) {
+    const { cogni, no } = found;
+    const [adjective, ...rest] = cogni.name.split(' ');
+    const icons = [FeatureIcons.target, FeatureIcons.clock, FeatureIcons.bolt];
+    const num = String(no).padStart(2, '0');
     return (
       <CogniHero
         eyebrow={displayName ? `${displayName}님의 첫 코그니는` : '나의 첫 코그니는'}
         name={
           <>
-            꼼꼼한
+            {adjective}
             <br />
-            설계자
+            {rest.join(' ')}
           </>
         }
-        character="cogni-headphone"
-        category="No.01 · 행동 · 습관 패턴"
-        features={[
-          { icon: FeatureIcons.target, text: '계획을 먼저 세워야 마음이 놓여요' },
-          { icon: FeatureIcons.clock, text: '시작 전에 준비가 길어지곤 해요' },
-          { icon: FeatureIcons.bolt, text: '마감이 보이면 확 몰입해요' },
-        ]}
-        counterLabel="온보딩 답 10개에서 발견"
-        counter="01 / 24"
+        imageSrc={cogni.image}
+        category={`No.${num} · ${cogni.category}`}
+        features={cogni.features.map((text, i) => ({ icon: icons[i % icons.length], text }))}
+        counterLabel={`온보딩 답 ${total}개에서 발견`}
+        counter={`${num} / 24`}
         primaryLabel="여정 시작하기"
         onPrimary={() => setPhase('outro')}
       />
