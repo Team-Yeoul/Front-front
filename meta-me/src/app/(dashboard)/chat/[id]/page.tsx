@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Screen } from '@/components/ui/Screen';
 import { Button, TopBar } from '@/components/ui/primitives';
 import { AiBubble, UserBubble } from '@/components/ui/chat';
-import { useMe } from '@/hooks/useMe';
+import { useChat } from '@/hooks/useChatHistory';
 import { chatKindLabel, hhmm } from '@/lib/chatLabels';
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
@@ -13,8 +13,16 @@ const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 export default function ChatDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { chats } = useMe();
-  const chat = chats.find((c) => c.id === id);
+  const { chat, loading } = useChat(id);
+
+  if (loading) {
+    return (
+      <Screen>
+        <TopBar backHref="/chat/history" />
+        <p className="text-center text-[14px] text-sub mt-24">대화를 불러오는 중이에요...</p>
+      </Screen>
+    );
+  }
 
   if (!chat) {
     return (

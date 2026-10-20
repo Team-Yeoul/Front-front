@@ -7,7 +7,8 @@ import { Screen } from '@/components/ui/Screen';
 import { AiBubble, Composer, OutlineChip, TypingBubble, UserBubble } from '@/components/ui/chat';
 import { useMe } from '@/hooks/useMe';
 import { counselingErrorText, useCounselingChat } from '@/hooks/useCounselingChat';
-import type { SavedChatMessage } from '@/store';
+import { useChat } from '@/hooks/useChatHistory';
+import type { SavedChat, SavedChatMessage } from '@/store';
 
 const OPENERS = [
   '요즘 가장 자주 떠오르는 사람이 있나요? 떠오르는 대로 편하게 이야기해 주세요.',
@@ -15,12 +16,9 @@ const OPENERS = [
   '최근에 스스로 잘했다고 느낀 순간이 있었나요?',
 ];
 
-function ChatContent() {
+function ChatContent({ resumed }: { resumed?: SavedChat }) {
   const router = useRouter();
-  const params = useSearchParams();
   const me = useMe();
-  const resumeId = params.get('resume');
-  const resumed = resumeId ? me.chats.find((c) => c.id === resumeId) : undefined;
 
   const [chatId] = useState(() => resumed?.id ?? `chat-${Date.now()}`);
   const [startedAt] = useState(() => (resumed ? new Date(resumed.startedAt) : new Date()));
@@ -124,10 +122,24 @@ function ChatContent() {
   );
 }
 
+/** ?resume=<id>: 이 기기에 저장한 대화, 없으면 서버 세션(다른 기기에서 나눈 대화)을 불러와 이어간다. */
+function ChatResume() {
+  const resumeId = useSearchParams().get('resume');
+  const { chat, loading } = useChat(resumeId);
+  if (loading) {
+    return (
+      <Screen nav>
+        <p className="text-center text-[14px] text-sub mt-24">대화를 불러오는 중이에요...</p>
+      </Screen>
+    );
+  }
+  return <ChatContent key={chat?.id ?? 'new'} resumed={chat} />;
+}
+
 export default function ChatPage() {
   return (
     <Suspense>
-      <ChatContent />
+      <ChatResume />
     </Suspense>
   );
 }

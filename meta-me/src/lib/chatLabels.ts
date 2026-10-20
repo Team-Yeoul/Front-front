@@ -21,11 +21,11 @@ export const hhmm = (iso: string) => {
 
 export const chatKindLabel = (c: SavedChat) => (c.kind === 'analysis' ? '분석 질문' : '자유 대화');
 
-/** 목록 제목: 분석 질문은 내가 처음 한 질문, 자유 대화는 AI의 첫 질문 */
+/** 목록 제목: 분석 질문은 내가 처음 한 질문, 자유 대화는 AI의 첫 질문. 메시지를 아직 못 불러온 서버 대화는 종류 이름. */
 export function chatTitle(c: SavedChat) {
   const firstUser = c.messages.find((m) => m.role === 'user')?.text ?? '';
-  if (c.kind === 'analysis') return firstUser;
-  return c.messages.find((m) => m.role === 'ai')?.text.split(/(?<=[?.!])\s/)[0] ?? firstUser;
+  const title = c.kind === 'analysis' ? firstUser : (c.messages.find((m) => m.role === 'ai')?.text.split(/(?<=[?.!])\s/)[0] ?? firstUser);
+  return title || chatKindLabel(c);
 }
 
 export function chatPreview(c: SavedChat) {
