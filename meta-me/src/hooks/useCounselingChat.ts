@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
-import { counselingApi } from '@/entities/counseling';
+import { useQueryClient } from '@tanstack/react-query';
+import { counselingApi, counselingKeys } from '@/entities/counseling';
 import { ApiError } from '@/shared/api';
 
 /** 메시지는 저장됐지만 서버가 AI 답변을 만들지 못한 경우(reply_status=FAILED). */
@@ -30,6 +31,7 @@ interface SessionRef {
  * 세션이 없어졌거나(404) 내 것이 아니면(403) 새 세션으로 한 번 다시 보낸다.
  */
 export function useCounselingChat(initialSessionId: string | null = null, title = '자유 대화') {
+  const queryClient = useQueryClient();
   const ref = useRef<SessionRef | null>(null);
   const resumeId = useRef<string | null>(initialSessionId);
 
@@ -49,6 +51,8 @@ export function useCounselingChat(initialSessionId: string | null = null, title 
       const post = async () => {
         const { sessionId, branchId } = await ensureSession();
         const res = await counselingApi.sendMessage(sessionId, branchId, message);
+        // 세션 목록·메시지가 바뀌었으니 지난 대화를 다시 열 때 새로 불러오게 한다(지금 화면은 다시 부르지 않는다).
+        queryClient.invalidateQueries({ queryKey: counselingKeys.all, refetchType: 'none' });
         const reply = res?.assistant_message?.content;
         if (!reply) throw new CounselingReplyFailed();
         return { reply, sessionId };
@@ -64,7 +68,7 @@ export function useCounselingChat(initialSessionId: string | null = null, title 
         throw err;
       }
     },
-    [ensureSession],
+    [ensureSession, queryClient],
   );
 
   const reset = useCallback(() => {

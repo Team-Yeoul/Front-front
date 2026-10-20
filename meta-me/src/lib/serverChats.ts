@@ -8,13 +8,16 @@ export const analysisMessage = (context: string, question: string) => `[${contex
 
 // 서버 시각(LocalDateTime)은 시간대 표시 없이 UTC로 온다. 그대로 Date에 넣으면 기기 시간으로 읽혀 9시간 어긋난다.
 // 소수점 아래가 9자리까지 오는데 Safari는 3자리까지만 읽으므로 잘라낸다.
-function toIso(t: string) {
+// 값이 없거나 읽을 수 없으면 null을 돌려준다(목록 전체가 깨지지 않게).
+function toIso(t: string | null | undefined) {
+  if (!t) return null;
   const ms = t.replace(/(\.\d{3})\d+/, '$1');
-  return new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(ms) ? ms : `${ms}Z`).toISOString();
+  const d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(ms) ? ms : `${ms}Z`);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 function kindOf(session: CounselingSession): Pick<SavedChat, 'kind' | 'context'> {
-  if (session.title.endsWith(ANALYSIS_TITLE_SUFFIX)) {
+  if (session.title?.endsWith(ANALYSIS_TITLE_SUFFIX)) {
     return { kind: 'analysis', context: session.title.slice(0, -ANALYSIS_TITLE_SUFFIX.length) || undefined };
   }
   return { kind: 'free' };
@@ -25,19 +28,20 @@ export function sessionToChat(session: CounselingSession, conversation?: Counsel
   const { kind, context } = kindOf(session);
   const prefix = context ? analysisMessage(context, '') : null;
   const messages = [...(conversation?.messages ?? [])]
-    .sort((a, b) => toIso(a.created_at).localeCompare(toIso(b.created_at)))
+    .sort((a, b) => (toIso(a.created_at) ?? '').localeCompare(toIso(b.created_at) ?? ''))
     .map((m) =>
       m.role === 'USER'
         ? { role: 'user' as const, text: prefix && m.content.startsWith(prefix) ? m.content.slice(prefix.length) : m.content }
         : { role: 'ai' as const, text: m.content },
     );
+  const startedAt = toIso(session.created_at) ?? toIso(session.updated_at) ?? new Date(0).toISOString();
   return {
     id: session.session_id,
     kind,
     context,
     sessionId: session.session_id,
-    startedAt: toIso(session.created_at),
-    endedAt: toIso(session.updated_at),
+    startedAt,
+    endedAt: toIso(session.updated_at) ?? startedAt,
     messages,
   };
 }

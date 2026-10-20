@@ -13,13 +13,22 @@ const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 export default function ChatDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { chat, loading } = useChat(id);
+  const { chat, loading, failed, retry } = useChat(id);
 
   if (loading) {
     return (
       <Screen>
         <TopBar backHref="/chat/history" />
         <p className="text-center text-[14px] text-sub mt-24">대화를 불러오는 중이에요...</p>
+      </Screen>
+    );
+  }
+
+  if (!chat && failed) {
+    return (
+      <Screen footer={<Button onClick={() => retry()}>다시 시도</Button>}>
+        <TopBar backHref="/chat/history" />
+        <p className="text-center text-[14px] text-sub mt-24">대화를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</p>
       </Screen>
     );
   }
