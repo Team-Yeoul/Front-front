@@ -26,14 +26,3 @@ export function useMe() {
 
   return { userId, ...local, patch, addCogni, saveChat };
 }
-
-/** 온보딩에서 처음 발견되는 코그니 (현재는 답과 무관하게 고정). */
-export const FIRST_COGNI: Omit<CollectedCogni, 'foundAt'> = {
-  id: 'onboarding-first',
-  name: '꼼꼼한 설계자',
-  desc: '계획을 먼저 세워야 마음이 놓이는 패턴',
-  category: '행동 · 습관 패턴',
-  image: '/v2/cogni-headphone.png',
-  source: 'onboarding',
-  features: ['계획을 먼저 세워야 마음이 놓여요', '시작 전에 준비가 길어지곤 해요', '마감이 보이면 확 몰입해요'],
-};
