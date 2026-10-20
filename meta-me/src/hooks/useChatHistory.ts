@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useCounselingConversation, useCounselingConversations, useCounselingSessions } from '@/entities/counseling';
 import { sessionToChat } from '@/lib/serverChats';
+import { ApiError } from '@/shared/api';
 import { useAuthStore } from '@/store';
 import { useMe } from './useMe';
 
@@ -18,22 +19,25 @@ export function useChatHistory() {
     const known = new Set(local.map((c) => c.sessionId).filter(Boolean));
     return (sessions.data ?? []).filter((s) => !known.has(s.session_id));
   }, [local, sessions.data]);
-  const conversations = useCounselingConversations(serverOnly.map((s) => s.session_id));
+  const conversations = useCounselingConversations(serverOnly);
 
   const chats = useMemo(
     () =>
       [
         ...local,
-        // 메시지를 아직 못 불러온 세션도 목록에는 보여준다. 비어 있는 세션(메시지 0개)은 뺀다.
+        // 메시지를 불러오는 중인 세션도 목록에는 보여준다. 비어 있는 세션(메시지 0개)과 불러오지 못한 세션은 뺀다.
         ...serverOnly
-          .map((s, i) => ({ chat: sessionToChat(s, conversations[i]?.data), loaded: conversations[i]?.isSuccess }))
-          .filter(({ chat, loaded }) => !loaded || chat.messages.length > 0)
+          .map((s, i) => ({ chat: sessionToChat(s, conversations[i]?.data), state: conversations[i] }))
+          .filter(({ chat, state }) => !state?.isError && (!state?.isSuccess || chat.messages.length > 0))
           .map(({ chat }) => chat),
       ].sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
     [local, serverOnly, conversations],
   );
 
-  return { chats, loading: sessions.isLoading };
+  // 서버 목록이나 일부 세션의 메시지를 못 불러왔으면 화면에서 알린다.
+  const failed = sessions.isError || conversations.some((c) => c.isError);
+
+  return { chats, loading: sessions.isLoading, failed };
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -50,5 +54,8 @@ export function useChat(id: string | null) {
     () => found ?? (conversation.data ? sessionToChat(conversation.data.session, conversation.data) : undefined),
     [found, conversation.data],
   );
-  return { chat, loading: conversation.isLoading };
+  // 세션이 없거나(404) 내 것이 아니면(403) '찾을 수 없음', 그 밖의 실패는 다시 시도할 수 있게 구분한다.
+  const err = conversation.error;
+  const notFound = err instanceof ApiError && (err.status === 403 || err.status === 404);
+  return { chat, loading: conversation.isLoading, failed: !!err && !notFound, retry: conversation.refetch };
 }

@@ -12,7 +12,7 @@ type Filter = 'all' | 'free' | 'analysis';
 // 이 기기에 저장한 대화와 서버의 상담 세션(다른 기기·브라우저에서 나눈 대화)을 함께 보여준다.
 export default function ChatHistoryPage() {
   const router = useRouter();
-  const { chats, loading } = useChatHistory();
+  const { chats, loading, failed } = useChatHistory();
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
 
@@ -57,6 +57,7 @@ export default function ChatHistoryPage() {
         </div>
       </div>
       <div className="px-5 pb-8">
+        {failed && <p className="mt-4 text-[13px] text-sub">다른 기기에서 나눈 대화 일부를 불러오지 못했어요.</p>}
         {groups.map((g) => (
           <section key={g} className="mt-5">
             <p className="font-mono text-[13px] text-sub mb-2.5">{g}</p>

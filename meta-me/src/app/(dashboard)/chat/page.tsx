@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Screen } from '@/components/ui/Screen';
 import { AiBubble, Composer, OutlineChip, TypingBubble, UserBubble } from '@/components/ui/chat';
+import { Button } from '@/components/ui/primitives';
 import { useMe } from '@/hooks/useMe';
 import { counselingErrorText, useCounselingChat } from '@/hooks/useCounselingChat';
 import { useChat } from '@/hooks/useChatHistory';
@@ -125,11 +126,30 @@ function ChatContent({ resumed }: { resumed?: SavedChat }) {
 /** ?resume=<id>: 이 기기에 저장한 대화, 없으면 서버 세션(다른 기기에서 나눈 대화)을 불러와 이어간다. */
 function ChatResume() {
   const resumeId = useSearchParams().get('resume');
-  const { chat, loading } = useChat(resumeId);
+  const router = useRouter();
+  const { chat, loading, failed, retry } = useChat(resumeId);
   if (loading) {
     return (
       <Screen nav>
         <p className="text-center text-[14px] text-sub mt-24">대화를 불러오는 중이에요...</p>
+      </Screen>
+    );
+  }
+  // 이어갈 대화를 못 불러왔으면 새 대화로 넘어가지 않고 알린다(이어서 쓰려던 대화가 따로 갈라지지 않게).
+  if (!chat && failed) {
+    return (
+      <Screen
+        nav
+        footer={
+          <div className="grid grid-cols-2 gap-2.5">
+            <Button variant="gray" onClick={() => router.replace('/chat')}>
+              새 대화 시작
+            </Button>
+            <Button onClick={() => retry()}>다시 시도</Button>
+          </div>
+        }
+      >
+        <p className="text-center text-[14px] text-sub mt-24">이어갈 대화를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</p>
       </Screen>
     );
   }
