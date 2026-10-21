@@ -1,4 +1,24 @@
 export interface paths {
+    "/v1/auth/google": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * GoogleLogin
+         * @description Google ID Token으로 로그인합니다. 가입되지 않은 사용자면 자동으로 회원가입합니다.
+         */
+        post: operations["GoogleLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/login": {
         parameters: {
             query?: never;
@@ -158,7 +178,7 @@ export interface paths {
         put?: never;
         /**
          * SubmitOnboarding
-         * @description Day 0 온보딩 답변을 제출하고 AI 첫 문장을 생성합니다. 온보딩은 한 번만 제출 가능하며 중복 제출 시 409 ONBOARDING_ALREADY_SUBMITTED가 반환됩니다.
+         * @description Day 0 온보딩 답변을 제출하고 AI 첫 문장을 생성합니다. 온보딩은 한 번만 제출 가능하며 중복 제출 시 409 ONBOARDING_ALREADY_SUBMITTED가 반환됩니다. AI 호출이 실패해도 온보딩은 저장되며, 이때 ai_first_sentence는 입력값 기반의 대체 문장입니다.
          */
         post: operations["SubmitOnboarding"];
         delete?: never;
@@ -351,6 +371,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/users/me/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Attendance
+         * @description 기간 내 출석 날짜 목록을 오름차순으로 반환합니다. 기간은 최대 1년이며 start_date > end_date이면 400.
+         */
+        get: operations["ListAttendance"];
+        put?: never;
+        /**
+         * Check In Attendance
+         * @description 오늘(Asia/Seoul 기준) 출석을 기록합니다. 같은 날 여러 번 호출해도 한 번만 기록됩니다(멱등).
+         */
+        post: operations["CheckInAttendance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/users/me/peer-feedback/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Peer Feedback Invitation
+         * @description 친구 평가 초대 링크를 발급합니다. 링크는 7일간 유효하며 1회 제출 후 만료됩니다. invite_url은 {프론트 URL}/feedback/{token} 형식입니다.
+         */
+        post: operations["CreatePeerFeedbackInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/users/me/peer-feedback/invitations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Peer Feedback Invitation
+         * @description 본인이 발급한 초대 링크를 무효화합니다.
+         */
+        delete: operations["RevokePeerFeedbackInvitation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/users/me/peer-feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Peer Feedback
+         * @description 친구들이 제출한 평가를 최신순으로 조회합니다.
+         */
+        get: operations["ListPeerFeedback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/peer-feedback/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Peer Feedback Invitation
+         * @description 로그인 없이 초대 링크 유효성을 확인합니다. 없는 토큰은 404, 만료·사용·취소된 링크는 410.
+         */
+        get: operations["GetPeerFeedbackInvitation"];
+        put?: never;
+        /**
+         * Submit Peer Feedback
+         * @description 로그인 없이 친구가 평가를 제출합니다. 링크당 1회만 가능하며 이후 410.
+         */
+        post: operations["SubmitPeerFeedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/brain-structures/weekly": {
         parameters: {
             query?: never;
@@ -460,7 +588,7 @@ export interface paths {
         };
         /**
          * ListReports
-         * @description 내 리포트 목록을 유형과 페이지 조건으로 조회합니다. reportType을 생략하면 전체 유형을 대상으로 조회합니다.
+         * @description 내 리포트 목록을 유형과 생성일, 페이지 조건으로 조회합니다. report_type과 날짜 조건은 함께 적용됩니다. 유형은 WEEKLY, MONTHLY, LIFETIME만 지원합니다.
          */
         get: operations["ListReports"];
         put?: never;
@@ -707,6 +835,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/daily-records/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Diary Draft
+         * @description 사용자당 1개인 다이어리 임시저장본을 조회합니다. 없으면 404.
+         */
+        get: operations["GetDiaryDraft"];
+        /**
+         * Save Diary Draft
+         * @description 임시저장본을 저장합니다. 최초 저장은 revision=0, 이후에는 마지막으로 받은 revision을 보냅니다. 응답의 revision은 +1 됩니다. 다른 기기에서 먼저 저장해 revision이 다르면 409 DRAFT_CONFLICT.
+         */
+        put: operations["SaveDiaryDraft"];
+        post?: never;
+        /**
+         * Delete Diary Draft
+         * @description 임시저장본을 삭제합니다. revision 불일치 시 409.
+         */
+        delete: operations["DeleteDiaryDraft"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/daily-records/draft/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Diary Draft
+         * @description 임시저장본으로 데일리 기록을 생성(POST /v1/daily-records와 동일)하고 임시저장본을 삭제합니다.
+         */
+        post: operations["PublishDiaryDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/mirror-monsters": {
         parameters: {
             query?: never;
@@ -842,7 +1018,8 @@ export interface paths {
         put?: never;
         /**
          * CreateAiCounselingSession
-         * @description AI 상담을 시작하기 위한 세션을 생성합니다. 서버는 사용자의 누적 기록, 최근 감정 흐름, 메타인지 패턴을 조회해 이 세션의 개인화 컨텍스트로 조립합니다. 이후 메시지는 session_id를 포함해 전송합니다.
+         * @deprecated
+         * @description 미구현·폐기 예정. /v1/counseling-sessions API를 사용하세요 (POST .../messages가 AI 답변을 생성합니다). 현재 백엔드에 이 경로의 컨트롤러가 구현되어 있지 않습니다. 아래는 계획된 계약이며 운영 지원을 의미하지 않습니다. AI 상담을 시작하기 위한 세션을 생성합니다. 서버는 사용자의 누적 기록, 최근 감정 흐름, 메타인지 패턴을 조회해 이 세션의 개인화 컨텍스트로 조립합니다. 이후 메시지는 session_id를 포함해 전송합니다.
          */
         post: operations["CreateAiCounselingSession"];
         delete?: never;
@@ -862,9 +1039,31 @@ export interface paths {
         put?: never;
         /**
          * CreateAiCounselingMessage
-         * @description AI 상담 세션에 사용자 메시지를 추가하고 AI 응답을 생성합니다. 세션은 POST /v1/ai-counseling/sessions로 먼저 생성해야 하며, LLM 호출 실패 시 500 EXTERNAL_LLM_FAILED 또는 INTERNAL_SERVER_ERROR가 반환될 수 있습니다.
+         * @deprecated
+         * @description 미구현·폐기 예정. /v1/counseling-sessions API를 사용하세요 (POST .../messages가 AI 답변을 생성합니다). 현재 백엔드에 이 경로의 컨트롤러가 구현되어 있지 않습니다. 아래는 계획된 계약이며 운영 지원을 의미하지 않습니다. AI 상담 세션에 사용자 메시지를 추가하고 AI 응답을 생성합니다. 세션은 POST /v1/ai-counseling/sessions로 먼저 생성해야 하며, LLM 호출 실패 시 500 EXTERNAL_LLM_FAILED 또는 INTERNAL_SERVER_ERROR가 반환될 수 있습니다.
          */
         post: operations["CreateAiCounselingMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ai-counseling/sessions/{session_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * ListAiCounselingMessages
+         * @deprecated
+         * @description 미구현·폐기 예정. /v1/counseling-sessions API를 사용하세요 (POST .../messages가 AI 답변을 생성합니다). 현재 백엔드에 이 경로의 컨트롤러가 구현되어 있지 않습니다. 아래는 계획된 계약이며 운영 지원을 의미하지 않습니다. 특정 AI 상담 세션의 메시지 목록을 페이지네이션으로 조회합니다. session_id가 현재 사용자 소유가 아니면 403 AI_COUNSELING_SESSION_FORBIDDEN을 반환하고, 존재하지 않으면 404를 반환합니다.
+         */
+        get: operations["ListAiCounselingMessages"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -883,26 +1082,6 @@ export interface paths {
          * @description 모든 위기 감지 로그를 조회합니다. (관리자 전용)
          */
         get: operations["GetCrisisLogs"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/ai-counseling/sessions/{session_id}/messages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * ListAiCounselingMessages
-         * @description 특정 AI 상담 세션의 메시지 목록을 페이지네이션으로 조회합니다. session_id가 현재 사용자 소유가 아니면 403 AI_COUNSELING_SESSION_FORBIDDEN을 반환하고, 존재하지 않으면 404를 반환합니다.
-         */
-        get: operations["ListAiCounselingMessages"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1015,6 +1194,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/subscriptions/{subscription_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * UpdateSubscription
+         * @description 구독을 해지하거나 자동 갱신 설정을 변경합니다.
+         */
+        patch: operations["UpdateSubscription"];
+        trace?: never;
+    };
     "/v1/subscriptions": {
         parameters: {
             query?: never;
@@ -1037,26 +1236,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
-        trace?: never;
-    };
-    "/v1/subscriptions/{subscription_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * UpdateSubscription
-         * @description 구독을 해지하거나 자동 갱신 설정을 변경합니다.
-         */
-        patch: operations["UpdateSubscription"];
         trace?: never;
     };
     "/v1/users/me/payments": {
@@ -1210,7 +1389,7 @@ export interface paths {
         put?: never;
         /**
          * Create Message
-         * @description 새로운 메시지(사용자 또는 AI)를 생성합니다. 첫 revision이 자동으로 생성됩니다.
+         * @description 본인 세션의 브랜치에 메시지를 저장합니다. role=USER이면(generate_reply 기본 true) 브랜치의 최근 대화 20개를 바탕으로 AI 답변을 생성해 ASSISTANT 메시지로 함께 저장하고 assistant_message로 반환합니다. AI 호출이 실패해도 USER 메시지는 저장되며 reply_status=FAILED로 응답하므로 POST /v1/counseling-sessions/{sessionId}/messages/reply로 재시도하세요. JSON 필드는 branch_id이며 branchId도 호환됩니다. 다른 사용자 세션이나 다른 세션의 브랜치이면 403입니다.
          */
         post: operations["CreateMessage"];
         delete?: never;
@@ -1237,6 +1416,26 @@ export interface paths {
          */
         put: operations["ReviseMessage"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/counseling-sessions/{sessionId}/messages/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Counseling Reply
+         * @description 브랜치의 마지막 메시지가 USER일 때 AI 답변을 (재)생성해 ASSISTANT 메시지로 저장합니다. 마지막 메시지가 이미 ASSISTANT이면 400, AI 호출 실패 시 500 EXTERNAL_LLM_FAILED.
+         */
+        post: operations["GenerateCounselingReply"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1499,6 +1698,11 @@ export interface components {
              * @example 2026-05-10
              */
             birth_date: string;
+            /**
+             * @description 닉네임(표시 이름). 공백만으로는 불가, 앞뒤 공백 제거 후 저장. 생략 시 '메타미' + 6자리 숫자로 자동 발급
+             * @example 메타미
+             */
+            username?: string;
         };
         /** @description LoginRequest */
         LoginRequest: {
@@ -1539,10 +1743,10 @@ export interface components {
         /** @description OnboardingRequest */
         OnboardingRequest: {
             /**
-             * @description 사용자가 작성한 자신을 표현하는 한 문장
+             * @description 선택 항목. 사용자가 작성한 자신을 표현하는 한 문장. 보내는 경우 공백을 제외한 최소 10자 이상이어야 하며, 보내지 않으면 생략한다.
              * @example 나는 몰입할 때 가장 나다운 사람입니다
              */
-            my_one_sentence: string;
+            my_one_sentence?: string;
             /**
              * @description 내가 생각하는 내 장점
              * @example 새로운 것을 빨리 이해합니다
@@ -1558,8 +1762,22 @@ export interface components {
              * @example 프로그래밍과 문제 해결
              */
             favorite_thing: string;
+            /**
+             * @description 온보딩 질문별 답변. 키는 질문 ID, 값은 문자열, 문자열 배열 또는 숫자입니다. 질문 목록 확정 전까지 서버에서 저장만 하고 분석에는 사용하지 않습니다.
+             * @example {
+             *       "q_1": "계획을 먼저 세운다",
+             *       "q_2": [
+             *         "정리",
+             *         "시작"
+             *       ],
+             *       "q_3": 3
+             *     }
+             */
+            answers?: {
+                [key: string]: string | string[] | number;
+            };
         };
-        /** @description 계정 기본 정보를 수정하는 요청입니다. subscription_tier는 결제/관리자 플로우에서만 변경되며, 일반 클라이언트가 PATCH /v1/users/me/account로 직접 변경할 수 없습니다. */
+        /** @description 계정 기본 정보를 수정하는 요청입니다. subscription_tier는 결제/관리자 플로우에서만 변경되며, 일반 클라이언트가 PATCH /v1/users/me/account로 직접 변경할 수 없습니다. email과 username 중 하나 이상을 보내야 하며, 보낸 필드만 변경됩니다. */
         UpdateAccountRequest: {
             /**
              * Format: email
@@ -1567,6 +1785,11 @@ export interface components {
              * @example user@example.com
              */
             email?: string;
+            /**
+             * @description 닉네임(표시 이름). 공백만으로는 불가, 앞뒤 공백 제거 후 저장
+             * @example 메타미
+             */
+            username?: string;
         };
         /** @description Access Token 재발급 요청입니다. Refresh Token은 Redis에 저장된 값과 비교됩니다. */
         RefreshTokenRequest: {
@@ -1655,6 +1878,8 @@ export interface components {
              * @example 나는 문제를 구조화하며 성장하는 사람입니다
              */
             ai_first_sentence: string;
+            /** @description 온보딩으로 배정된 첫 코그니. 기존 계정(배정 이전 온보딩)은 키가 없습니다. */
+            first_cogni?: components["schemas"]["FirstCogni"];
         };
         /** @description AccountResponse */
         AccountResponse: {
@@ -1709,6 +1934,52 @@ export interface components {
             /** @description device_token */
             device_token: components["schemas"]["DeviceToken"];
         };
+        PeerFeedback: {
+            /** Format: uuid */
+            feedback_id?: string;
+            /** Format: uuid */
+            invitation_id?: string;
+            strengths?: string;
+            growth_areas?: string;
+            impression?: string;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        /** @description 온보딩으로 배정된 첫 코그니(몬스터). MirrorMonster 스키마를 기반으로 features를 더한다. */
+        FirstCogni: {
+            /**
+             * Format: uuid
+             * @example 11111111-1111-4111-8111-111111111111
+             */
+            monster_id: string;
+            /**
+             * @description 몬스터 코드
+             * @example EXTERNAL_BLAME
+             */
+            monster_code: string;
+            /**
+             * @description 1단계 칭호
+             * @example 남탓 군주
+             */
+            name: string;
+            /**
+             * @description 몬스터 설명
+             * @example 컨디션이 좋지 않을 때 외부 요인에 책임을 돌리는 경향이 있습니다.
+             */
+            description: string;
+            /** @enum {string} */
+            category: "COGNITIVE" | "EMOTIONAL" | "BEHAVIORAL" | "RELATIONAL" | "GROWTH" | "SITUATIONAL";
+            /** @example https://cdn.metame.app/monsters/external_blame.png */
+            icon_url?: string;
+            /**
+             * @description 이 사용자가 이 코그니로 배정된 근거 문구 목록. 분석에서 이 몬스터로 감지된 각 1회의 이유를 모은 것입니다. 무작위 배정(AI 실패 등)이면 빈 배열입니다.
+             * @example [
+             *       "매번 남 탓으로 돌린다고 했다",
+             *       "컨디션이 나쁠 때 외부 요인을 먼저 찾는다"
+             *     ]
+             */
+            features?: string[];
+        };
         /** @description Report */
         Report: {
             /**
@@ -1725,15 +1996,53 @@ export interface components {
             user_id: string;
             /**
              * @description 리포트 유형
-             * @example WEEK
+             * @example WEEKLY
              * @enum {string}
              */
             report_type: "WEEKLY" | "MONTHLY" | "LIFETIME";
             /**
-             * @description 리포트 구조화 내용 JSON
-             * @example {"strengths":["problem_solving"],"growth_index":12}
+             * @description 리포트 콘텐츠 v1. generated_by가 stub-report-ai이면 실제 AI 분석이 아닌 대체 콘텐츠입니다. 강점/약점/에너지 전용 필드는 아직 제공하지 않습니다.
+             * @example {
+             *       "version": 1,
+             *       "period_summary": {},
+             *       "cumulative_state": {},
+             *       "comparison": {},
+             *       "narrative": {
+             *         "headline": "이번 주 자기이해",
+             *         "body": "기록에서 관찰된 흐름을 정리했습니다."
+             *       },
+             *       "objective_catalog": {},
+             *       "generated_by": "stub-report-ai",
+             *       "period_start": "2026-09-01",
+             *       "period_end": "2026-09-07"
+             *     }
              */
             content: {
+                /** @enum {integer} */
+                version?: 1;
+                period_summary?: {
+                    [key: string]: unknown;
+                };
+                cumulative_state?: {
+                    [key: string]: unknown;
+                };
+                comparison?: {
+                    [key: string]: unknown;
+                };
+                narrative?: {
+                    headline?: string;
+                    body?: string;
+                };
+                objective_catalog?: {
+                    [key: string]: unknown;
+                };
+                /** @enum {string} */
+                generated_by?: "openai-report-ai" | "bedrock-report-ai" | "stub-report-ai";
+                /** Format: date */
+                period_start?: string;
+                /** Format: date */
+                period_end?: string;
+            } & {
                 [key: string]: unknown;
             };
             /**
@@ -1821,7 +2130,7 @@ export interface components {
         /** @description GenerateReportRequest */
         GenerateReportRequest: {
             /**
-             * @description 생성할 리포트 유형입니다. WEEK, MONTH, MY_REPORT는 ERD의 REPORTS.report_type과 대응합니다. OBJECTIVE_FEEDBACK은 객관화 미러 기반 피드백 리포트를 생성하기 위해 API 명세 v8 이후 추가된 확장 타입이며, DB 저장 시 REPORTS.content에 구조화해 저장합니다.
+             * @description 생성 및 목록 조회에서 공통으로 사용하는 유형입니다. WEEKLY, MONTHLY, LIFETIME만 지원합니다.
              * @example WEEKLY
              * @enum {string}
              */
@@ -2301,6 +2610,18 @@ export interface components {
         BettingResponse: {
             /** @description 메타인지 베팅 결과 */
             betting: components["schemas"]["MetacogBetting"];
+        };
+        DiaryDraft: {
+            /** Format: uuid */
+            user_id?: string;
+            content?: components["schemas"]["SubmitDailyRecordRequest"];
+            /**
+             * Format: int64
+             * @description 낙관적 잠금 버전. 다음 저장/삭제/발행 시 그대로 보내야 함
+             */
+            revision?: number;
+            /** Format: date-time */
+            updated_at?: string;
         };
         /** @description MonsterListResponse */
         MonsterListResponse: {
@@ -3029,6 +3350,11 @@ export interface components {
             role: "USER" | "ASSISTANT";
             /** @description 메시지 내용 */
             content: string;
+            /**
+             * @description role=USER일 때 AI 답변 자동 생성 여부 (기본 true). 클라이언트가 직접 ASSISTANT를 저장하려면 false
+             * @default true
+             */
+            generate_reply: boolean;
         };
         ReviseMessageRequest: {
             /** @description 변경할 메시지 내용 */
@@ -3069,17 +3395,28 @@ export interface components {
             /** Format: uuid */
             message_id?: string;
             role?: string;
+            /** @description 저장된 메시지 본문 */
+            content?: string;
+            /** Format: uuid */
+            session_id?: string;
+            /** Format: uuid */
+            branch_id?: string;
+            /** Format: uuid */
+            active_revision_id?: string;
+            /** Format: uuid */
+            selected_generation_id?: string | null;
+            /** Format: date-time */
+            created_at?: string;
+            /** @description AI가 생성한 ASSISTANT 메시지. reply_status가 CREATED일 때만 존재하며 그 외에는 생략됩니다. */
+            assistant_message?: components["schemas"]["CounselingMessage"];
+            /**
+             * @description CREATED: AI 답변 생성·저장됨 / FAILED: 사용자 메시지는 저장됐지만 AI 호출 실패 → POST .../messages/reply로 재시도 / NOT_REQUESTED: ASSISTANT 메시지 저장 또는 generate_reply=false
+             * @enum {string}
+             */
+            reply_status?: "CREATED" | "FAILED" | "NOT_REQUESTED";
         };
         MessageListResponse: {
-            messages?: {
-                /** Format: uuid */
-                message_id?: string;
-                role?: string;
-                user_content?: string | null;
-                assistant_content?: string | null;
-                /** Format: date-time */
-                created_at?: string;
-            }[];
+            messages?: components["schemas"]["CounselingMessage"][];
         };
         MessageDetailResponse: {
             /** Format: uuid */
@@ -3087,6 +3424,23 @@ export interface components {
             role?: string;
             user_content?: string | null;
             assistant_content?: string | null;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        CounselingMessage: {
+            /** Format: uuid */
+            message_id?: string;
+            role?: string;
+            /** @description 메시지 본문 (활성 revision 또는 선택된 generation) */
+            content?: string;
+            /** Format: uuid */
+            session_id?: string;
+            /** Format: uuid */
+            branch_id?: string;
+            /** Format: uuid */
+            active_revision_id?: string;
+            /** Format: uuid */
+            selected_generation_id?: string | null;
             /** Format: date-time */
             created_at?: string;
         };
@@ -3099,6 +3453,37 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    GoogleLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "id_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImV4YW1wbGUiLCJ0eXAiOiJKV1QifQ.example-payload.example-signature"
+                 *     }
+                 */
+                "application/json": {
+                    /** @description Google 로그인 후 발급받은 ID Token (JWT) */
+                    id_token: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     Login: {
         parameters: {
             query?: never;
@@ -4734,6 +5119,322 @@ export interface operations {
             };
         };
     };
+    ListAttendance: {
+        parameters: {
+            query: {
+                start_date: string;
+                end_date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "dates": [
+                     *         "2026-09-29",
+                     *         "2026-10-01"
+                     *       ],
+                     *       "timezone": "Asia/Seoul"
+                     *     }
+                     */
+                    "application/json": {
+                        dates?: string[];
+                        /** @example Asia/Seoul */
+                        timezone?: string;
+                    };
+                };
+            };
+            /** @description Invalid range */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    CheckInAttendance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "attendance_date": "2026-10-01"
+                     *     }
+                     */
+                    "application/json": {
+                        /** Format: date */
+                        attendance_date?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    CreatePeerFeedbackInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        invitation_id?: string;
+                        invite_url?: string;
+                        /** Format: date-time */
+                        expires_at?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    RevokePeerFeedbackInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example  */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ListPeerFeedback: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        feedbacks?: components["schemas"]["PeerFeedback"][];
+                        /** Format: int64 */
+                        total_elements?: number;
+                        page?: number;
+                        size?: number;
+                    };
+                };
+            };
+            /** @description Invalid paging */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    GetPeerFeedbackInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example  */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        expires_at?: string;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description FEEDBACK_INVITATION_UNAVAILABLE */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    SubmitPeerFeedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example  */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    strengths: string;
+                    growth_areas: string;
+                    impression: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        submitted?: boolean;
+                    };
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description FEEDBACK_INVITATION_UNAVAILABLE */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     GenerateWeeklyBrainStructure: {
         parameters: {
             query?: never;
@@ -5209,9 +5910,13 @@ export interface operations {
             query?: {
                 /**
                  * @description 리포트 유형 필터
-                 * @example WEEK
+                 * @example WEEKLY
                  */
-                report_type?: "WEEK" | "MONTH" | "MY_REPORT" | "OBJECTIVE_FEEDBACK";
+                report_type?: "WEEKLY" | "MONTHLY" | "LIFETIME";
+                /** @description 리포트 생성일 시작 (포함). report_type과 함께 적용됩니다. */
+                start_date?: string;
+                /** @description 리포트 생성일 종료 (포함). start_date보다 이전이면 400입니다. */
+                end_date?: string;
                 /**
                  * @description 페이지 번호
                  * @example 1
@@ -6878,6 +7583,191 @@ export interface operations {
             };
         };
     };
+    GetDiaryDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaryDraft"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description No draft */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    SaveDiaryDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    content: components["schemas"]["SubmitDailyRecordRequest"];
+                    /** Format: int64 */
+                    revision: number;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaryDraft"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description DRAFT_CONFLICT */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    DeleteDiaryDraft: {
+        parameters: {
+            query: {
+                revision: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description DRAFT_CONFLICT */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PublishDiaryDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: int64 */
+                    revision: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyRecordResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description No draft */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description DRAFT_CONFLICT or DIARY_RECORD_ALREADY_EXISTS */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     ListMirrorMonsters: {
         parameters: {
             query?: {
@@ -7776,42 +8666,6 @@ export interface operations {
             };
         };
     };
-    GetCrisisLogs: {
-        parameters: {
-            query?: {
-                /** @description 특정 사용자의 위기 로그만 조회 (선택) */
-                user_id?: string;
-                /** @description 필터 단계별 조회 (선택) */
-                filter_stage?: "INPUT" | "OUTPUT";
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CrisisLogListResponse"];
-                };
-            };
-            /** @description Forbidden - Admin only */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
     ListAiCounselingMessages: {
         parameters: {
             query?: {
@@ -7929,6 +8783,42 @@ export interface operations {
                      *       "resolution": "사용자에게 잠시 후 다시 시도하라고 안내합니다."
                      *     }
                      */
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    GetCrisisLogs: {
+        parameters: {
+            query?: {
+                /** @description 특정 사용자의 위기 로그만 조회 (선택) */
+                user_id?: string;
+                /** @description 필터 단계별 조회 (선택) */
+                filter_stage?: "INPUT" | "OUTPUT";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrisisLogListResponse"];
+                };
+            };
+            /** @description Forbidden - Admin only */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
@@ -8194,50 +9084,6 @@ export interface operations {
             };
         };
     };
-    GetUserSubscription: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SubscriptionResponse"];
-                };
-            };
-        };
-    };
-    CreateSubscription: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateSubscriptionRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SubscriptionResponse"];
-                };
-            };
-        };
-    };
     UpdateSubscription: {
         parameters: {
             query?: never;
@@ -8361,6 +9207,50 @@ export interface operations {
                      *     }
                      */
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    GetUserSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionResponse"];
+                };
+            };
+        };
+    };
+    CreateSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSubscriptionRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionResponse"];
                 };
             };
         };
@@ -8753,7 +9643,7 @@ export interface operations {
             content: {
                 /**
                  * @example {
-                 *       "branchId": "22222222-2222-4222-8222-222222222222",
+                 *       "branch_id": "22222222-2222-4222-8222-222222222222",
                  *       "role": "USER",
                  *       "content": "개발자가 되고 싶은데 어떻게 시작해야 할까요?"
                  *     }
@@ -8762,13 +9652,49 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Success */
-            200: {
+            /** @description Created */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["CreateMessageResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Session or branch access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Session or branch not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -8827,6 +9753,81 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    GenerateCounselingReply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example  */
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    branch_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CounselingMessage"];
+                };
+            };
+            /** @description No USER message to answer */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Session or branch access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Session or branch not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description EXTERNAL_LLM_FAILED */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
         };
     };
