@@ -1,10 +1,23 @@
+import type { components } from '@/shared/api';
 import type { CollectedCogni } from '@/store';
+
+type FirstCogni = components['schemas']['FirstCogni'];
+export type FoundCogni = { cogni: Omit<CollectedCogni, 'foundAt'> & { features: string[] }; label: string };
+
+export const CATEGORY_LABEL: Record<string, string> = {
+  COGNITIVE: '사고 · 인지 패턴',
+  EMOTIONAL: '감정 반응 패턴',
+  BEHAVIORAL: '행동 패턴',
+  RELATIONAL: '대인관계 패턴',
+  GROWTH: '성장 패턴',
+  SITUATIONAL: '상황 패턴',
+};
 
 type OnboardingCogni = Omit<CollectedCogni, 'foundAt' | 'id' | 'source'> & { no: number; features: string[] };
 
 /**
- * 온보딩에서 발견할 수 있는 첫 코그니 후보.
- * 서버가 온보딩 결과로 캐릭터를 내려주지 않아 답변으로 여기서 고른다.
+ * 서버가 first_cogni를 주지 않을 때(백엔드 구현 전·기존 계정) 쓰는 임시 첫 코그니 후보.
+ * 서버 구현이 끝나면 지운다.
  * 캐릭터 그림이 아직 두 장뿐이라 그림은 나눠 쓴다.
  */
 export const ONBOARDING_COGNIS = {
@@ -73,7 +86,7 @@ const CURIOUS_TO_COGNI: Record<string, CogniKey> = {
 const asList = (a: unknown) => (Array.isArray(a) ? (a as string[]) : []);
 
 /** 온보딩 답으로 첫 코그니를 고른다. 점수가 같으면 먼저 고른 답을 따르고, 단서가 없으면 관찰자. */
-export function pickOnboardingCogni(answers: Record<string, unknown>) {
+export function pickOnboardingCogni(answers: Record<string, unknown>): FoundCogni {
   const score = new Map<CogniKey, number>();
   const add = (key: CogniKey | undefined, w: number) => key && score.set(key, (score.get(key) ?? 0) + w);
   asList(answers.repeating_pattern).forEach((p) => add(PATTERN_TO_COGNI[p], 2));
@@ -87,5 +100,33 @@ export function pickOnboardingCogni(answers: Record<string, unknown>) {
   const { no, ...rest } = ONBOARDING_COGNIS[best];
   // 다시 온보딩해도 도감에 하나만 남도록 id는 온보딩 코그니 하나로 유지한다.
   const cogni: Omit<CollectedCogni, 'foundAt'> & { features: string[] } = { id: 'onboarding-first', source: 'onboarding', ...rest };
-  return { no, cogni };
+  return { cogni, label: `No.${String(no).padStart(2, '0')} · ${cogni.category}` };
+}
+
+/**
+ * 서버 프로필로 첫 코그니를 다시 고른다. 기기에 저장된 코그니가 없을 때(다른 기기·브라우저) 쓴다.
+ * 온보딩 제출 때 반복 패턴 답은 others_feedback에, 알고 싶은 것 답은 favorite_thing에 ', '로 이어 보낸다.
+ */
+export function pickOnboardingCogniFromProfile(profile: { others_feedback: string; favorite_thing: string }) {
+  const split = (s: string) => s.split(', ').filter(Boolean);
+  return pickOnboardingCogni({
+    repeating_pattern: split(profile.others_feedback),
+    curious_about: split(profile.favorite_thing),
+  });
+}
+
+/** 서버가 배정한 첫 코그니. 서버 도감과 겹치지 않도록 id는 monster_id를 쓴다. */
+export function fromFirstCogni(fc: FirstCogni): FoundCogni {
+  const category = CATEGORY_LABEL[fc.category] ?? '패턴';
+  const cogni = {
+    id: fc.monster_id,
+    name: fc.name,
+    desc: fc.description,
+    category,
+    image: fc.icon_url || '/v2/mascot-glasses.png',
+    source: 'onboarding' as const,
+    // AI 배정에 실패하면 근거 문구가 비어 오므로 설명으로 대신한다.
+    features: fc.features?.length ? fc.features : [fc.description],
+  };
+  return { cogni, label: category };
 }
