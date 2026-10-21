@@ -10,8 +10,8 @@ import { BackButton, Button, CheckIcon, Dots, Img3D, OptionRow } from '@/compone
 import { AnalyzingScreen, CogniHero, FeatureIcons } from '@/components/ui/flows';
 import { HourSlider } from '@/components/ui/HourSlider';
 import { useMe } from '@/hooks/useMe';
+import { fromFirstCogni, pickOnboardingCogni, type FoundCogni } from '@/lib/onboardingCogni';
 import { ONBOARDING_QUESTIONS, type OnboardingQuestion } from './questions';
-import { pickOnboardingCogni } from './cogni';
 
 type Phase = 'intro' | 'question' | 'analyzing' | 'result' | 'outro';
 type Answer = string | string[] | number | undefined;
@@ -354,6 +354,17 @@ function isAnswered(q: OnboardingQuestion, a: Answer) {
   return typeof a === 'string' && a.length > 0;
 }
 
+/** 서버 answers로 보낼 질문별 원래 답. 척도는 순번 대신 고른 문구로 보낸다. */
+const rawAnswers = (answers: Record<string, Answer>) => {
+  const out: Record<string, string | string[] | number> = {};
+  for (const q of ONBOARDING_QUESTIONS) {
+    const a = answers[q.id];
+    if (a === undefined || a === '' || a === '__later__') continue;
+    out[q.id] = q.kind === 'scale' && typeof a === 'number' ? q.options[a].label : a;
+  }
+  return out;
+};
+
 const labelOf = (a: Answer, q?: OnboardingQuestion) => {
   if (Array.isArray(a)) return a.join(', ');
   if (typeof a === 'number' && q?.kind === 'scale') return q.options[a].label;
@@ -389,18 +400,25 @@ export default function OnboardingPage() {
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState(false);
 
+  // 서버가 배정한 첫 코그니. 제출 응답이 분석 화면보다 늦을 수 있어 발견할 때 이 약속을 기다린다.
+  const serverCogni = useRef<Promise<FoundCogni | undefined>>(undefined);
+
   const submit = async () => {
     const byId = (id: string) => labelOf(answers[id], ONBOARDING_QUESTIONS.find((x) => x.id === id)) || '아직 모르겠어요';
     const sentence = labelOf(answers.my_one_sentence);
     if (sentence) me.patch((u) => ({ ...u, mySentence: sentence }));
     try {
-      // v2 온보딩 질문은 API 필드(4개 문장)와 1:1로 맞지 않아 가장 가까운 답을 묶어서 보낸다.
-      const res = await submitOnboarding.mutateAsync({
-        my_one_sentence: byId('my_one_sentence'),
+      // v2 온보딩 질문은 API 필드(3개 문장)와 1:1로 맞지 않아 가장 가까운 답을 묶어 보내고, 원래 답은 answers로 함께 보낸다.
+      const request = submitOnboarding.mutateAsync({
+        // 한 문장은 선택 항목이고, 보낼 때는 공백을 뺀 10자 이상이어야 한다.
+        ...(sentence.replace(/\s/g, '').length >= 10 && { my_one_sentence: sentence }),
         self_strength: byId('self_awareness'),
         others_feedback: byId('repeating_pattern'),
         favorite_thing: byId('curious_about'),
+        answers: rawAnswers(answers),
       });
+      serverCogni.current = request.then((r) => (r.first_cogni ? fromFirstCogni(r.first_cogni) : undefined)).catch(() => undefined);
+      const res = await request;
       if (typeof res.accuracy_percent === 'number') setAccuracy(Math.round(res.accuracy_percent));
       setSubmitted(true);
       return true;
@@ -412,10 +430,16 @@ export default function OnboardingPage() {
     }
   };
 
-  // 온보딩 답으로 고른 첫 코그니를 도감(기기 저장)에 넣는다. 메인·마이페이지 캐릭터도 이걸 쓴다.
-  const [found, setFound] = useState<ReturnType<typeof pickOnboardingCogni>>();
-  const discover = () => {
-    const picked = pickOnboardingCogni(answers);
+  // 첫 코그니를 도감(기기 저장)에 넣는다. 메인·마이페이지 캐릭터도 이걸 쓴다.
+  // 서버가 배정한 코그니를 쓰되, 없거나 3초 안에 오지 않으면 답으로 임시 코그니를 고른다.
+  const [found, setFound] = useState<FoundCogni>();
+  // 분석 화면은 끝날 때와 닫을 때 모두 부르므로, 서버 응답을 기다리는 사이 두 번 들어오지 않게 막는다.
+  const discovering = useRef(false);
+  const discover = async () => {
+    if (discovering.current) return;
+    discovering.current = true;
+    const timeout = new Promise<undefined>((resolve) => setTimeout(resolve, 3000));
+    const picked = (await Promise.race([serverCogni.current, timeout])) ?? pickOnboardingCogni(answers);
     me.addCogni({ ...picked.cogni, foundAt: new Date().toISOString() });
     setFound(picked);
     setPhase('result');
@@ -552,10 +576,9 @@ export default function OnboardingPage() {
 
   /* 첫 코그니 결과 */
   if (phase === 'result' && found) {
-    const { cogni, no } = found;
+    const { cogni, label } = found;
     const [adjective, ...rest] = cogni.name.split(' ');
     const icons = [FeatureIcons.target, FeatureIcons.clock, FeatureIcons.bolt];
-    const num = String(no).padStart(2, '0');
     return (
       <CogniHero
         eyebrow={displayName ? `${displayName}님의 첫 코그니는` : '나의 첫 코그니는'}
@@ -567,10 +590,10 @@ export default function OnboardingPage() {
           </>
         }
         imageSrc={cogni.image}
-        category={`No.${num} · ${cogni.category}`}
+        category={label}
         features={cogni.features.map((text, i) => ({ icon: icons[i % icons.length], text }))}
         counterLabel={`온보딩 답 ${total}개에서 발견`}
-        counter={`${num} / 24`}
+        counter="01 / 24"
         primaryLabel="여정 시작하기"
         onPrimary={() => setPhase('outro')}
       />
