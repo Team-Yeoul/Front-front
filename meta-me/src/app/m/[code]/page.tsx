@@ -37,6 +37,8 @@ const SCENES = [
 ];
 const ROLES = ['앞에서 이끌었어요', '내용을 정리하고 설명했어요', '분위기와 사람을 챙겼어요', '뒤에서 묵묵히 해냈어요', '잘 모르겠어요'];
 const WORDS = ['꼼꼼한', '차분한', '말을 잘하는', '걱정이 많은', '책임감 있는', '느긋한', '솔직한', '눈치 빠른', '고집 있는'];
+const MESSAGE_TOPICS = ['고마웠던 점', '응원', '바라는 점'];
+const TOPIC_PREFIX = new RegExp(`^(${MESSAGE_TOPICS.join('|')}): `);
 const HARD = ['시작하기 전, 준비가 길어질 때', '여러 사람 의견이 부딪힐 때', '계획이 갑자기 바뀔 때', '힘들어 보인 적이 없어요'];
 const AXIS_DESC = ['설명하거나 발표할 때', '일을 끌고 가는 정도', '상대 감정을 알아채는 정도', '끝까지 밀고 가는 정도', '급한 상황에서의 태도'];
 const OTHERS_AVG = [4.2, 3.2, 3.9, 3.6, 3.3];
@@ -109,6 +111,8 @@ function FriendFlow() {
   const [sceneNote, setSceneNote] = useState('');
   const [role, setRole] = useState<string | null>(null);
   const [words, setWords] = useState<string[]>([]);
+  const [customWords, setCustomWords] = useState<string[]>([]);
+  const [wordDraft, setWordDraft] = useState<string | null>(null);
   const [hard, setHard] = useState<string | null>(null);
   const [hardWhy, setHardWhy] = useState('');
   const [strength, setStrength] = useState('');
@@ -308,7 +312,7 @@ function FriendFlow() {
         />
         <div className="px-5 pt-5">
           <div className="flex flex-wrap gap-2">
-            {WORDS.map((w) => (
+            {[...WORDS, ...customWords].map((w) => (
               <ChoiceChip
                 key={w}
                 label={w}
@@ -316,7 +320,35 @@ function FriendFlow() {
                 onClick={() => setWords((p) => (p.includes(w) ? p.filter((x) => x !== w) : p.length < 3 ? [...p, w] : p))}
               />
             ))}
-            <ChoiceChip label="+ 직접 입력" selected={false} />
+            {wordDraft === null ? (
+              <ChoiceChip label="+ 직접 입력" selected={false} onClick={() => setWordDraft('')} />
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const w = wordDraft.trim();
+                  if (w) {
+                    if (![...WORDS, ...customWords].includes(w)) setCustomWords((p) => [...p, w]);
+                    setWords((p) => (p.includes(w) || p.length >= 3 ? p : [...p, w]));
+                  }
+                  setWordDraft(null);
+                }}
+                className="h-9 pl-4 pr-1 rounded-full bg-surface-2 border border-primary flex items-center gap-1"
+              >
+                <input
+                  autoFocus
+                  value={wordDraft}
+                  onChange={(e) => setWordDraft(e.target.value)}
+                  onBlur={(e) => !e.currentTarget.value.trim() && setWordDraft(null)}
+                  maxLength={12}
+                  placeholder="단어 입력"
+                  className="w-24 bg-transparent outline-none text-[14px] text-ink placeholder:text-mute caret-primary"
+                />
+                <button type="submit" className="h-7 px-3 rounded-full bg-primary text-[13px] font-semibold text-white">
+                  추가
+                </button>
+              </form>
+            )}
           </div>
           <p className="font-mono text-[12px] text-sub mt-4">{words.length} / 3 선택</p>
         </div>
@@ -364,8 +396,20 @@ function FriendFlow() {
         <div className="px-5 pt-5">
           {!isQ4 && (
             <div className="flex gap-2 mb-3">
-              {['고마웠던 점', '응원', '바라는 점'].map((c) => (
-                <ChoiceChip key={c} size="sm" label={c} selected={false} onClick={() => set((v) => (v ? v : `${c}: `))} />
+              {MESSAGE_TOPICS.map((c) => (
+                <ChoiceChip
+                  key={c}
+                  size="sm"
+                  label={c}
+                  selected={value.startsWith(`${c}: `)}
+                  onClick={() =>
+                    set((v) => {
+                      // 말머리는 하나만: 같은 칩을 다시 누르면 빼고, 다른 칩이면 바꾼다.
+                      const rest = v.replace(TOPIC_PREFIX, '');
+                      return v.startsWith(`${c}: `) ? rest : `${c}: ${rest}`;
+                    })
+                  }
+                />
               ))}
             </div>
           )}
