@@ -46,14 +46,9 @@ export default function ChatDetailPage({ params }: { params: Promise<{ id: strin
   return (
     <Screen
       footer={
-        <div className="grid grid-cols-2 gap-2.5">
-          <Button variant="gray" onClick={() => router.push('/diary/write')}>
-            다이어리로 옮기기
-          </Button>
-          <Button onClick={() => router.push(chat.kind === 'free' ? `/chat?resume=${chat.id}` : '/report')}>
-            {chat.kind === 'free' ? '이어서 대화하기' : '리포트로 가기'}
-          </Button>
-        </div>
+        <Button onClick={() => router.push(chat.kind === 'free' ? `/chat?resume=${chat.id}` : '/report')}>
+          {chat.kind === 'free' ? '이어서 대화하기' : '리포트로 가기'}
+        </Button>
       }
     >
       <TopBar

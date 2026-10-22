@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/primitives';
 import { useMe } from '@/hooks/useMe';
 import { counselingErrorText, useCounselingChat } from '@/hooks/useCounselingChat';
 import { useChat } from '@/hooks/useChatHistory';
+import { useTodayRecord } from '@/hooks/useSaveTodayRecord';
 import type { SavedChat, SavedChatMessage } from '@/store';
 
 const OPENERS = [
@@ -29,6 +30,8 @@ function ChatContent({ resumed }: { resumed?: SavedChat }) {
   const counseling = useCounselingChat(resumed?.sessionId ?? null, '자유 대화');
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
+  // 오늘 이미 다이어리를 썼으면 기록하러 가라는 안내는 띄우지 않는다(확인 중일 때도 깜빡이지 않게 숨긴다).
+  const todayRecord = useTodayRecord(!resumed);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -107,7 +110,7 @@ function ChatContent({ resumed }: { resumed?: SavedChat }) {
         </Link>
       </div>
       <div className="px-4 pb-4 flex flex-col gap-4">
-        {!resumed && (
+        {!resumed && !todayRecord.isLoading && !todayRecord.record && (
           <div className="rounded-2xl bg-surface-2 px-4 py-3 text-[13px] text-[#48484F] leading-relaxed">
             기록과 별개로 편하게 이야기하는 공간이에요. 여기 나눈 대화는 다이어리에 저장되지 않아요.{' '}
             <Link href="/diary/chat" className="font-semibold text-primary whitespace-nowrap">
