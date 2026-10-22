@@ -4,25 +4,33 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store';
 import { useMe } from '@/hooks/useMe';
 import { useGetMyAccount } from '@/entities/user';
+import { useCreatePeerFeedbackInvitation, useListPeerFeedback } from '@/entities/peer-feedback';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button, Toast } from '@/components/ui/primitives';
 
-// 친구 응답 API가 아직 없어 응답 수는 0으로 둔다.
-const RESPONDERS: { name: string; color: string; when: string }[] = [];
 const OPEN_AT = 3;
+const COLORS = ['#A9ABFF', '#FFD66B', '#8FD3B6', '#FFB0A8', '#B9D7FF'];
 
-// 초대 링크 발급 API가 아직 없어 사용자 id로 데모 링크를 만든다.
+function timeAgo(iso?: string) {
+  if (!iso) return '';
+  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return '방금';
+  if (min < 60) return `${min}분 전`;
+  if (min < 60 * 24) return `${Math.floor(min / 60)}시간 전`;
+  return `${Math.floor(min / (60 * 24))}일 전`;
+}
+
 export default function MirrorInvitePage() {
-  const userId = useAuthStore((s) => s.userId);
   const token = useAuthStore((s) => s.accessToken);
-  const code = (userId ?? 's0h33').replace(/-/g, '').slice(0, 5);
   const me = useMe();
   // 닉네임은 가입한 기기에만 저장돼 있어, 없으면 계정 이름으로 대신한다.
   const { data: account } = useGetMyAccount(!!token && !me.nickname);
   const nickname = me.nickname || account?.user.username || account?.user.email?.split('@')[0];
-  // 친구 화면에 내 이름이 보이도록 닉네임을 링크에 담는다.
-  const path = `/m/${code}${nickname ? `?n=${encodeURIComponent(nickname)}` : ''}`;
-  const display = `metame.app/mirror/${code}`;
+  const { data: list } = useListPeerFeedback(undefined, !!token);
+  const feedbacks = list?.feedbacks ?? [];
+  const count = list?.total_elements ?? feedbacks.length;
+  const createInvitation = useCreatePeerFeedbackInvitation();
+  const [link, setLink] = useState<string | null>(null);
   const [toast, setToast] = useState(false);
 
   useEffect(() => {
@@ -31,13 +39,32 @@ export default function MirrorInvitePage() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // 링크 하나에 한 명만 답할 수 있어, 복사할 때마다 새 초대 링크를 발급한다.
+  const issueLink = async () => {
+    const { invite_url } = await createInvitation.mutateAsync();
+    // invite_url은 {프론트 URL}/feedback/{token}이라, 지금 보고 있는 주소로 다시 만든다(개발 서버에서도 열리게).
+    const inviteToken = invite_url?.split('/').pop();
+    if (!inviteToken) throw new Error('초대 링크가 비어 있어요');
+    // 친구 화면에 내 이름이 보이도록 닉네임을 링크에 담는다.
+    const url = `${window.location.origin}/feedback/${inviteToken}${nickname ? `?n=${encodeURIComponent(nickname)}` : ''}`;
+    setLink(url);
+    return url;
+  };
+
   const copy = async () => {
+    if (createInvitation.isPending) return;
+    const pending = issueLink();
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+      // Safari는 비동기 응답을 기다린 뒤의 복사를 막아, 클릭한 순간에 Promise를 넘긴다.
+      await navigator.clipboard.write([new ClipboardItem({ 'text/plain': pending.then((u) => new Blob([u], { type: 'text/plain' })) })]);
     } catch {
-      // 클립보드 권한이 없어도 안내는 띄움
+      try {
+        await navigator.clipboard.writeText(await pending);
+      } catch {
+        // 발급 실패는 아래 안내로, 클립보드 권한이 없으면 화면의 링크를 직접 복사하게 둔다.
+      }
     }
-    setToast(true);
+    if (await pending.then(() => true, () => false)) setToast(true);
   };
 
   return (
@@ -51,15 +78,15 @@ export default function MirrorInvitePage() {
         <div className="mt-6 rounded-3xl bg-primary px-5 py-5">
           <div className="flex justify-between text-[13px] text-white/75">
             <span>응답 현황</span>
-            <span>기한 없음</span>
+            <span>링크마다 7일</span>
           </div>
           <div className="flex items-end justify-between mt-4">
             <p className="text-white">
-              <span className="text-[40px] font-bold leading-none">{RESPONDERS.length}</span>
+              <span className="text-[40px] font-bold leading-none">{count}</span>
               <span className="text-[15px] ml-2">명 응답</span>
             </p>
             <span className="h-7 px-3 rounded-full bg-white/20 text-[12px] font-bold text-white inline-flex items-center">
-              {RESPONDERS.length >= OPEN_AT ? '비교 리포트 열림' : `${OPEN_AT - RESPONDERS.length}명 더 모이면 열려요`}
+              {count >= OPEN_AT ? '비교 리포트 열림' : `${OPEN_AT - count}명 더 모이면 열려요`}
             </span>
           </div>
           <p className="text-[13px] text-white/85 mt-4">인원 제한 없이 계속 받을 수 있어요</p>
@@ -67,24 +94,33 @@ export default function MirrorInvitePage() {
 
         <div className="mt-4 rounded-3xl bg-surface px-5 py-5">
           <p className="text-[16px] font-bold text-ink">초대 링크</p>
-          <div className="mt-4 flex items-center justify-between rounded-2xl bg-[#EDEDF2] pl-4 pr-2 h-14">
-            <span className="font-mono text-[14px] text-[#48484F] truncate">{display}</span>
-            <button onClick={copy} className="h-9 px-3.5 rounded-xl bg-primary-soft text-[13px] font-semibold text-primary shrink-0">
-              복사
+          <div className="mt-4 flex items-center justify-between gap-2 rounded-2xl bg-[#EDEDF2] pl-4 pr-2 h-14">
+            <span className={`font-mono text-[14px] truncate select-all ${link ? 'text-[#48484F]' : 'text-mute'}`}>{link ?? '복사하면 새 링크가 만들어져요'}</span>
+            <button onClick={copy} disabled={createInvitation.isPending} className="h-9 px-3.5 rounded-xl bg-primary-soft text-[13px] font-semibold text-primary shrink-0">
+              {createInvitation.isPending ? '만드는 중' : '복사'}
             </button>
           </div>
-          <p className="text-[12px] text-sub mt-3">링크를 받은 사람은 로그인 없이 3분 안에 답할 수 있어요</p>
+          {createInvitation.isError ? (
+            <p className="text-[12px] text-danger mt-3">링크를 만들지 못했어요. 다시 눌러 주세요.</p>
+          ) : (
+            <p className="text-[12px] text-sub mt-3 leading-relaxed">
+              링크 하나에 친구 한 명이 답할 수 있어요. 친구마다 새로 복사해서 보내 주세요.
+              <br />
+              로그인 없이 3분 안에 답할 수 있고, 링크는 7일 동안 유효해요.
+            </p>
+          )}
         </div>
 
         <div className="mt-4 rounded-3xl bg-surface px-5 py-5">
           <p className="text-[16px] font-bold text-ink">응답한 사람</p>
-          {RESPONDERS.length === 0 && <p className="text-[13px] text-sub mt-3">아직 답한 친구가 없어요. 링크를 보내 보세요.</p>}
+          {count === 0 && <p className="text-[13px] text-sub mt-3">아직 답한 친구가 없어요. 링크를 보내 보세요.</p>}
           <div className="flex flex-col gap-2.5 mt-4">
-            {RESPONDERS.map((r) => (
-              <div key={r.name} className="flex items-center gap-3 rounded-2xl bg-[#EDEDF2] px-4 h-14">
-                <span className="w-7 h-7 rounded-full" style={{ background: r.color }} />
-                <span className="flex-1 text-[14px] text-ink">{r.name}</span>
-                <span className="text-[12px] text-sub">{r.when}</span>
+            {/* 누가 답했는지는 공개하지 않아, 답한 순서로만 보여준다. */}
+            {feedbacks.map((f, i) => (
+              <div key={f.feedback_id} className="flex items-center gap-3 rounded-2xl bg-[#EDEDF2] px-4 h-14">
+                <span className="w-7 h-7 rounded-full" style={{ background: COLORS[(count - i - 1) % COLORS.length] }} />
+                <span className="flex-1 text-[14px] text-ink">익명 친구 {count - i}</span>
+                <span className="text-[12px] text-sub">{timeAgo(f.created_at)}</span>
               </div>
             ))}
           </div>

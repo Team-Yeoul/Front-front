@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState, type ReactNode } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Screen } from '@/components/ui/Screen';
 import {
   BackButton,
@@ -21,8 +21,8 @@ import {
 import { GradientBg } from '@/components/ui/overlays';
 import { Wordmark } from '@/components/ui/brand';
 import { AXES, TYPE_OPTIONS } from '@/lib/mock';
+import { useGetPeerFeedbackInvitation, useSubmitPeerFeedback, type SubmitPeerFeedbackRequest } from '@/entities/peer-feedback';
 
-// 타인 평가(친구 응답) API가 아직 없어 응답은 화면 안에서만 흘러간다.
 const RELATIONS = ['학교 · 같은 반', '동아리 · 팀 프로젝트', '가족', '온라인에서 알게 된 사이', '기타'];
 const YEARS = [
   { value: 'lt1', label: '1년 미만' },
@@ -42,6 +42,37 @@ const TOPIC_PREFIX = new RegExp(`^(${MESSAGE_TOPICS.join('|')}): `);
 const HARD = ['시작하기 전, 준비가 길어질 때', '여러 사람 의견이 부딪힐 때', '계획이 갑자기 바뀔 때', '힘들어 보인 적이 없어요'];
 const AXIS_DESC = ['설명하거나 발표할 때', '일을 끌고 가는 정도', '상대 감정을 알아채는 정도', '끝까지 밀고 가는 정도', '급한 상황에서의 태도'];
 const OTHERS_AVG = [4.2, 3.2, 3.9, 3.6, 3.3];
+const MAX_FIELD = 2000;
+const SKIPPED = '답하지 않음';
+
+// 서버는 장점·아쉬운 점·인상 세 칸의 글만 받으므로, 질문별 답을 줄 단위로 나눠 담는다.
+function buildFeedback(a: {
+  relation: string;
+  years: string;
+  scene: string;
+  sceneNote: string;
+  role: string | null;
+  words: string[];
+  hard: string | null;
+  hardWhy: string;
+  strength: string;
+  scores: (number | null)[];
+  message: string;
+}): SubmitPeerFeedbackRequest {
+  const lines = (...xs: (string | false | null)[]) => xs.filter(Boolean).join('\n').slice(0, MAX_FIELD) || SKIPPED;
+  const scored = AXES.flatMap((axis, i) => (a.scores[i] === null ? [] : [`${axis} ${a.scores[i]}`]));
+  return {
+    strengths: lines(a.strength.trim(), a.words.length > 0 && `떠오르는 단어: ${a.words.join(', ')}`),
+    growth_areas: lines(a.hard ? `힘들어 보였던 때: ${a.hard}` : false, a.hardWhy.trim() && `이유: ${a.hardWhy.trim()}`),
+    impression: lines(
+      `관계: ${a.relation} (알고 지낸 지 ${a.years})`,
+      `기준 장면: ${a.scene}${a.sceneNote.trim() ? ` — ${a.sceneNote.trim()}` : ''}`,
+      a.role && `그 장면에서의 역할: ${a.role}`,
+      scored.length > 0 && `점수(1–5): ${scored.join(' · ')}`,
+      a.message.trim() && `한 마디: ${a.message.trim()}`,
+    ),
+  };
+}
 
 type Step = 'landing' | 'relation' | 'scene' | 'q1' | 'q2' | 'q3' | 'q4' | 'q5' | 'q6' | 'vote' | 'done';
 const Q_STEPS: Step[] = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'];
@@ -99,6 +130,10 @@ function QTitle({ type, scene, title, caption }: { type: string; scene: string; 
 function FriendFlow() {
   const router = useRouter();
   const params = useSearchParams();
+  const { token } = useParams<{ token: string }>();
+  // 없는 링크는 404, 만료·사용·취소된 링크는 410으로 온다.
+  const invitation = useGetPeerFeedbackInvitation(token);
+  const submit = useSubmitPeerFeedback(token);
   // 링크를 보낸 사람의 닉네임 (/mirror/invite에서 ?n=으로 담는다)
   const OWNER = params.get('n')?.trim() || '친구';
   // 친구 응답 API가 없어 이미 모인 다른 친구 응답 수는 알 수 없다(0으로 둔다).
@@ -127,6 +162,40 @@ function FriendFlow() {
   const qIndex = Q_STEPS.indexOf(step);
   const prevQ = () => go(qIndex === 0 ? 'scene' : Q_STEPS[qIndex - 1]);
   const nextQ = () => go(qIndex === Q_STEPS.length - 1 ? 'vote' : Q_STEPS[qIndex + 1]);
+
+  const finish = () =>
+    submit.mutate(
+      buildFeedback({
+        relation,
+        years: YEARS.find((y) => y.value === years)!.label,
+        scene: sceneTitle,
+        sceneNote,
+        role,
+        words,
+        hard,
+        hardWhy,
+        strength,
+        scores,
+        message,
+      }),
+      { onSuccess: () => go('done') },
+    );
+
+  if (invitation.isError && step !== 'done') {
+    return (
+      <Screen footer={<Button onClick={() => router.push('/')}>메타미 둘러보기</Button>}>
+        <div className="flex flex-col items-center text-center px-8 pt-[200px]">
+          <Img3D name="envelope" size={96} />
+          <h1 className="text-[22px] font-bold text-ink mt-4">이 링크는 더 쓸 수 없어요</h1>
+          <p className="text-[14px] text-[#5A5A62] leading-[1.7] mt-3">
+            이미 답했거나, 7일이 지났거나, 취소된 링크예요.
+            <br />
+            {OWNER}님에게 새 링크를 받아 주세요.
+          </p>
+        </div>
+      </Screen>
+    );
+  }
 
   if (step === 'landing') {
     return (
@@ -479,11 +548,19 @@ function FriendFlow() {
       <Screen
         footer={
           <>
-            <p className="text-center text-[12px] text-sub mb-3">
-              {locked ? '투표가 열리면 같은 링크로 다시 참여할 수 있어요' : voted ? '누가 무엇을 골랐는지는 공개되지 않아요' : '투표하면 다른 친구들의 선택 비율이 보여요'}
+            <p className={`text-center text-[12px] mb-3 ${submit.isError ? 'text-danger' : 'text-sub'}`}>
+              {submit.isError
+                ? '답을 보내지 못했어요. 다시 눌러 주세요.'
+                : locked
+                  ? '응답 완료를 누르면 답이 익명으로 전달돼요'
+                  : voted
+                    ? '누가 무엇을 골랐는지는 공개되지 않아요'
+                    : '투표하면 다른 친구들의 선택 비율이 보여요'}
             </p>
             {locked || voted ? (
-              <Button onClick={() => go('done')}>응답 완료</Button>
+              <Button onClick={finish} disabled={submit.isPending}>
+                {submit.isPending ? '보내는 중…' : '응답 완료'}
+              </Button>
             ) : (
               <Button variant="dark" disabled={!vote} onClick={() => setVoted(true)}>
                 투표하기
