@@ -1730,10 +1730,16 @@ export interface components {
         /** @description PasswordResetConfirmRequest */
         PasswordResetConfirmRequest: {
             /**
-             * @description 비밀번호 재설정 토큰
-             * @example reset-token-123
+             * Format: email
+             * @description 비밀번호 재설정을 요청한 이메일
+             * @example user@example.com
              */
-            reset_token: string;
+            email: string;
+            /**
+             * @description 메일로 발송된 6자리 숫자 인증코드 (발송 후 10분 유효)
+             * @example 123456
+             */
+            code: string;
             /**
              * @description 새 비밀번호
              * @example NewSecurePass123!
@@ -3939,7 +3945,8 @@ export interface operations {
             content: {
                 /**
                  * @example {
-                 *       "reset_token": "reset-token-123",
+                 *       "email": "user@example.com",
+                 *       "code": "123456",
                  *       "new_password": "NewSecurePass123!"
                  *     }
                  */
@@ -3972,23 +3979,6 @@ export interface operations {
                      *       "message": "요청 값 검증에 실패했습니다.",
                      *       "code": "VALIDATION_FAILED",
                      *       "timestamp": "2026-05-10T09:00:00+09:00"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description 처리할 수 없는 요청 */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "message": "비밀번호 재설정 토큰이 만료되었습니다.",
-                     *       "code": "AUTH_PASSWORD_RESET_TOKEN_EXPIRED",
-                     *       "timestamp": "2026-05-10T09:00:00+09:00",
-                     *       "resolution": "새 비밀번호 재설정 메일 발송을 안내합니다."
                      *     }
                      */
                     "application/json": components["schemas"]["ErrorResponse"];

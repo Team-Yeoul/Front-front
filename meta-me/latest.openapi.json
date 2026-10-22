@@ -660,7 +660,8 @@
                 "$ref": "#/components/schemas/PasswordResetConfirmRequest"
               },
               "example": {
-                "reset_token": "reset-token-123",
+                "email": "user@example.com",
+                "code": "123456",
                 "new_password": "NewSecurePass123!"
               }
             }
@@ -698,23 +699,6 @@
             },
             "headers": {}
           },
-          "422": {
-            "description": "처리할 수 없는 요청",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "example": {
-                  "message": "비밀번호 재설정 토큰이 만료되었습니다.",
-                  "code": "AUTH_PASSWORD_RESET_TOKEN_EXPIRED",
-                  "timestamp": "2026-05-10T09:00:00+09:00",
-                  "resolution": "새 비밀번호 재설정 메일 발송을 안내합니다."
-                }
-              }
-            },
-            "headers": {}
-          },
           "500": {
             "description": "서버 내부 오류",
             "content": {
@@ -741,7 +725,7 @@
         "x-error-codes": [
           "VALIDATION_FAILED",
           "AUTH_PASSWORD_RESET_TOKEN_INVALID",
-          "AUTH_PASSWORD_RESET_TOKEN_EXPIRED",
+          "TOO_MANY_REQUESTS",
           "INTERNAL_SERVER_ERROR"
         ]
       }
@@ -8788,10 +8772,16 @@
         "type": "object",
         "description": "PasswordResetConfirmRequest",
         "properties": {
-          "reset_token": {
+          "email": {
             "type": "string",
-            "description": "비밀번호 재설정 토큰",
-            "example": "reset-token-123"
+            "description": "비밀번호 재설정을 요청한 이메일",
+            "format": "email",
+            "example": "user@example.com"
+          },
+          "code": {
+            "type": "string",
+            "description": "메일로 발송된 6자리 숫자 인증코드 (발송 후 10분 유효)",
+            "example": "123456"
           },
           "new_password": {
             "type": "string",
@@ -8802,7 +8792,8 @@
           }
         },
         "required": [
-          "reset_token",
+          "email",
+          "code",
           "new_password"
         ]
       },
