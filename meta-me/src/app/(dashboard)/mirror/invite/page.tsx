@@ -24,8 +24,9 @@ export default function MirrorInvitePage() {
   const token = useAuthStore((s) => s.accessToken);
   const me = useMe();
   // 닉네임은 가입한 기기에만 저장돼 있어, 없으면 계정 이름으로 대신한다.
-  const { data: account } = useGetMyAccount(!!token && !me.nickname);
-  const nickname = me.nickname || account?.user.username || account?.user.email?.split('@')[0];
+  const { data: account, refetch: refetchAccount } = useGetMyAccount(!!token && !me.nickname);
+  const accountName = (a?: typeof account) => a?.user.username || a?.user.email?.split('@')[0];
+  const nickname = me.nickname || accountName(account);
   const { data: list } = useListPeerFeedback(undefined, !!token);
   const feedbacks = list?.feedbacks ?? [];
   const count = list?.total_elements ?? feedbacks.length;
@@ -41,12 +42,16 @@ export default function MirrorInvitePage() {
 
   // 링크 하나에 한 명만 답할 수 있어, 복사할 때마다 새 초대 링크를 발급한다.
   const issueLink = async () => {
-    const { invite_url } = await createInvitation.mutateAsync();
+    // 계정 이름을 아직 못 받았으면 함께 받아 와, 이름 없는 링크(친구 화면에 '친구님')가 나가지 않게 한다.
+    const [{ invite_url }, name] = await Promise.all([
+      createInvitation.mutateAsync(),
+      nickname || refetchAccount().then((r) => accountName(r.data)),
+    ]);
     // invite_url은 {프론트 URL}/feedback/{token}이라, 지금 보고 있는 주소로 다시 만든다(개발 서버에서도 열리게).
     const inviteToken = invite_url?.split('/').pop();
     if (!inviteToken) throw new Error('초대 링크가 비어 있어요');
     // 친구 화면에 내 이름이 보이도록 닉네임을 링크에 담는다.
-    const url = `${window.location.origin}/feedback/${inviteToken}${nickname ? `?n=${encodeURIComponent(nickname)}` : ''}`;
+    const url = `${window.location.origin}/feedback/${inviteToken}${name ? `?n=${encodeURIComponent(name)}` : ''}`;
     setLink(url);
     return url;
   };
