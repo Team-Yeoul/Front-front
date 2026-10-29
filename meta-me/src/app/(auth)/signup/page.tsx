@@ -47,10 +47,11 @@ export default function SignupPage() {
     setSubmitting(true);
     setError('');
     try {
-      const res = await signupMutation.mutateAsync({ email, password, birth_date: birthDate });
+      // 닉네임을 계정 이름(username)으로 저장해, 다른 기기에서도 초대 링크 등에 같은 이름이 쓰이게 한다.
+      const res = await signupMutation.mutateAsync({ email, password, birth_date: birthDate, username: nickname.trim() });
       setAuth(res.access_token, res.refresh_token, res.user_id);
-      // 가입 API가 닉네임을 받지 않아 기기에 저장해 마이페이지 등에서 쓴다.
-      if (nickname.trim()) useLocalStore.getState().update(res.user_id, (u) => ({ ...u, nickname: nickname.trim() }));
+      // 계정 정보를 받기 전에도 바로 보이도록 기기에도 저장해 둔다.
+      useLocalStore.getState().update(res.user_id, (u) => ({ ...u, nickname: nickname.trim() }));
       try {
         const current = await userApi.getNotificationSettings();
         await userApi.updateNotificationSettings({ ...current, marketing_consent: marketing });
