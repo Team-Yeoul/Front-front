@@ -1,14 +1,23 @@
 'use client';
 
-import { use } from 'react';
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, CogniImg } from '@/components/ui/primitives';
 import { useCollection } from '@/hooks/useCollection';
 
 const mmdd = (iso: string) => (iso ? new Date(iso).toLocaleDateString('sv-SE').slice(5).replace('-', '.') : '-');
 
-export default function CogniMomentsPage({ params }: { params: Promise<{ id: string }> }) {
-  const id = decodeURIComponent(use(params).id);
+export default function CogniMomentsPage() {
+  return (
+    <Suspense>
+      <CogniMoments />
+    </Suspense>
+  );
+}
+
+function CogniMoments() {
+  const id = useSearchParams().get('id') ?? '';
   const cogni = useCollection().find((c) => c.id === id);
 
   return (

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore, useLocalStore } from '@/store';
 
 /** 로그인 없이 볼 수 있는 경로. 나머지는 로그인이 필요하다. */
-const PUBLIC = ['/login', '/signup', '/terms', '/forgot-password', '/notifications', '/feedback/'];
+const PUBLIC = ['/login', '/signup', '/terms', '/forgot-password', '/notifications', '/feedback'];
 const isPublic = (path: string) => path === '/' || PUBLIC.some((p) => path.startsWith(p));
 
 /**

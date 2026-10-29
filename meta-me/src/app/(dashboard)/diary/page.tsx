@@ -42,7 +42,7 @@ function RealDiaryCard({ record }: { record: DailyRecord }) {
     .map((t) => t.trim())
     .filter((t) => t && /[가-힣]/.test(t))
     .slice(0, 3);
-  return <DiaryCard title={title} date={record.recorded_date.replaceAll('-', '.')} tags={tags} onClick={() => router.push(`/diary/${record.record_id}`)} />;
+  return <DiaryCard title={title} date={record.recorded_date.replaceAll('-', '.')} tags={tags} onClick={() => router.push(`/diary/detail?id=${record.record_id}`)} />;
 }
 
 export default function DiaryListPage() {

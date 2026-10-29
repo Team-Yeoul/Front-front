@@ -88,7 +88,7 @@ function RealRecordRow({ record }: { record: DailyRecord }) {
   const question = data?.questions?.[0];
   const rawTitle = question?.scene_description || question?.emotion_tag;
   const title = rawTitle && /[가-힣]/.test(rawTitle) ? rawTitle : '기록 보기';
-  return <RecordRow title={title} date={record.recorded_date.replaceAll('-', '.')} onClick={() => router.push(`/diary/${record.record_id}`)} />;
+  return <RecordRow title={title} date={record.recorded_date.replaceAll('-', '.')} onClick={() => router.push(`/diary/detail?id=${record.record_id}`)} />;
 }
 
 const PencilIcon = () => (
@@ -198,7 +198,7 @@ export default function MainPage() {
           </div>
           {completedToday ? (
             <button
-              onClick={() => router.push(todayRecord ? `/diary/${todayRecord.record_id}` : '/diary')}
+              onClick={() => router.push(todayRecord ? `/diary/detail?id=${todayRecord.record_id}` : '/diary')}
               className="w-full flex items-center justify-between mt-4 text-left"
             >
               <div>

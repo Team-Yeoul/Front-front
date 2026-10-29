@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState, type ReactNode } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Screen } from '@/components/ui/Screen';
 import {
   BackButton,
@@ -130,7 +130,7 @@ function QTitle({ type, scene, title, caption }: { type: string; scene: string; 
 function FriendFlow() {
   const router = useRouter();
   const params = useSearchParams();
-  const { token } = useParams<{ token: string }>();
+  const token = params.get('token') ?? '';
   // 없는 링크는 404, 만료·사용·취소된 링크는 410으로 온다.
   const invitation = useGetPeerFeedbackInvitation(token);
   const submit = useSubmitPeerFeedback(token);
@@ -181,7 +181,7 @@ function FriendFlow() {
       { onSuccess: () => go('done') },
     );
 
-  if (invitation.isError && step !== 'done') {
+  if ((invitation.isError || !token) && step !== 'done') {
     return (
       <Screen footer={<Button onClick={() => router.push('/')}>메타미 둘러보기</Button>}>
         <div className="flex flex-col items-center text-center px-8 pt-[200px]">

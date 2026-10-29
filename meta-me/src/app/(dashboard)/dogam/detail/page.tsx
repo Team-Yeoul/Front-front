@@ -1,7 +1,7 @@
 'use client';
 
-import { use } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Screen } from '@/components/ui/Screen';
 import { Button, TopBar } from '@/components/ui/primitives';
 import { CogniHero, FeatureIcons } from '@/components/ui/flows';
@@ -10,8 +10,16 @@ import { useMe } from '@/hooks/useMe';
 
 const ICONS = [FeatureIcons.target, FeatureIcons.clock, FeatureIcons.bolt];
 
-export default function CogniDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const id = decodeURIComponent(use(params).id);
+export default function CogniDetailPage() {
+  return (
+    <Suspense>
+      <CogniDetail />
+    </Suspense>
+  );
+}
+
+function CogniDetail() {
+  const id = useSearchParams().get('id') ?? '';
   const router = useRouter();
   const { nickname } = useMe();
   const collection = useCollection();
@@ -38,7 +46,7 @@ export default function CogniDetailPage({ params }: { params: Promise<{ id: stri
       counterLabel="도감에 저장했어요"
       counter={`${String(index + 1).padStart(2, '0')} / 24`}
       primaryLabel="잡은 순간 확인하기"
-      onPrimary={() => router.push(`/dogam/${encodeURIComponent(cogni.id)}/moments`)}
+      onPrimary={() => router.push(`/dogam/moments?id=${encodeURIComponent(cogni.id)}`)}
       onBack={() => router.back()}
     />
   );

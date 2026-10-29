@@ -1,7 +1,7 @@
 'use client';
 
-import { use } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Screen } from '@/components/ui/Screen';
 import { Button, TopBar } from '@/components/ui/primitives';
 import { AiBubble, UserBubble } from '@/components/ui/chat';
@@ -10,8 +10,16 @@ import { chatKindLabel, hhmm } from '@/lib/chatLabels';
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 
-export default function ChatDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ChatDetailPage() {
+  return (
+    <Suspense>
+      <ChatDetail />
+    </Suspense>
+  );
+}
+
+function ChatDetail() {
+  const id = useSearchParams().get('id') ?? '';
   const router = useRouter();
   const { chat, loading, failed, retry } = useChat(id);
 

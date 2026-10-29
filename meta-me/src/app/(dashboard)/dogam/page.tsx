@@ -50,7 +50,7 @@ export default function DogamPage() {
         {items.map((c) => (
           <button
             key={c.id}
-            onClick={() => router.push(`/dogam/${encodeURIComponent(c.id)}`)}
+            onClick={() => router.push(`/dogam/detail?id=${encodeURIComponent(c.id)}`)}
             className="rounded-3xl bg-white border border-line flex flex-col items-center text-center px-4 pt-4 pb-4 min-h-[214px]"
           >
             <span className="w-[70px] h-[70px] rounded-full bg-surface-2 flex items-center justify-center overflow-hidden">

@@ -1,7 +1,7 @@
 'use client';
 
-import { use, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useDeleteDailyRecord, useGetDailyRecord } from '@/entities/diary';
 import { useAuthStore } from '@/store';
 import { Screen } from '@/components/ui/Screen';
@@ -10,8 +10,16 @@ import { Modal } from '@/components/ui/overlays';
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 
-export default function DiaryDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function DiaryDetailPage() {
+  return (
+    <Suspense>
+      <DiaryDetail />
+    </Suspense>
+  );
+}
+
+function DiaryDetail() {
+  const id = useSearchParams().get('id') ?? '';
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
   const { data, isError } = useGetDailyRecord(id, !!accessToken);
@@ -49,7 +57,7 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
 
   if (!detail) {
     // 응답은 왔는데 질문이 없는 기록이면 '불러오는 중'에 멈추지 않게 따로 안내한다.
-    const message = isError ? '기록을 불러오지 못했어요.' : data ? '표시할 내용이 없는 기록이에요.' : '불러오는 중...';
+    const message = isError || !id ? '기록을 불러오지 못했어요.' : data ? '표시할 내용이 없는 기록이에요.' : '불러오는 중...';
     return (
       <Screen>
         <TopBar />

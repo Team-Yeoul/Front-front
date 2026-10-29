@@ -13,7 +13,7 @@ export function TodayRecordExists({ recordId }: { recordId: string | null }) {
         recordId ? (
           <>
             <Button onClick={() => router.replace(`/diary/write?edit=${recordId}`)}>오늘 기록 수정하기</Button>
-            <TextButton className="mt-1" onClick={() => router.replace(`/diary/${recordId}`)}>
+            <TextButton className="mt-1" onClick={() => router.replace(`/diary/detail?id=${recordId}`)}>
               기록 보기
             </TextButton>
           </>

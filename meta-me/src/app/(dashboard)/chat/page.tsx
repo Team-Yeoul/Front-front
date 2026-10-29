@@ -76,7 +76,7 @@ function ChatContent({ resumed }: { resumed?: SavedChat }) {
       endedAt: new Date().toISOString(),
       messages,
     });
-    router.push(`/chat/${chatId}`);
+    router.push(`/chat/detail?id=${chatId}`);
   };
 
   const h = startedAt.getHours();

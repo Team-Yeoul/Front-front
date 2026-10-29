@@ -47,11 +47,12 @@ export default function MirrorInvitePage() {
       createInvitation.mutateAsync(),
       nickname || refetchAccount().then((r) => accountName(r.data)),
     ]);
-    // invite_url은 {프론트 URL}/feedback/{token}이라, 지금 보고 있는 주소로 다시 만든다(개발 서버에서도 열리게).
+    // invite_url은 {프론트 URL}/feedback/{token}이라, 토큰만 꺼내 지금 보고 있는 주소로 다시 만든다(개발 서버에서도 열리게).
     const inviteToken = invite_url?.split('/').pop();
     if (!inviteToken) throw new Error('초대 링크가 비어 있어요');
     // 친구 화면에 내 이름이 보이도록 닉네임을 링크에 담는다.
-    const url = `${window.location.origin}/feedback/${inviteToken}${name ? `?n=${encodeURIComponent(name)}` : ''}`;
+    const query = new URLSearchParams({ token: inviteToken, ...(name ? { n: name } : {}) });
+    const url = `${window.location.origin}/feedback/?${query}`;
     setLink(url);
     return url;
   };
