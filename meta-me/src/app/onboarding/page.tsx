@@ -354,13 +354,17 @@ function isAnswered(q: OnboardingQuestion, a: Answer) {
   return typeof a === 'string' && a.length > 0;
 }
 
-/** 서버 answers로 보낼 질문별 원래 답. 척도는 순번 대신 고른 문구로 보낸다. */
+/**
+ * 서버 answers로 보낼 질문별 원래 답. 척도는 순번 대신 고른 문구로 보낸다.
+ * 시간은 슬라이더가 0.5시간 단위라 소수(1.5)가 나오므로, 서버가 정수만 받아도 되게 분 단위 정수(90)로 바꿔 `_minutes` 키로 보낸다.
+ */
 const rawAnswers = (answers: Record<string, Answer>) => {
   const out: Record<string, string | string[] | number> = {};
   for (const q of ONBOARDING_QUESTIONS) {
     const a = answers[q.id];
     if (a === undefined || a === '' || a === '__later__') continue;
-    out[q.id] = q.kind === 'scale' && typeof a === 'number' ? q.options[a].label : a;
+    if (q.kind === 'hours' && typeof a === 'number') out[q.id.replace(/_hours$/, '_minutes')] = Math.round(a * 60);
+    else out[q.id] = q.kind === 'scale' && typeof a === 'number' ? q.options[a].label : a;
   }
   return out;
 };
