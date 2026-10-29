@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { useGetMyAccount, useSubmitOnboarding } from '@/entities/user';
+import { useGetMyAccount, useSubmitOnboarding, type OnboardingRequest } from '@/entities/user';
 import { useAuthStore } from '@/store';
 import { ApiError } from '@/shared/api';
 import { Screen } from '@/components/ui/Screen';
@@ -407,16 +407,18 @@ export default function OnboardingPage() {
     const byId = (id: string) => labelOf(answers[id], ONBOARDING_QUESTIONS.find((x) => x.id === id)) || '아직 모르겠어요';
     const sentence = labelOf(answers.my_one_sentence);
     if (sentence) me.patch((u) => ({ ...u, mySentence: sentence }));
+    let body: OnboardingRequest | undefined;
     try {
       // v2 온보딩 질문은 API 필드(3개 문장)와 1:1로 맞지 않아 가장 가까운 답을 묶어 보내고, 원래 답은 answers로 함께 보낸다.
-      const request = submitOnboarding.mutateAsync({
+      body = {
         // 한 문장은 선택 항목이고, 보낼 때는 공백을 뺀 10자 이상이어야 한다.
         ...(sentence.replace(/\s/g, '').length >= 10 && { my_one_sentence: sentence }),
         self_strength: byId('self_awareness'),
         others_feedback: byId('repeating_pattern'),
         favorite_thing: byId('curious_about'),
         answers: rawAnswers(answers),
-      });
+      };
+      const request = submitOnboarding.mutateAsync(body);
       serverCogni.current = request.then((r) => (r.first_cogni ? fromFirstCogni(r.first_cogni) : undefined)).catch(() => undefined);
       const res = await request;
       if (typeof res.accuracy_percent === 'number') setAccuracy(Math.round(res.accuracy_percent));
@@ -426,6 +428,13 @@ export default function OnboardingPage() {
       // 이미 제출된 계정(409)은 성공으로 본다. 그 외 실패는 마칠 때 한 번 더 시도한다.
       const already = err instanceof ApiError && err.code === 'ONBOARDING_ALREADY_SUBMITTED';
       if (already) setSubmitted(true);
+      // 원인을 재현하기 어려운 실패(예: 400 검증 실패)를 콘솔에서 바로 확인할 수 있게 서버 응답과 보낸 내용을 남긴다.
+      else
+        console.error(
+          '[onboarding] 제출 실패',
+          err instanceof ApiError ? { status: err.status, code: err.code, message: err.message } : err,
+          body,
+        );
       return already;
     }
   };
