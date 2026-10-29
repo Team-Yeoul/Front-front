@@ -65,8 +65,15 @@ export const ONBOARDING_COGNIS = {
 
 type CogniKey = keyof typeof ONBOARDING_COGNIS;
 
-/** 반복 패턴 답(가중치 2)과 알고 싶은 것 답(가중치 1)이 가리키는 코그니. */
+/**
+ * 반복 패턴 답(가중치 2)과 알고 싶은 것 답(가중치 1)이 가리키는 코그니.
+ * 예전 온보딩 선택지는 그 답으로 가입한 계정의 프로필에서 다시 고를 때 쓰므로 남겨 둔다.
+ */
 const PATTERN_TO_COGNI: Record<string, CogniKey> = {
+  '혼자 깊이 파고들 때 즐거워요': 'observer',
+  '하고 싶은 게 많아 이것저것 시작해요': 'explorer',
+  '계획은 세우는데 실행이 어려워요': 'planner',
+  '기분에 따라 하루가 크게 달라져요': 'wave',
   '계획은 세우는데 잘 안 지켜요': 'planner',
   '시작하기가 어려워요': 'starter',
   '감정에 따라 행동이 많이 바뀌어요': 'wave',
@@ -75,6 +82,11 @@ const PATTERN_TO_COGNI: Record<string, CogniKey> = {
   '특별한 패턴은 아직 모르겠어요': 'observer',
 };
 const CURIOUS_TO_COGNI: Record<string, CogniKey> = {
+  '내가 진짜 좋아하는 것': 'explorer',
+  '내가 잘하는 것, 나의 강점': 'explorer',
+  '에너지가 차오르는 순간과 빠지는 순간': 'wave',
+  '감정이 움직이는 패턴': 'wave',
+  '자꾸 미루거나 멈추는 이유': 'starter',
   '내가 왜 자꾸 미루는지': 'starter',
   '내가 뭘 좋아하고 잘하는지': 'explorer',
   '내 감정 패턴이 어떤지': 'wave',
