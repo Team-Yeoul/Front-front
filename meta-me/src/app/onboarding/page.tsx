@@ -16,6 +16,8 @@ import { ONBOARDING_QUESTIONS, type OnboardingQuestion } from './questions';
 type Phase = 'intro' | 'question' | 'analyzing' | 'result' | 'outro';
 type Answer = string | string[] | number | undefined;
 
+const LATER_LABEL = '아직 저 자신을 잘 몰라요';
+
 /* ── 인트로 / 아웃트로 슬라이드 ─────────────────────────── */
 
 /** 이 거리(px) 이상 가로로 밀어야 넘어간다. */
@@ -188,7 +190,10 @@ function QuestionBody({ q, answer, setAnswer }: { q: OnboardingQuestion; answer:
               placeholder="계획은 잘 세우는데, 시작 앞에서 오래 머무는 사람."
               className="w-full mt-1.5 bg-transparent outline-none resize-none text-[16px] font-semibold text-ink placeholder:text-mute placeholder:font-medium caret-primary"
             />
-            <p className="text-right font-mono text-[12px] text-mute">{text.length} / 80</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[12px] text-danger">{text.trim() && !isSentenceLongEnough(text) ? `공백을 빼고 ${MIN_SENTENCE_LENGTH}자 이상 써 주세요` : ''}</p>
+              <p className="font-mono text-[12px] text-mute">{text.length} / 80</p>
+            </div>
           </div>
           <button
             onClick={() => setAnswer(later ? '' : '__later__')}
@@ -197,7 +202,7 @@ function QuestionBody({ q, answer, setAnswer }: { q: OnboardingQuestion; answer:
             <span className={`w-[22px] h-[22px] rounded-[6px] flex items-center justify-center ${later ? 'bg-[#E5B92E]' : 'border-[1.5px] border-[#E5C45A]'}`}>
               {later && <CheckIcon size={13} />}
             </span>
-            <span className="text-[15px] text-gold">한 문장은 나중에 쓸게요</span>
+            <span className="text-[15px] text-gold">{LATER_LABEL}</span>
           </button>
         </div>
       );
@@ -347,8 +352,13 @@ function QuestionBody({ q, answer, setAnswer }: { q: OnboardingQuestion; answer:
   }
 }
 
+/** 서버는 한 문장을 공백을 뺀 10자 이상만 받는다. */
+const MIN_SENTENCE_LENGTH = 10;
+const isSentenceLongEnough = (text: string) => text.replace(/\s/g, '').length >= MIN_SENTENCE_LENGTH;
+
 function isAnswered(q: OnboardingQuestion, a: Answer) {
-  if (q.kind === 'sentence') return typeof a === 'string' && a.trim().length > 0;
+  // 한 문장은 '아직 저 자신을 잘 몰라요'를 고르거나, 10자 이상 써야 넘어갈 수 있다.
+  if (q.kind === 'sentence') return a === '__later__' || (typeof a === 'string' && isSentenceLongEnough(a));
   if (q.kind === 'multi') return Array.isArray(a) && a.length > 0;
   if (q.kind === 'scale' || q.kind === 'hours') return true;
   return typeof a === 'string' && a.length > 0;
@@ -362,8 +372,10 @@ const rawAnswers = (answers: Record<string, Answer>) => {
   const out: Record<string, string | string[] | number> = {};
   for (const q of ONBOARDING_QUESTIONS) {
     const a = answers[q.id];
-    if (a === undefined || a === '' || a === '__later__') continue;
-    if (q.kind === 'hours' && typeof a === 'number') out[q.id.replace(/_hours$/, '_minutes')] = Math.round(a * 60);
+    if (a === undefined || a === '') continue;
+    // 서버는 1번 질문(한 문장)의 답이 없으면 거절하므로, '아직 잘 몰라요'를 고른 것도 그 문구를 답으로 보낸다.
+    if (a === '__later__') out[q.id] = LATER_LABEL;
+    else if (q.kind === 'hours' && typeof a === 'number') out[q.id.replace(/_hours$/, '_minutes')] = Math.round(a * 60);
     else out[q.id] = q.kind === 'scale' && typeof a === 'number' ? q.options[a].label : a;
   }
   return out;
@@ -415,8 +427,8 @@ export default function OnboardingPage() {
     try {
       // v2 온보딩 질문은 API 필드(3개 문장)와 1:1로 맞지 않아 가장 가까운 답을 묶어 보내고, 원래 답은 answers로 함께 보낸다.
       body = {
-        // 한 문장은 선택 항목이고, 보낼 때는 공백을 뺀 10자 이상이어야 한다.
-        ...(sentence.replace(/\s/g, '').length >= 10 && { my_one_sentence: sentence }),
+        // 한 문장은 '아직 저 자신을 잘 몰라요'를 고르면 보내지 않는다. 직접 썼다면 질문 화면에서 10자 이상만 통과시킨다.
+        ...(sentence && { my_one_sentence: sentence }),
         self_strength: byId('self_awareness'),
         others_feedback: byId('repeating_pattern'),
         favorite_thing: byId('curious_about'),
