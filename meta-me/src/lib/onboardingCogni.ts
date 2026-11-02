@@ -83,12 +83,27 @@ const CURIOUS_TO_COGNI: Record<string, CogniKey> = {
   '아직 잘 모르겠어요': 'observer',
 };
 
+/** 직접 쓴 한 문장에 들어 있으면 그 코그니를 가리키는 단어(어간). 단어 하나마다 가중치 2. */
+const KEYWORDS: Record<CogniKey, string[]> = {
+  planner: ['계획', '준비', '정리', '마감', '꼼꼼', '체계', '목표', '일정', '루틴', '효율'],
+  starter: ['미루', '미뤄', '시작', '귀찮', '게으', '망설', '신중', '완벽', '걱정', '고민'],
+  wave: ['기분', '감정', '우울', '불안', '짜증', '화가', '화나', '눈물', '예민', '스트레스'],
+  explorer: ['원하', '좋아하', '꿈', '방향', '진로', '도전', '새로운', '호기심', '탐험', '여행'],
+  observer: ['관찰', '생각이 많', '조용', '혼자', '내향', '차분', '궁금', '알고 싶', '돌아보', '사람들'],
+};
+
 const asList = (a: unknown) => (Array.isArray(a) ? (a as string[]) : []);
 
-/** 온보딩 답으로 첫 코그니를 고른다. 점수가 같으면 먼저 고른 답을 따르고, 단서가 없으면 관찰자. */
+/**
+ * 온보딩 답으로 첫 코그니를 고른다. 직접 쓴 한 문장의 단어(2) · 반복 패턴 답(2) · 알고 싶은 것 답(1)을 더한다.
+ * 점수가 같으면 한 문장, 먼저 고른 답 순으로 따르고, 단서가 없으면 관찰자.
+ */
 export function pickOnboardingCogni(answers: Record<string, unknown>): FoundCogni {
   const score = new Map<CogniKey, number>();
   const add = (key: CogniKey | undefined, w: number) => key && score.set(key, (score.get(key) ?? 0) + w);
+  const sentence = typeof answers.my_one_sentence === 'string' ? answers.my_one_sentence : '';
+  for (const [key, words] of Object.entries(KEYWORDS) as [CogniKey, string[]][])
+    words.filter((w) => sentence.includes(w)).forEach(() => add(key, 2));
   asList(answers.repeating_pattern).forEach((p) => add(PATTERN_TO_COGNI[p], 2));
   asList(answers.curious_about).forEach((c) => add(CURIOUS_TO_COGNI[c], 1));
 
