@@ -185,7 +185,10 @@ function QuestionBody({ q, answer, setAnswer }: { q: OnboardingQuestion; answer:
             placeholder="계획은 잘 세우는데, 시작 앞에서 오래 머무는 사람."
             className="w-full mt-1.5 bg-transparent outline-none resize-none text-[16px] font-semibold text-ink placeholder:text-mute placeholder:font-medium caret-primary"
           />
-          <p className="text-right font-mono text-[12px] text-mute">{text.length} / 80</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[12px] text-danger">{tooShortSentence(q, text) ? `공백을 빼고 ${MIN_SENTENCE_LENGTH}자 이상 써 주세요` : ''}</p>
+            <p className="font-mono text-[12px] text-mute">{text.length} / 80</p>
+          </div>
         </div>
       );
     }
@@ -326,8 +329,14 @@ function QuestionBody({ q, answer, setAnswer }: { q: OnboardingQuestion; answer:
   }
 }
 
+/** 서버는 한 문장(my_one_sentence)을 공백을 뺀 10자 이상만 받는다. 나머지 소개 문장은 1자 이상이면 된다. */
+const MIN_SENTENCE_LENGTH = 10;
+const tooShortSentence = (q: OnboardingQuestion, text: string) =>
+  q.id === 'my_one_sentence' && text.trim().length > 0 && text.replace(/\s/g, '').length < MIN_SENTENCE_LENGTH;
+
 function isAnswered(q: OnboardingQuestion, a: Answer) {
-  if (q.kind === 'sentence') return typeof a === 'string' && a.trim().length > 0;
+  // 한 문장이 10자보다 짧으면 막는다. 쓰기 어렵다면 '잘 모르겠습니다.'로 넘길 수 있다.
+  if (q.kind === 'sentence') return typeof a === 'string' && a.trim().length > 0 && !tooShortSentence(q, a);
   if (q.kind === 'multi') return Array.isArray(a) && a.some((x) => x.trim().length > 0);
   if (q.kind === 'scale') return true;
   return typeof a === 'string' && a.length > 0;
@@ -398,8 +407,8 @@ export default function OnboardingPage() {
     try {
       // 소개 질문 4개는 API 필드와 id가 같아 그대로 보내고, 나머지 설문 답은 answers로 함께 보낸다.
       body = {
-        // 한 문장은 선택 항목이고, 보낼 때는 공백을 뺀 10자 이상이어야 한다.
-        ...(sentence.replace(/\s/g, '').length >= 10 && { my_one_sentence: sentence }),
+        // 한 문장은 선택 항목이다. 직접 썼다면 질문 화면에서 공백을 뺀 10자 이상만 통과시킨다.
+        ...(sentence && { my_one_sentence: sentence }),
         self_strength: byId('self_strength'),
         others_feedback: byId('others_feedback'),
         favorite_thing: byId('favorite_thing'),
