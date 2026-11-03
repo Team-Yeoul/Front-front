@@ -342,10 +342,11 @@ function isAnswered(q: OnboardingQuestion, a: Answer) {
   return typeof a === 'string' && a.length > 0;
 }
 
-/** 서버 answers로 보낼 질문별 원래 답. 척도는 순번 대신 고른 문구로 보낸다. */
-const rawAnswers = (answers: Record<string, Answer>) => {
+/** 서버 answers로 보낼 질문별 원래 답. 척도는 순번 대신 고른 문구로 보낸다. sentenceOnly면 소개 문장 답만 고른다. */
+const rawAnswers = (answers: Record<string, Answer>, sentenceOnly = false) => {
   const out: Record<string, string | string[] | number> = {};
   for (const q of ONBOARDING_QUESTIONS) {
+    if (sentenceOnly && q.kind !== 'sentence') continue;
     const a = answers[q.id];
     if (a === undefined || a === '' || a === '__later__') continue;
     out[q.id] = q.kind === 'scale' && typeof a === 'number' ? q.options[a].label : a;
@@ -405,14 +406,15 @@ export default function OnboardingPage() {
     if (sentence) me.patch((u) => ({ ...u, mySentence: sentence }));
     let body: OnboardingRequest | undefined;
     try {
-      // 소개 질문 4개는 API 필드와 id가 같아 그대로 보내고, 나머지 설문 답은 answers로 함께 보낸다.
+      // 소개 질문 4개는 API 필드와 id가 같아 그대로 보내고, 설문을 거쳤을 때만 설문 답을 answers로 함께 보낸다.
+      // 소개 문장만으로 끝낸 경우(마지막 화면이 소개 문장)엔 미리 채운 척도 값 등이 섞이지 않게 answers를 보내지 않는다.
       body = {
         // 한 문장은 선택 항목이다. 직접 썼다면 질문 화면에서 공백을 뺀 10자 이상만 통과시킨다.
         ...(sentence && { my_one_sentence: sentence }),
         self_strength: byId('self_strength'),
         others_feedback: byId('others_feedback'),
         favorite_thing: byId('favorite_thing'),
-        answers: rawAnswers(answers),
+        ...(!isSentence && { answers: rawAnswers(answers) }),
       };
       const request = submitOnboarding.mutateAsync(body);
       serverCogni.current = request.then((r) => (r.first_cogni ? fromFirstCogni(r.first_cogni) : undefined)).catch(() => undefined);
@@ -626,7 +628,7 @@ export default function OnboardingPage() {
         imageSrc={cogni.image}
         category={label}
         features={cogni.features.map((text, i) => ({ icon: icons[i % icons.length], text }))}
-        counterLabel={`온보딩 답 ${Object.keys(rawAnswers(answers)).length}개에서 발견`}
+        counterLabel={`온보딩 답 ${Object.keys(rawAnswers(answers, isSentence)).length}개에서 발견`}
         counter="01 / 24"
         primaryLabel="여정 시작하기"
         onPrimary={() => setPhase('outro')}
