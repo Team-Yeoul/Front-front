@@ -354,6 +354,21 @@ const rawAnswers = (answers: Record<string, Answer>, sentenceOnly = false) => {
   return out;
 };
 
+/**
+ * 서버 answers(밸런스 게임). 설문 8개를 화면 순서대로 "1"~"8" 키로 보낸다. 서버는 8개 모두 답해야 받는다.
+ * 척도는 순번 대신 고른 문구로, 여러 개 고르는 질문은 비어 있지 않은 항목만 보낸다.
+ */
+const balanceAnswers = (answers: Record<string, Answer>) => {
+  const out: Record<string, string | string[]> = {};
+  ONBOARDING_QUESTIONS.filter((q) => q.kind !== 'sentence').forEach((q, i) => {
+    const a = answers[q.id];
+    if (q.kind === 'scale' && typeof a === 'number') out[i + 1] = q.options[a].label;
+    else if (Array.isArray(a)) out[i + 1] = a.map((x) => x.trim()).filter(Boolean);
+    else if (typeof a === 'string') out[i + 1] = a;
+  });
+  return out;
+};
+
 const labelOf = (a: Answer, q?: OnboardingQuestion) => {
   if (Array.isArray(a)) return a.join(', ');
   if (typeof a === 'number' && q?.kind === 'scale') return q.options[a].label;
@@ -414,7 +429,7 @@ export default function OnboardingPage() {
         self_strength: byId('self_strength'),
         others_feedback: byId('others_feedback'),
         favorite_thing: byId('favorite_thing'),
-        ...(!isSentence && { answers: rawAnswers(answers) }),
+        ...(!isSentence && { answers: balanceAnswers(answers) }),
       };
       const request = submitOnboarding.mutateAsync(body);
       serverCogni.current = request.then((r) => (r.first_cogni ? fromFirstCogni(r.first_cogni) : undefined)).catch(() => undefined);
@@ -535,31 +550,24 @@ export default function OnboardingPage() {
       setSkippedFrom(qIndex);
       setQIndex(surveyStart);
     };
-    // 설문은 답하지 않고 넘길 수 있다. 미리 채워 둔 척도 값도 지워서 보내지 않는다.
-    const skipQuestion = () => {
-      setAnswer(undefined);
-      next();
-    };
-    // 넘겼던 척도 질문에 돌아와 그대로 '다음'을 누르면, 화면에 보이는 가운데 값을 답으로 다시 채운다.
-    const goNext = () => {
-      if (q.kind === 'scale' && typeof answer !== 'number') setAnswer(2);
-      next();
-    };
     return (
       <Screen
         footer={
           isLast ? (
-            <Button onClick={goNext} disabled={!isAnswered(q, answer)}>
+            <Button onClick={next} disabled={!isAnswered(q, answer)}>
               답변 마치기
             </Button>
           ) : (
             <div className="flex flex-col items-center gap-1">
-              <Button onClick={goNext} disabled={!isAnswered(q, answer)}>
+              <Button onClick={next} disabled={!isAnswered(q, answer)}>
                 다음 ({sectionIndex + 1}/{section.length})
               </Button>
-              <button onClick={isSentence ? skipToSurvey : skipQuestion} className="h-11 px-4 text-[15px] font-medium text-ink">
-                {isSentence ? '잘 모르겠습니다.' : '넘어가기'}
-              </button>
+              {/* 설문은 서버가 8개 모두 답해야 받으므로 넘기기 버튼을 두지 않는다. */}
+              {isSentence && (
+                <button onClick={skipToSurvey} className="h-11 px-4 text-[15px] font-medium text-ink">
+                  잘 모르겠습니다.
+                </button>
+              )}
             </div>
           )
         }
