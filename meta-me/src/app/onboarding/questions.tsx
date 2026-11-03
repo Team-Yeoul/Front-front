@@ -13,7 +13,8 @@ const SENTENCE_CAPTION = '정답은 없어요. 지금 떠오르는 문장이면 
 /**
  * 온보딩은 두 묶음으로 진행한다(진행 표시도 묶음마다 따로 센다).
  * 1) 소개 문장 4개: id가 온보딩 API 필드 이름과 같다.
- * 2) 설문 8개: 소개 중 '잘 모르겠습니다.'를 누르면 이어서 답한다. 답은 API answers로 보낸다.
+ * 2) 설문 8개: 소개 중 '잘 모르겠습니다.'를 누르면 이어서 답한다. 답은 API answers에 이 순서대로 "1"~"8" 키로 보낸다
+ *    (서버 BalanceGame과 순서·선택지 문구가 같아야 한다).
  */
 export const ONBOARDING_QUESTIONS: OnboardingQuestion[] = [
   { id: 'my_one_sentence', kind: 'sentence', icon: 'pen', title: '당신을 한문장으로 소개해주세요', caption: SENTENCE_CAPTION },
