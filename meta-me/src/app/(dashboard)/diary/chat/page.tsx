@@ -77,6 +77,7 @@ export default function DiaryChatPage() {
   const questionIdRef = useRef<string | null>(null);
   const tail1IdRef = useRef<string | null>(null);
   const tail2IdRef = useRef<string | null>(null);
+  const tail1Saved = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -156,7 +157,11 @@ export default function DiaryChatPage() {
   };
 
   const goTail2 = async () => {
-    const fallback = emotions.length >= 2 ? `${emotions[0]}과 ${emotions[1]}이 같이 왔네요. ${FALLBACK_TAIL_2}` : FALLBACK_TAIL_2;
+    // 감정 칩은 모두 받침으로 끝나서 '과/이'로 고정해도 된다.
+    const fallback =
+      emotions.length >= 2
+        ? `${emotions[0]}과 ${emotions[1]}이 같이 왔네요. ${FALLBACK_TAIL_2}`
+        : `'${emotions[0]}' 감정이 든 순간, 어떤 상황이었나요?`;
     const text = await askTail(tail2IdRef, fallback);
     appendAi(text, `자동 추가 · 태그 ${emotions.length}개`);
     setTurn('tail2');
@@ -168,7 +173,7 @@ export default function DiaryChatPage() {
     let after = accuracy.before;
     // 꼬리 질문 답변은 부가 정보라 실패해도 기록 저장은 계속한다. 건너뛴 답은 보내지 않는다.
     const tails: [string | null, string][] = [
-      [tail1IdRef.current, answers.current.tail1],
+      [tail1Saved.current ? null : tail1IdRef.current, answers.current.tail1],
       [tail2IdRef.current, answers.current.tail2],
     ];
     for (const [tailId, answer] of tails) {
@@ -222,6 +227,13 @@ export default function DiaryChatPage() {
       answers.current.tail1 = text;
       appendUser(text);
       setInput('');
+      // 다음 꼬리 질문을 만들 때 서버가 이 답을 참고할 수 있도록 바로 저장한다(실패해도 finish에서 다시 보낸다).
+      if (tail1IdRef.current && questionIdRef.current) {
+        updateTailAnswer
+          .mutateAsync({ questionId: questionIdRef.current, tailId: tail1IdRef.current, body: { user_answer: text } })
+          .then(() => (tail1Saved.current = true))
+          .catch(() => {});
+      }
       goEmotion();
     } else if (turn === 'emotion' && emotions.length > 0) {
       setMessages((m) => [...m, { id: nextId(), role: 'user', text: emotions.join(', '), kind: 'chips' }]);
