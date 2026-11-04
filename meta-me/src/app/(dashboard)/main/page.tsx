@@ -11,7 +11,7 @@ import { useGetDailyRecord, useListDailyRecords } from '@/entities/diary';
 import type { DailyRecord } from '@/entities/diary';
 import { Screen } from '@/components/ui/Screen';
 import { CheckIcon, ChevronRight, CogniImg, GearIcon, ProgressBar } from '@/components/ui/primitives';
-import { useCollection } from '@/hooks/useCollection';
+import { latestIndex, useCollection } from '@/hooks/useCollection';
 import { countStreak } from '@/lib/streak';
 
 type DayStatus = 'done' | 'missed' | 'today' | 'pending';
@@ -115,7 +115,7 @@ export default function MainPage() {
   const [stripOpen, setStripOpen] = useState(true);
   const cognis = useCollection();
   // 메인 캐릭터 = 가장 최근에 모은 코그니 (온보딩 직후엔 첫 코그니)
-  const character = cognis[cognis.length - 1];
+  const character = cognis[latestIndex(cognis)];
 
   const today = new Date();
   const todayIndex = today.getDay();
