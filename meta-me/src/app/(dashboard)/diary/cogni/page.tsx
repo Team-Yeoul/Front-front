@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AskFriendSheet, CogniHero, FeatureIcons } from '@/components/ui/flows';
 import { readLastWrite, type MonsterDetection } from '@/lib/lastWrite';
 import { useMe } from '@/hooks/useMe';
+import { monsterName } from '@/lib/onboardingCogni';
 
 const CATEGORY_LABEL: Record<string, string> = {
   COGNITIVE: '사고 · 인지 패턴',
@@ -31,7 +32,7 @@ export default function DiaryCogniPage() {
   if (!found) return null;
 
   const m = found.monster;
-  const name = m.stage_titles?.[0] || m.monster_code;
+  const name = monsterName(m);
   const category = CATEGORY_LABEL[m.category] ?? '패턴';
   const image = m.icon_url || '/v2/mascot-glasses.png';
   const total = me.cognis.length + (me.cognis.some((c) => c.id === m.monster_id) ? 0 : 1);

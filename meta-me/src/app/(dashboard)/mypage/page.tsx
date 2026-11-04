@@ -10,7 +10,7 @@ import { ChevronLeft, ChevronRight, CogniImg, GearIcon, ProgressBar } from '@/co
 import { Sheet } from '@/components/ui/overlays';
 import { MyTabs } from '@/components/ui/MyTabs';
 import { useMe } from '@/hooks/useMe';
-import { useCollection } from '@/hooks/useCollection';
+import { latestIndex, useCollection } from '@/hooks/useCollection';
 
 const NICKNAME_UNLOCK = 80;
 
@@ -35,7 +35,7 @@ export default function MyPage() {
   const sentence = profile?.profile.ai_first_sentence || me.mySentence;
   const lv = `Lv.${String(level).padStart(2, '0')}`;
   // 기본은 가장 최근에 모은 코그니, ↺ 버튼으로 모은 코그니를 돌려 본다.
-  const idx = shownIdx ?? collection.length - 1;
+  const idx = shownIdx ?? latestIndex(collection);
   const character = collection[idx];
 
   return (

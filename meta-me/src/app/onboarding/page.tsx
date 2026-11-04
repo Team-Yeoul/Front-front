@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { useGetMyAccount, useSubmitOnboarding, type OnboardingRequest } from '@/entities/user';
+import { useGetMyAccount, useSubmitOnboarding, userApi, type OnboardingRequest } from '@/entities/user';
 import { useAuthStore } from '@/store';
 import { ApiError } from '@/shared/api';
 import { Screen } from '@/components/ui/Screen';
@@ -464,15 +464,24 @@ export default function OnboardingPage() {
   };
 
   // 첫 코그니를 도감(기기 저장)에 넣는다. 메인·마이페이지 캐릭터도 이걸 쓴다.
-  // 서버가 배정한 코그니를 쓰되, 없거나 3초 안에 오지 않으면 답으로 임시 코그니를 고른다.
+  // 서버가 배정한 코그니를 쓴다. 홈·도감은 서버 first_cogni를 보여주므로, 여기서 임시 코그니를 고르면 서로 달라진다.
+  // 그래서 AI 배정이 끝날 때까지 넉넉히 기다리고, 제출 응답에 없으면(이미 제출된 계정 등) 서버 결과를 한 번 더 묻는다.
+  // 그래도 없을 때만 답으로 임시 코그니를 고른다.
   const [found, setFound] = useState<FoundCogni>();
   // 분석 화면은 끝날 때와 닫을 때 모두 부르므로, 서버 응답을 기다리는 사이 두 번 들어오지 않게 막는다.
   const discovering = useRef(false);
   const discover = async () => {
     if (discovering.current) return;
     discovering.current = true;
-    const timeout = new Promise<undefined>((resolve) => setTimeout(resolve, 3000));
-    const picked = (await Promise.race([serverCogni.current, timeout])) ?? pickOnboardingCogni(answers);
+    const within = <T,>(p: Promise<T> | undefined, ms: number) =>
+      Promise.race([p, new Promise<undefined>((resolve) => setTimeout(resolve, ms))]);
+    const fromResult = () =>
+      userApi
+        .getOnboardingResult()
+        .then((r) => (r.first_cogni ? fromFirstCogni(r.first_cogni) : undefined))
+        .catch(() => undefined);
+    const picked =
+      (await within(serverCogni.current, 20000)) ?? (await within(fromResult(), 5000)) ?? pickOnboardingCogni(answers);
     me.addCogni({ ...picked.cogni, foundAt: new Date().toISOString() });
     setFound(picked);
     setPhase('result');

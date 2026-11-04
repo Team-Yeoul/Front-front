@@ -147,7 +147,7 @@ export function fromFirstCogni(fc: FirstCogni): FoundCogni {
   const category = CATEGORY_LABEL[fc.category] ?? '패턴';
   const cogni = {
     id: fc.monster_id,
-    name: fc.name,
+    name: monsterName({ category: fc.category }, { fallbacks: [fc.name] }),
     desc: fc.description,
     category,
     image: fc.icon_url || '/v2/mascot-glasses.png',
@@ -156,4 +156,30 @@ export function fromFirstCogni(fc: FirstCogni): FoundCogni {
     features: fc.features?.length ? fc.features : [fc.description],
   };
   return { cogni, label: category };
+}
+
+const HANGUL = /[가-힣]/;
+const CATEGORY_NAME: Record<string, string> = {
+  COGNITIVE: '생각하는 코그니',
+  EMOTIONAL: '감정 코그니',
+  BEHAVIORAL: '습관 코그니',
+  RELATIONAL: '관계 코그니',
+  GROWTH: '성장 코그니',
+  SITUATIONAL: '상황 코그니',
+};
+
+/** 한국어가 들어 있는 이름인지. 서버 칭호가 비면 영어 monster_code가 오므로 이걸로 거른다. */
+export const isKoreanName = (s?: string | null): s is string => !!s && HANGUL.test(s);
+
+/**
+ * 서버 몬스터의 화면 이름. 현재 칭호 → 지금 단계 칭호 → 1단계 칭호 → 그 밖의 후보 순으로 한국어 이름을 고르고,
+ * 모두 비었거나 영어뿐이면 분류로 지은 한국어 이름을 쓴다. 영어 monster_code는 보여주지 않는다.
+ */
+export function monsterName(
+  m: { stage_titles?: string[] | null; category: string },
+  opts: { current?: string | null; stage?: number; fallbacks?: (string | null | undefined)[] } = {},
+): string {
+  const titles = m.stage_titles ?? [];
+  const candidates = [opts.current, opts.stage ? titles[opts.stage - 1] : undefined, titles[0], ...(opts.fallbacks ?? [])];
+  return candidates.find(isKoreanName) ?? CATEGORY_NAME[m.category] ?? '코그니';
 }
