@@ -1,4 +1,4 @@
-import { useAuthStore } from '@/store';
+import { syncAuthFromStorage, useAuthStore } from '@/store';
 import type { components } from './schema.gen';
 
 export type ErrorCode = components['schemas']['ErrorCode'];
@@ -56,6 +56,8 @@ let refreshing: Promise<boolean> | null = null;
 function refreshAccessToken(): Promise<boolean> {
   if (refreshing) return refreshing;
   refreshing = (async () => {
+    // 다른 탭이 이미 갱신했다면 그 탭이 저장한 토큰으로 갱신해야 한다(예전 토큰은 서버에서 폐기됨).
+    await syncAuthFromStorage();
     const { refreshToken } = useAuthStore.getState();
     if (!refreshToken) return false;
     const res = await fetch(`${BASE_URL}/v1/auth/token/refresh`, {
@@ -65,7 +67,7 @@ function refreshAccessToken(): Promise<boolean> {
     });
     if (!res.ok) {
       if (res.status >= 500) throw new ApiError(res.status, await res.json().catch(() => ({})));
-      return false;
+      return adoptNewerTokenFromOtherTab(refreshToken);
     }
     const data = (await res.json()) as components['schemas']['AuthResponse'];
     // 갱신하는 동안 로그아웃·탈퇴(또는 다른 계정 로그인)가 있었다면 그 세션을 되살리지 않는다.
@@ -77,6 +79,20 @@ function refreshAccessToken(): Promise<boolean> {
     refreshing = null;
   });
   return refreshing;
+}
+
+/**
+ * 갱신이 거부됐을 때, 다른 탭이 같은 refresh token으로 먼저 갱신해서 폐기된 것인지 확인한다.
+ * 그 탭이 새 토큰을 저장했으면 그걸 받아 쓰고 true. 저장이 조금 늦을 수 있어 한 번 더 기다려 본다.
+ */
+async function adoptNewerTokenFromOtherTab(usedRefreshToken: string): Promise<boolean> {
+  for (const waitMs of [0, 1000]) {
+    if (waitMs) await new Promise((r) => setTimeout(r, waitMs));
+    await syncAuthFromStorage();
+    const { refreshToken, accessToken } = useAuthStore.getState();
+    if (refreshToken !== usedRefreshToken) return !!accessToken;
+  }
+  return false;
 }
 
 export async function apiRequest<T>(path: string, config: RequestConfig = {}, retried = false): Promise<T> {
@@ -95,7 +111,8 @@ export async function apiRequest<T>(path: string, config: RequestConfig = {}, re
   // 로그인이 유지되는 동안 토큰이 만료되면 한 번 갱신해 재시도하고, 실패하면 로그아웃한다.
   if (res.status === 401 && auth) {
     if (!retried) {
-      // 이 요청을 보낸 뒤 다른 요청이 이미 토큰을 갱신했다면, 다시 갱신하지 않고 새 토큰으로 재시도한다.
+      // 이 요청을 보낸 뒤 다른 요청(또는 다른 탭)이 이미 토큰을 갱신했다면, 다시 갱신하지 않고 새 토큰으로 재시도한다.
+      await syncAuthFromStorage();
       const latest = useAuthStore.getState().accessToken;
       if (latest && latest !== token) return apiRequest<T>(path, config, true);
       if (await refreshAccessToken()) return apiRequest<T>(path, config, true);

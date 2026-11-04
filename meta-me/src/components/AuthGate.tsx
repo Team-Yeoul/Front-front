@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useAuthStore, useLocalStore } from '@/store';
+import { AUTH_STORAGE_KEY, syncAuthFromStorage, useAuthStore, useLocalStore } from '@/store';
 
 /** 로그인 없이 볼 수 있는 경로. 나머지는 로그인이 필요하다. */
 const PUBLIC = ['/login', '/signup', '/terms', '/forgot-password', '/notifications', '/feedback/'];
@@ -20,6 +20,15 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     Promise.all([useAuthStore.persist.rehydrate(), useLocalStore.persist.rehydrate()]).finally(() => setReady(true));
+  }, []);
+
+  // 다른 탭에서 토큰을 갱신하거나 로그인·로그아웃하면 이 탭에도 바로 반영한다.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === AUTH_STORAGE_KEY || e.key === null) void syncAuthFromStorage();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   const blocked = ready && !token && !isPublic(pathname);
