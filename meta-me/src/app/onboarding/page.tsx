@@ -415,7 +415,18 @@ export default function OnboardingPage() {
   // 서버가 배정한 첫 코그니. 제출 응답이 분석 화면보다 늦을 수 있어 발견할 때 이 약속을 기다린다.
   const serverCogni = useRef<Promise<FoundCogni | undefined>>(undefined);
 
-  const submit = async () => {
+  // 진행 중인 제출. 분석 화면에서 보낸 제출이 끝나기 전에 '여정 시작하기'를 누르면 새로 보내지 않고 이걸 기다린다.
+  // 겹쳐 보내면 서버가 둘 다 저장하려다 뒤의 것이 400(INVALID_REQUEST)으로 실패해, 저장됐는데도 실패로 보였다.
+  const pendingSubmit = useRef<Promise<boolean>>(undefined);
+  const submit = () => {
+    pendingSubmit.current ??= send().then((ok) => {
+      // 실패하면 다음에 다시 보낼 수 있게 비운다.
+      if (!ok) pendingSubmit.current = undefined;
+      return ok;
+    });
+    return pendingSubmit.current;
+  };
+  const send = async () => {
     const byId = (id: string) => labelOf(answers[id], ONBOARDING_QUESTIONS.find((x) => x.id === id)) || '아직 모르겠어요';
     const sentence = labelOf(answers.my_one_sentence);
     if (sentence) me.patch((u) => ({ ...u, mySentence: sentence }));
