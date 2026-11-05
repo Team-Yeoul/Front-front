@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store';
 import { useMe } from '@/hooks/useMe';
 import { useExportRecords } from '@/hooks/useExportRecords';
@@ -18,6 +19,9 @@ function Stat({ value, label }: { value: number; label: string }) {
 }
 
 export default function ExportRecordsPage() {
+  const router = useRouter();
+  // 설정으로 새 항목을 push하면 설정의 뒤로가기(router.back)가 다시 이 페이지로 돌아오므로, 기록을 되돌린다.
+  const back = () => (window.history.length > 1 ? router.back() : router.replace('/settings'));
   const accessToken = useAuthStore((s) => s.accessToken);
   const me = useMe();
   const { data, isError, refetch, isFetching } = useExportRecords(!!accessToken);
@@ -33,7 +37,7 @@ export default function ExportRecordsPage() {
 
   return (
     <Screen footer={footer}>
-      <TopBar title="기록 내보내기" backHref="/settings" />
+      <TopBar title="기록 내보내기" onBack={back} />
       <div className="px-5 pb-8">
         {!data && !isError && <p className="text-center text-[14px] text-sub mt-24">기록을 모으는 중...</p>}
         {isError && (
