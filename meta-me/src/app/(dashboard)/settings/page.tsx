@@ -127,7 +127,7 @@ export default function SettingsPage() {
           <Row label="마케팅 정보 수신" right={<Toggle on={noti?.marketing_consent ?? false} disabled={!noti} onChange={(v) => setNoti({ marketing_consent: v })} />} />
         </Group>
         <Group title="데이터">
-          <Row label="기록 내보내기" />
+          <Row label="기록 내보내기" onClick={() => router.push('/settings/export')} />
           <Row label="객관화 기록 보관" value="12개월" />
         </Group>
         <Group title="정보">
