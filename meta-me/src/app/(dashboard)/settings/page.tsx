@@ -131,8 +131,8 @@ export default function SettingsPage() {
           <Row label="객관화 기록 보관" value="12개월" />
         </Group>
         <Group title="정보">
-          <Row label="이용약관" onClick={() => router.push('/terms')} />
-          <Row label="개인정보 처리방침" onClick={() => router.push('/terms')} />
+          <Row label="이용약관" onClick={() => router.push('/settings/terms/service')} />
+          <Row label="개인정보 처리방침" onClick={() => router.push('/settings/terms/privacy')} />
           <Row label="버전" value="1.0.3" />
         </Group>
         <div className="flex gap-5 px-1 mt-6">
