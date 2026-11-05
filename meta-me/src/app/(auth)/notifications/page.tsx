@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store';
-import { useUpdateNotificationSettings, userApi } from '@/entities/user';
+import { useGetNotificationSettings, useUpdateNotificationSettings, userApi } from '@/entities/user';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button, Img3D, TextButton } from '@/components/ui/primitives';
 import { HourSlider } from '@/components/ui/HourSlider';
@@ -35,15 +35,41 @@ function NotificationPreview({ dim = false }: { dim?: boolean }) {
   );
 }
 
+/** 서버 "HH:mm" → 슬라이더 시각(18~26). 범위 밖이면 null. */
+const toSliderHour = (time?: string | null) => {
+  const h = Number(time?.split(':')[0]);
+  if (!time || Number.isNaN(h)) return null;
+  const v = h < 6 ? h + 24 : h;
+  return v >= MIN_HOUR && v <= MAX_HOUR ? v : null;
+};
+
 export default function NotificationsPage() {
+  return (
+    <Suspense>
+      <NotificationsContent />
+    </Suspense>
+  );
+}
+
+function NotificationsContent() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
+  // 설정 > 기록 리마인더에서 들어오면 시간만 바꾸고 설정으로 돌아간다 (온보딩으로 보내지 않음).
+  const fromSettings = useSearchParams().get('from') === 'settings';
+  const { data: current } = useGetNotificationSettings(!!accessToken && fromSettings);
   const updateSettings = useUpdateNotificationSettings();
-  const [step, setStep] = useState<'permission' | 'time'>('permission');
+  const [step, setStep] = useState<'permission' | 'time'>(fromSettings ? 'time' : 'permission');
   const [dialog, setDialog] = useState(false);
   const [hour, setHour] = useState(22);
 
+  // 설정에서 들어온 경우 현재 저장된 시각으로 슬라이더를 맞춘다.
+  const savedHour = toSliderHour(current?.daily_question_time);
+  useEffect(() => {
+    if (savedHour !== null) setHour(savedHour);
+  }, [savedHour]);
+
   const goOnboarding = () => router.push('/onboarding');
+  const goNext = () => (fromSettings ? router.back() : goOnboarding());
 
   // 데일리 질문 알림 시각을 서버(daily_question_time, HH:mm)에 저장한다.
   const saveTime = async () => {
@@ -52,10 +78,10 @@ export default function NotificationsPage() {
         const current = await userApi.getNotificationSettings();
         await updateSettings.mutateAsync({ ...current, daily_question_time: `${String(hour % 24).padStart(2, '0')}:00` });
       } catch {
-        // 실패해도 온보딩은 이어간다
+        // 실패해도 흐름은 이어간다
       }
     }
-    goOnboarding();
+    goNext();
   };
 
   const allow = async (enabled: boolean) => {
@@ -80,14 +106,14 @@ export default function NotificationsPage() {
             <Button variant="dark" onClick={saveTime} disabled={updateSettings.isPending}>
               이 시간에 알림 받기
             </Button>
-            <TextButton className="mt-1" onClick={goOnboarding}>
-              나중에 설정할게요
+            <TextButton className="mt-1" onClick={goNext}>
+              {fromSettings ? '취소' : '나중에 설정할게요'}
             </TextButton>
           </>
         }
       >
         <div className="px-5 pt-2">
-          <BackButton onClick={() => setStep('permission')} />
+          <BackButton onClick={() => (fromSettings ? router.back() : setStep('permission'))} />
           <h1 className="text-[22px] font-bold text-ink leading-[1.45] mt-6">
             매일 몇 시에
             <br />

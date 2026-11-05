@@ -122,7 +122,7 @@ export default function SettingsPage() {
           <Row label="연결된 계정" value="이메일" />
         </Group>
         <Group title="알림">
-          <Row label="기록 리마인더" value={alarm} onClick={() => router.push('/notifications')} />
+          <Row label="기록 리마인더" value={alarm} onClick={() => router.push('/notifications?from=settings')} />
           <Row label="푸시 알림" right={<Toggle on={noti?.push_enabled ?? true} disabled={!noti} onChange={(v) => setNoti({ push_enabled: v })} />} />
           <Row label="마케팅 정보 수신" right={<Toggle on={noti?.marketing_consent ?? false} disabled={!noti} onChange={(v) => setNoti({ marketing_consent: v })} />} />
         </Group>
