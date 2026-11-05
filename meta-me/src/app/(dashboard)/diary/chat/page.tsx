@@ -161,7 +161,8 @@ export default function DiaryChatPage() {
 
   const goTail1 = async () => {
     const text = await askTail(tail1IdRef, FALLBACK_TAIL_1);
-    appendAi(text, '시간 맥락');
+    // 꼬리 질문 응답에는 질문 유형이 없어서, 이어 묻는 메인 질문의 맥락 배지를 그대로 쓴다.
+    appendAi(text, questionBadge);
     setTurn('tail1');
   };
 
