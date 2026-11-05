@@ -104,11 +104,30 @@ export function Img3D({ name, size, className = '' }: { name: Asset3D; size: num
   );
 }
 
+/**
+ * 서버 icon_url(…/monsters/png/<코드>/<단계>.png)은 70px 남짓이라 크게 띄우면 흐려진다.
+ * 같은 경로에 벡터 SVG(…/monsters/svg/<코드>/<단계>.svg)가 있어 그것을 쓴다. 다른 주소는 그대로 둔다.
+ */
+const vectorOf = (src: string) => src.replace(/\/monsters\/png\/(.+)\.png(\?.*)?$/, '/monsters/svg/$1.svg$2');
+
 /** 코그니 캐릭터 이미지 (로컬 에셋 경로 또는 서버 icon_url). */
 export function CogniImg({ src, size, className = '' }: { src: string; size: number; className?: string }) {
+  const vector = vectorOf(src);
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="" width={size} className={`h-auto select-none object-contain ${className}`} draggable={false} />
+    <img
+      // 주소가 바뀌면 SVG부터 다시 시도하도록 새로 그린다.
+      key={src}
+      src={vector}
+      alt=""
+      width={size}
+      className={`h-auto select-none object-contain ${className}`}
+      draggable={false}
+      // SVG가 없으면 원래 PNG로 돌아간다(한 번만).
+      onError={(e) => {
+        if (vector !== src && e.currentTarget.getAttribute('src') !== src) e.currentTarget.src = src;
+      }}
+    />
   );
 }
 

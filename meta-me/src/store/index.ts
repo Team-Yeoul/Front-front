@@ -10,6 +10,8 @@ interface AuthStore {
   clearAuth: () => void;
 }
 
+export const AUTH_STORAGE_KEY = 'metame-auth';
+
 // 새로고침해도 로그인이 유지되도록 localStorage에 저장한다.
 // SSR과 첫 렌더가 어긋나지 않게 skipHydration 후 <AuthGate>에서 rehydrate한다.
 export const useAuthStore = create<AuthStore>()(
@@ -21,9 +23,15 @@ export const useAuthStore = create<AuthStore>()(
       setAuth: (accessToken, refreshToken, userId) => set({ accessToken, refreshToken, userId }),
       clearAuth: () => set({ accessToken: null, refreshToken: null, userId: null }),
     }),
-    { name: 'metame-auth', storage: createJSONStorage(() => localStorage), skipHydration: true },
+    { name: AUTH_STORAGE_KEY, storage: createJSONStorage(() => localStorage), skipHydration: true },
   ),
 );
+
+/**
+ * 다른 탭이 저장한 최신 토큰을 이 탭으로 가져온다. 탭마다 메모리에 토큰을 따로 들고 있어서,
+ * 다른 탭이 갱신(서버가 예전 refresh token을 폐기)한 뒤 예전 토큰으로 갱신을 시도하면 로그아웃되는 문제를 막는다.
+ */
+export const syncAuthFromStorage = () => useAuthStore.persist.rehydrate();
 
 export * from './local';
 

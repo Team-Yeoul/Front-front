@@ -20,22 +20,37 @@ interface GoogleId {
 type GoogleWindow = Window & { google?: { accounts: { id: GoogleId } } };
 
 let gsiLoading: Promise<GoogleId> | null = null;
+// initialize는 앱 전체에서 한 번만 부른다. 로그인 결과는 지금 화면에 있는 버튼의 핸들러로 넘긴다.
+let credentialHandler: ((idToken: string) => void) | null = null;
 
-/** Google Identity Services 스크립트를 한 번만 불러온다. */
-function loadGsi(): Promise<GoogleId> {
+function loadGsiScript(): Promise<GoogleId> {
   const w = window as GoogleWindow;
   if (w.google?.accounts?.id) return Promise.resolve(w.google.accounts.id);
-  gsiLoading ??= new Promise<GoogleId>((resolve, reject) => {
+  return new Promise<GoogleId>((resolve, reject) => {
     const script = document.createElement('script');
     script.src = GSI_SRC;
     script.async = true;
     script.onload = () => (w.google?.accounts?.id ? resolve(w.google.accounts.id) : reject(new Error('GSI unavailable')));
-    script.onerror = () => {
-      gsiLoading = null;
-      reject(new Error('GSI load failed'));
-    };
+    script.onerror = () => reject(new Error('GSI load failed'));
     document.head.appendChild(script);
   });
+}
+
+/** Google Identity Services 스크립트를 불러오고 initialize까지 한 번만 한다. */
+function loadGsi(): Promise<GoogleId> {
+  gsiLoading ??= loadGsiScript()
+    .then((id) => {
+      id.initialize({
+        client_id: CLIENT_ID,
+        ux_mode: 'popup',
+        callback: ({ credential }) => credential && credentialHandler?.(credential),
+      });
+      return id;
+    })
+    .catch((err) => {
+      gsiLoading = null;
+      throw err;
+    });
   return gsiLoading;
 }
 
@@ -53,7 +68,7 @@ export function GoogleLoginButton() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  // 콜백은 initialize 때 한 번만 넘기므로 최신 핸들러를 ref로 들고 있는다.
+  // 렌더마다 바뀌는 핸들러를 ref로 들고, credentialHandler는 이 ref를 거쳐 부른다.
   const onCredential = useRef<(idToken: string) => void>(() => {});
   onCredential.current = async (idToken: string) => {
     setBusy(true);
@@ -76,14 +91,11 @@ export function GoogleLoginButton() {
   useEffect(() => {
     if (!CLIENT_ID) return;
     let cancelled = false;
+    const handler = (idToken: string) => onCredential.current(idToken);
+    credentialHandler = handler;
     loadGsi()
       .then((id) => {
         if (cancelled || !overlayRef.current) return;
-        id.initialize({
-          client_id: CLIENT_ID,
-          ux_mode: 'popup',
-          callback: ({ credential }) => credential && onCredential.current(credential),
-        });
         id.renderButton(overlayRef.current, {
           type: 'standard',
           size: 'large',
@@ -94,6 +106,7 @@ export function GoogleLoginButton() {
       .catch(() => !cancelled && setError('Google 로그인을 불러오지 못했어요.'));
     return () => {
       cancelled = true;
+      if (credentialHandler === handler) credentialHandler = null;
     };
   }, []);
 

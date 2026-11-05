@@ -65,8 +65,15 @@ export const ONBOARDING_COGNIS = {
 
 type CogniKey = keyof typeof ONBOARDING_COGNIS;
 
-/** 반복 패턴 답(가중치 2)과 알고 싶은 것 답(가중치 1)이 가리키는 코그니. */
+/**
+ * 반복 패턴 답(가중치 2)과 알고 싶은 것 답(가중치 1)이 가리키는 코그니.
+ * 예전 온보딩 선택지는 그 답으로 가입한 계정의 프로필에서 다시 고를 때 쓰므로 남겨 둔다.
+ */
 const PATTERN_TO_COGNI: Record<string, CogniKey> = {
+  '혼자 깊이 파고들 때 즐거워요': 'observer',
+  '하고 싶은 게 많아 이것저것 시작해요': 'explorer',
+  '계획은 세우는데 실행이 어려워요': 'planner',
+  '기분에 따라 하루가 크게 달라져요': 'wave',
   '계획은 세우는데 잘 안 지켜요': 'planner',
   '시작하기가 어려워요': 'starter',
   '감정에 따라 행동이 많이 바뀌어요': 'wave',
@@ -75,6 +82,11 @@ const PATTERN_TO_COGNI: Record<string, CogniKey> = {
   '특별한 패턴은 아직 모르겠어요': 'observer',
 };
 const CURIOUS_TO_COGNI: Record<string, CogniKey> = {
+  '내가 진짜 좋아하는 것': 'explorer',
+  '내가 잘하는 것, 나의 강점': 'explorer',
+  '에너지가 차오르는 순간과 빠지는 순간': 'wave',
+  '감정이 움직이는 패턴': 'wave',
+  '자꾸 미루거나 멈추는 이유': 'starter',
   '내가 왜 자꾸 미루는지': 'starter',
   '내가 뭘 좋아하고 잘하는지': 'explorer',
   '내 감정 패턴이 어떤지': 'wave',
@@ -83,12 +95,27 @@ const CURIOUS_TO_COGNI: Record<string, CogniKey> = {
   '아직 잘 모르겠어요': 'observer',
 };
 
+/** 직접 쓴 한 문장에 들어 있으면 그 코그니를 가리키는 단어(어간). 단어 하나마다 가중치 2. */
+const KEYWORDS: Record<CogniKey, string[]> = {
+  planner: ['계획', '준비', '정리', '마감', '꼼꼼', '체계', '목표', '일정', '루틴', '효율'],
+  starter: ['미루', '미뤄', '시작', '귀찮', '게으', '망설', '신중', '완벽', '걱정', '고민'],
+  wave: ['기분', '감정', '우울', '불안', '짜증', '화가', '화나', '눈물', '예민', '스트레스'],
+  explorer: ['원하', '좋아하', '꿈', '방향', '진로', '도전', '새로운', '호기심', '탐험', '여행'],
+  observer: ['관찰', '생각이 많', '조용', '혼자', '내향', '차분', '궁금', '알고 싶', '돌아보', '사람들'],
+};
+
 const asList = (a: unknown) => (Array.isArray(a) ? (a as string[]) : []);
 
-/** 온보딩 답으로 첫 코그니를 고른다. 점수가 같으면 먼저 고른 답을 따르고, 단서가 없으면 관찰자. */
+/**
+ * 온보딩 답으로 첫 코그니를 고른다. 직접 쓴 한 문장의 단어(2) · 반복 패턴 답(2) · 알고 싶은 것 답(1)을 더한다.
+ * 점수가 같으면 한 문장, 먼저 고른 답 순으로 따르고, 단서가 없으면 관찰자.
+ */
 export function pickOnboardingCogni(answers: Record<string, unknown>): FoundCogni {
   const score = new Map<CogniKey, number>();
   const add = (key: CogniKey | undefined, w: number) => key && score.set(key, (score.get(key) ?? 0) + w);
+  const sentence = typeof answers.my_one_sentence === 'string' ? answers.my_one_sentence : '';
+  for (const [key, words] of Object.entries(KEYWORDS) as [CogniKey, string[]][])
+    words.filter((w) => sentence.includes(w)).forEach(() => add(key, 2));
   asList(answers.repeating_pattern).forEach((p) => add(PATTERN_TO_COGNI[p], 2));
   asList(answers.curious_about).forEach((c) => add(CURIOUS_TO_COGNI[c], 1));
 
@@ -120,7 +147,7 @@ export function fromFirstCogni(fc: FirstCogni): FoundCogni {
   const category = CATEGORY_LABEL[fc.category] ?? '패턴';
   const cogni = {
     id: fc.monster_id,
-    name: fc.name,
+    name: monsterName({ category: fc.category }, { fallbacks: [fc.name] }),
     desc: fc.description,
     category,
     image: fc.icon_url || '/v2/mascot-glasses.png',
@@ -129,4 +156,30 @@ export function fromFirstCogni(fc: FirstCogni): FoundCogni {
     features: fc.features?.length ? fc.features : [fc.description],
   };
   return { cogni, label: category };
+}
+
+const HANGUL = /[가-힣]/;
+const CATEGORY_NAME: Record<string, string> = {
+  COGNITIVE: '생각하는 코그니',
+  EMOTIONAL: '감정 코그니',
+  BEHAVIORAL: '습관 코그니',
+  RELATIONAL: '관계 코그니',
+  GROWTH: '성장 코그니',
+  SITUATIONAL: '상황 코그니',
+};
+
+/** 한국어가 들어 있는 이름인지. 서버 칭호가 비면 영어 monster_code가 오므로 이걸로 거른다. */
+export const isKoreanName = (s?: string | null): s is string => !!s && HANGUL.test(s);
+
+/**
+ * 서버 몬스터의 화면 이름. 현재 칭호 → 지금 단계 칭호 → 1단계 칭호 → 그 밖의 후보 순으로 한국어 이름을 고르고,
+ * 모두 비었거나 영어뿐이면 분류로 지은 한국어 이름을 쓴다. 영어 monster_code는 보여주지 않는다.
+ */
+export function monsterName(
+  m: { stage_titles?: string[] | null; category: string },
+  opts: { current?: string | null; stage?: number; fallbacks?: (string | null | undefined)[] } = {},
+): string {
+  const titles = m.stage_titles ?? [];
+  const candidates = [opts.current, opts.stage ? titles[opts.stage - 1] : undefined, titles[0], ...(opts.fallbacks ?? [])];
+  return candidates.find(isKoreanName) ?? CATEGORY_NAME[m.category] ?? '코그니';
 }
