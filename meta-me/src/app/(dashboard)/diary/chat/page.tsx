@@ -35,12 +35,29 @@ const QUESTION_TYPE_LABEL: Record<string, string> = {
 };
 
 const FALLBACK_QUESTION = '오늘 하루는 어떤 장면으로 남았나요?';
-const FALLBACK_TAIL_1 = '그 장면을 조금 더 자세히 들려줄 수 있나요? 그렇게 느낀 이유까지 알려주세요.';
+// 메인 질문이 장면을 묻지 않을 때도 있어서 '그 장면' 같은 지시어 없이 묻는다.
+const FALLBACK_TAIL_1 = '방금 이야기를 조금 더 자세히 들려줄 수 있나요? 그렇게 느낀 이유까지 알려주세요.';
 const FALLBACK_TAIL_2 = '이 조합, 어떤 상황이었나요?';
 // 명세상 최대 길이: user_answer 2000자, scene_description 1000자
 const MAX_ANSWER = 2000;
 const MAX_SCENE = 1000;
 const EMOTION_CHIPS = ['몰입', '조급함', '뿌듯함', '지침', '무던함', '편안함', '설렘', '답답함'];
+
+// 답이 '모르겠음', 'ㅋㅋ'처럼 내용이 거의 없으면 한 번 더 쉽게 다시 묻는다.
+const RETRY_PROMPT: Partial<Record<TurnKey, string>> = {
+  main: '괜찮아요, 거창하지 않아도 돼요. 오늘 있었던 일 하나만 떠올려볼까요? 점심에 먹은 것, 누군가와 나눈 대화처럼 작은 것도 좋아요.',
+  tail1: '떠오르지 않아도 괜찮아요. 그때 기분이 어땠는지 한 단어로만 말해줘도 돼요. 어렵다면 건너뛰어도 괜찮아요.',
+  tail2: '딱 떠오르지 않으면 비슷했던 순간 아무거나 괜찮아요. 어렵다면 건너뛰어도 돼요.',
+};
+const VAGUE_PATTERN = /(모르겠|몰라|모름|몰루|글쎄|기억\s*(이\s*)?안|생각\s*(이\s*)?안|딱히|별거\s*없|없음|없어|없는데|그냥)/;
+const isVagueAnswer = (raw: string) => {
+  const t = raw.replace(/[\s.,!?~…·'"()\-]/g, '');
+  if (t.length < 2) return true;
+  // 완성형 글자나 알파벳이 없으면(ㅋㅋ, ㅁㄴㅇㄹ, 이모지만) 내용이 없는 답으로 본다.
+  if (!/[가-힣a-zA-Z0-9]/.test(t)) return true;
+  if (/^(.)\1+$/.test(t)) return true;
+  return t.length <= 20 && VAGUE_PATTERN.test(t);
+};
 
 let uid = 0;
 const nextId = () => `m${++uid}`;
@@ -78,6 +95,8 @@ export default function DiaryChatPage() {
   const tail1IdRef = useRef<string | null>(null);
   const tail2IdRef = useRef<string | null>(null);
   const tail1Saved = useRef(false);
+  // 턴마다 다시 묻기는 한 번만 한다(두 번째도 모호하면 그대로 받고 넘어간다).
+  const retried = useRef<Partial<Record<TurnKey, boolean>>>({});
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -142,7 +161,8 @@ export default function DiaryChatPage() {
 
   const goTail1 = async () => {
     const text = await askTail(tail1IdRef, FALLBACK_TAIL_1);
-    appendAi(text, '시간 맥락');
+    // 꼬리 질문 응답에는 질문 유형이 없어서, 이어 묻는 메인 질문의 맥락 배지를 그대로 쓴다.
+    appendAi(text, questionBadge);
     setTurn('tail1');
   };
 
@@ -215,8 +235,20 @@ export default function DiaryChatPage() {
     setTurn('summary');
   };
 
+  // 모호한 답이면 다시 묻고 true를 돌려준다. 이미 한 번 다시 물었으면 그대로 진행한다.
+  const retryIfVague = (text: string) => {
+    const prompt = RETRY_PROMPT[turn];
+    if (!prompt || retried.current[turn] || !isVagueAnswer(text)) return false;
+    retried.current[turn] = true;
+    appendUser(text);
+    setInput('');
+    appendAi(prompt);
+    return true;
+  };
+
   const send = async () => {
     const text = input.trim();
+    if ((turn === 'main' || turn === 'tail1' || turn === 'tail2') && text && retryIfVague(text)) return;
     if (turn === 'main' && text) {
       answers.current.main = text;
       if (mainAsksMyselfMoment) answers.current.myselfMoment = text;
