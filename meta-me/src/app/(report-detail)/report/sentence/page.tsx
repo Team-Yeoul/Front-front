@@ -19,9 +19,10 @@ export default function MySentencePage() {
     <Screen
       footer={
         <>
-          <Button onClick={() => router.push('/onboarding')}>문장 다시 쓰기</Button>
+          {/* 온보딩은 한 번만 제출할 수 있어(409) 여기서 다시 보내지 않는다. 문장은 기록이 쌓이며 갱신된다. */}
+          <Button onClick={() => router.push('/main')}>홈으로</Button>
           <TextButton className="mt-1" onClick={() => router.push('/report')}>
-            리포트로 돌아가기
+            리포트 보기
           </TextButton>
         </>
       }
