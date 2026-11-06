@@ -12,11 +12,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.2",
-    "@zxing/browser": "^0.1.5",
-    "@zxing/library": "^0.21.3",
-    "lucide-react": "^1.24.0",
     "next": "15.5.22",
-    "next-auth": "^4.24.14",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "zustand": "^5.0.13"
