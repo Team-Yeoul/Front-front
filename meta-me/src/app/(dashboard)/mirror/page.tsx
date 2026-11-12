@@ -22,7 +22,6 @@ export default function MirrorIntroPage() {
             <path d="M15 5l-7 7 7 7" stroke="#1A1A1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <button className="text-[13px] text-[#48484F]">이미지 저장</button>
       </div>
       <div className="text-center mt-6">
         <p className="text-[16px] text-[#48484F]">당신은</p>

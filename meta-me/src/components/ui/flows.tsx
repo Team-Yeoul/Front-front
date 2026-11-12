@@ -179,12 +179,15 @@ export function CogniHero({
             <span className="font-mono text-[15px] font-bold text-primary">{counter}</span>
           </div>
           <div className="flex gap-2.5">
-            <button
-              onClick={onSave}
-              className="flex-1 h-[63px] rounded-2xl bg-white flex items-center justify-center gap-2 text-[16px] font-semibold text-ink"
-            >
-              <DownloadIcon /> 이미지 저장
-            </button>
+            {/* 저장 기능이 연결된 화면에서만 버튼을 보여준다. */}
+            {onSave && (
+              <button
+                onClick={onSave}
+                className="flex-1 h-[63px] rounded-2xl bg-white flex items-center justify-center gap-2 text-[16px] font-semibold text-ink"
+              >
+                <DownloadIcon /> 이미지 저장
+              </button>
+            )}
             <Button variant={primaryVariant} className="flex-1" onClick={onPrimary}>
               {primaryLabel}
             </Button>

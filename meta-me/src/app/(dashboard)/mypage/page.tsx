@@ -34,7 +34,7 @@ export default function MyPage() {
   const delta = profile?.latest_accuracy?.xp_delta ?? 0;
   const sentence = profile?.profile.ai_first_sentence || me.mySentence;
   const lv = `Lv.${String(level).padStart(2, '0')}`;
-  // 기본은 가장 최근에 모은 코그니, ↺ 버튼으로 모은 코그니를 돌려 본다.
+  // 기본은 가장 최근에 모은 코그니, '내가 모은 코그니'에서 고르면 그 코그니를 보여준다.
   const idx = shownIdx ?? latestIndex(collection);
   const character = collection[idx];
 
@@ -128,16 +128,6 @@ export default function MyPage() {
             <p className="text-[14px] text-sub">아직 모은 코그니가 없어요</p>
           )}
           <div className="absolute right-2 top-2 flex flex-col gap-3">
-            <button
-              onClick={() => collection.length > 1 && setShownIdx((idx - 1 + collection.length) % collection.length)}
-              disabled={collection.length < 2}
-              className="w-9 h-9 rounded-full bg-primary flex items-center justify-center disabled:opacity-40"
-              aria-label="다른 코그니 보기"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4.5h4.5" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
             <button onClick={() => setCollectionOpen(true)} className="w-9 h-9 rounded-full bg-primary flex items-center justify-center" aria-label="내가 모은 코그니">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                 <path d="M7 17L17 7M9 7h8v8" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
