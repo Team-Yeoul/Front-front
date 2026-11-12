@@ -53,12 +53,8 @@ export default function ReportHubPage() {
         <p className="font-mono text-[12px] tracking-[0.12em] text-sub">REPORT ME</p>
         <div className="flex items-center justify-between mt-1">
           <h1 className="text-[26px] font-bold text-ink">리포트</h1>
-          <button className="h-9 px-3.5 rounded-full bg-surface-2 text-[14px] font-semibold text-ink flex items-center gap-1.5">
-            {r.week.label}
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-              <path d="M6 9l6 6 6-6" stroke="#1A1A1E" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+          {/* 주 선택은 아직 지원하지 않아 이번 주 라벨만 보여준다. */}
+          <span className="h-9 px-3.5 rounded-full bg-surface-2 text-[14px] font-semibold text-ink flex items-center">{r.week.label}</span>
         </div>
       </div>
 

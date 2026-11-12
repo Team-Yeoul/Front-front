@@ -14,7 +14,6 @@ import type { NotificationSetting } from '@/entities/user';
 import { Screen } from '@/components/ui/Screen';
 import { Button, ChevronRight, Toast, Toggle, TopBar } from '@/components/ui/primitives';
 import { Modal } from '@/components/ui/overlays';
-import { useMe } from '@/hooks/useMe';
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -32,7 +31,8 @@ function Row({ label, value, right, onClick }: { label: string; value?: string; 
       {right ?? (
         <span className="flex items-center gap-1.5 text-[14px] text-sub">
           {value}
-          <ChevronRight size={15} />
+          {/* 누를 수 있는 행에만 화살표를 붙인다. */}
+          {onClick && <ChevronRight size={15} />}
         </span>
       )}
     </div>
@@ -50,7 +50,6 @@ export default function SettingsPage() {
   const updateNoti = useUpdateNotificationSettings();
   const logout = useLogout();
   const withdraw = useWithdrawAccount();
-  const me = useMe();
   const alarm = noti?.push_enabled === false ? '꺼짐' : noti?.daily_question_time ? `매일 ${noti.daily_question_time}` : '';
   const [confirm, setConfirm] = useState<'logout' | 'withdraw' | null>(null);
   const [toast, setToast] = useState('');
@@ -117,7 +116,6 @@ export default function SettingsPage() {
       <TopBar title="설정" />
       <div className="px-5 pb-8">
         <Group title="계정">
-          <Row label="프로필 편집" value={me.nickname || account?.user.username || ''} />
           <Row label="이메일" value={account?.user.email ?? ''} />
           <Row label="연결된 계정" value="이메일" />
         </Group>

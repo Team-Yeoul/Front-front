@@ -89,7 +89,7 @@ export default function DiaryListPage() {
         </button>
       }
     >
-      <TopBar title="다이어리" backHref="/main" right={<button className="text-[14px] font-semibold text-primary">검색</button>} />
+      <TopBar title="다이어리" backHref="/main" />
       <div className="flex gap-2 px-5 mt-1">
         {FILTERS.map((f) => (
           <button
