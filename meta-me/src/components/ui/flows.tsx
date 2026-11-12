@@ -153,17 +153,20 @@ export function CogniHero({
           )}
           {topRight}
         </div>
-        {(eyebrow || name) && (
-          <div className="text-center -mt-2">
-            {eyebrow && <p className="text-[15px] text-[#48484F]">{eyebrow}</p>}
-            {name && <h1 className="text-[26px] font-bold text-ink leading-[1.35] mt-1.5">{name}</h1>}
+        {/* 이름과 캐릭터를 한 덩어리로 남는 공간 가운데에 둔다. 캐릭터만 가운데 두면 이름과 사이가 크게 벌어진다. */}
+        <div className="flex-1 flex flex-col justify-center pb-6 min-h-[230px]">
+          {(eyebrow || name) && (
+            <div className="text-center">
+              {eyebrow && <p className="text-[15px] text-[#48484F]">{eyebrow}</p>}
+              {name && <h1 className="text-[26px] font-bold text-ink leading-[1.35] mt-1.5">{name}</h1>}
+            </div>
+          )}
+          <div className="flex flex-col items-center mt-12">
+            {imageSrc ? <CogniImg src={imageSrc} size={180} /> : <Img3D name={character} size={character === 'cogni-headphone' ? 190 : 180} />}
+            <span className="mt-3 h-7 px-3 rounded-full bg-white/90 text-[12px] font-semibold text-primary inline-flex items-center">
+              {category}
+            </span>
           </div>
-        )}
-        <div className="flex-1 flex flex-col items-center justify-center py-6 min-h-[230px]">
-          {imageSrc ? <CogniImg src={imageSrc} size={180} /> : <Img3D name={character} size={character === 'cogni-headphone' ? 190 : 180} />}
-          <span className="mt-3 h-7 px-3 rounded-full bg-white/90 text-[12px] font-semibold text-primary inline-flex items-center">
-            {category}
-          </span>
         </div>
         <div className="px-4 pb-4 flex flex-col gap-2.5">
           <div className="bg-white/85 backdrop-blur rounded-3xl px-4 py-4 flex flex-col gap-3.5">

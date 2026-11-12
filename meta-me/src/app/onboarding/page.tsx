@@ -647,11 +647,16 @@ export default function OnboardingPage() {
       <CogniHero
         eyebrow={displayName ? `${displayName}님의 첫 코그니는` : '나의 첫 코그니는'}
         name={
-          <>
-            {adjective}
-            <br />
-            {rest.join(' ')}
-          </>
+          // 한 단어 이름이면 빈 줄이 생기지 않게 줄바꿈을 넣지 않는다.
+          rest.length ? (
+            <>
+              {adjective}
+              <br />
+              {rest.join(' ')}
+            </>
+          ) : (
+            adjective
+          )
         }
         imageSrc={cogni.image}
         category={label}
