@@ -79,7 +79,9 @@ function DiaryWrite() {
   // 저장 시점에 409로 오늘 기록이 있다는 걸 알게 된 경우(undefined = 해당 없음)
   const [existingId, setExistingId] = useState<string | null | undefined>(undefined);
 
-  const { data: questionData } = useGetTodayDailyQuestion(!!accessToken && !editId);
+  const { data: questionData, isPending: questionPending } = useGetTodayDailyQuestion(!!accessToken && !editId);
+  // 질문을 불러오는 동안 기본 문구를 띄웠다가 실제 질문으로 바뀌지 않게 한다(실패하면 기본 문구를 쓴다).
+  const questionLoading = !!accessToken && !editId && questionPending;
   const { data: editing, isError: editLoadFailed } = useGetDailyRecord(editId ?? '', !!accessToken && !!editId);
   const editQuestion = editing?.questions?.[0];
   const rawQuestion = editId ? editQuestion?.question_text : questionData?.question?.question_text;
@@ -269,7 +271,7 @@ function DiaryWrite() {
             <Badge tone="primary" icon={<TrendIcon />}>
               {questionBadge}
             </Badge>
-            <h1 className="text-[21px] font-bold text-ink leading-[1.45] mt-3">{todayQuestion}</h1>
+            <h1 className="text-[21px] font-bold text-ink leading-[1.45] mt-3">{questionLoading ? '\u00a0' : todayQuestion}</h1>
             <div className="mt-4 rounded-3xl bg-surface px-5 py-5 h-[260px] flex flex-col">
               <textarea
                 value={answer}

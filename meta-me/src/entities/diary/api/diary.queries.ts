@@ -13,7 +13,11 @@ import type {
 
 export const diaryKeys = {
   all: ['diary'] as const,
-  todayQuestion: () => [...diaryKeys.all, 'today-question'] as const,
+  // 날짜를 키에 넣어 자정이 지나면 새 질문을 받는다.
+  todayQuestion: () => {
+    const d = new Date();
+    return [...diaryKeys.all, 'today-question', `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`] as const;
+  },
   // 파라미터와 관계없이 목록 전체를 무효화할 때 쓰는 접두 키
   recordLists: () => [...diaryKeys.all, 'records'] as const,
   records: (params?: ListDailyRecordsParams) => [...diaryKeys.recordLists(), params] as const,
@@ -26,6 +30,10 @@ export const useGetTodayDailyQuestion = (enabled = true) =>
     queryKey: diaryKeys.todayQuestion(),
     queryFn: diaryApi.getTodayDailyQuestion,
     enabled,
+    // 다시 불러올 때마다 서버가 다른 질문을 줄 수 있어, 한 번 받은 오늘 질문은 기록 저장으로 무효화되기 전까지 그대로 쓴다.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
 export const useCreateTailQuestion = () =>

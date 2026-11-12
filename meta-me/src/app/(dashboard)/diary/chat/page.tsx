@@ -66,7 +66,12 @@ export default function DiaryChatPage() {
   const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
   const { nickname } = useMe();
-  const { data: questionData } = useGetTodayDailyQuestion(!!accessToken);
+  const { data: fetchedQuestion, isPending: questionPending } = useGetTodayDailyQuestion(!!accessToken);
+  // 이 화면에 들어와 처음 받은 질문을 끝까지 쓴다(저장 후 무효화로 다시 불러와도 문구가 바뀌지 않게).
+  const [questionData, setQuestionData] = useState(fetchedQuestion);
+  if (fetchedQuestion && !questionData) setQuestionData(fetchedQuestion);
+  // 질문을 불러오는 동안 기본 문구를 띄웠다가 실제 질문으로 바뀌지 않게 한다(실패하면 기본 문구를 쓴다).
+  const questionLoading = !!accessToken && questionPending;
   const { data: profile, refetch: refetchProfile } = useGetMyProfile(!!accessToken);
   const createTailQuestion = useCreateTailQuestion();
   const updateTailAnswer = useUpdateTailQuestionAnswer();
@@ -330,7 +335,7 @@ export default function DiaryChatPage() {
             value={mode === 'FREE' ? freeText : ''}
             onChange={setFreeText}
             onSend={mode === 'AI' ? begin : submitFree}
-            sendEnabled={mode === 'AI' || (freeText.trim().length > 0 && !createRecord.isPending)}
+            sendEnabled={mode === 'AI' ? !questionLoading : freeText.trim().length > 0 && !createRecord.isPending}
             maxLength={MAX_ANSWER}
             placeholder={mode === 'AI' ? '첫 질문을 기다리는 중' : '오늘을 자유롭게 적어보세요'}
             chips={
@@ -365,7 +370,7 @@ export default function DiaryChatPage() {
         <div className="flex flex-col items-center pt-[110px]">
           <Img3D name="star-pink" size={210} />
           <h1 className="text-[22px] font-bold text-ink text-center leading-[1.5] mt-9 whitespace-pre-line">
-            {`${nickname ? `${nickname}님, ` : ''}${questionText.replace(/^오늘 하루는 /, '오늘 하루는\n')}`}
+            {questionLoading ? '\u00a0' : `${nickname ? `${nickname}님, ` : ''}${questionText.replace(/^오늘 하루는 /, '오늘 하루는\n')}`}
           </h1>
           {mode === 'FREE' && freeError && <p className="text-[13px] text-danger mt-4">{freeError}</p>}
         </div>
