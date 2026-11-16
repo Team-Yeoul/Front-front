@@ -19,7 +19,7 @@ const EMAIL_RULE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function SignupPage() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
-  const { service, privacy, marketing } = useTermsStore();
+  const { service, privacy, sensitive, marketing } = useTermsStore();
   const resetTerms = useTermsStore((s) => s.reset);
   const signupMutation = useSignup();
   const [nickname, setNickname] = useState('');
@@ -34,13 +34,13 @@ export default function SignupPage() {
   const submittedRef = useRef(false);
 
   useEffect(() => {
-    if (!submittedRef.current && (!service || !privacy)) router.replace('/terms');
-  }, [service, privacy, router]);
+    if (!submittedRef.current && (!service || !privacy || !sensitive)) router.replace('/terms');
+  }, [service, privacy, sensitive, router]);
 
   const emailError = email.length > 0 && !EMAIL_RULE.test(email) ? '올바른 이메일 형식으로 입력해 주세요' : undefined;
   const passwordError = password.length > 0 && !PASSWORD_RULE.test(password) ? '영문·숫자 조합 8~64자로 입력해 주세요' : undefined;
   const canSubmit =
-    nickname.trim().length > 0 && EMAIL_RULE.test(email) && PASSWORD_RULE.test(password) && birthDate.length > 0 && service && privacy;
+    nickname.trim().length > 0 && EMAIL_RULE.test(email) && PASSWORD_RULE.test(password) && birthDate.length > 0 && service && privacy && sensitive;
 
   const handleSubmit = async () => {
     if (!canSubmit || loading) return;
@@ -51,7 +51,12 @@ export default function SignupPage() {
       const res = await signupMutation.mutateAsync({ email, password, birth_date: birthDate, username: nickname.trim() });
       setAuth(res.access_token, res.refresh_token, res.user_id);
       // 계정 정보를 받기 전에도 바로 보이도록 기기에도 저장해 둔다.
-      useLocalStore.getState().update(res.user_id, (u) => ({ ...u, nickname: nickname.trim() }));
+      // 약관 화면에서 받은 민감정보 처리 동의도 함께 남긴다(서버에 동의 API가 아직 없음).
+      useLocalStore.getState().update(res.user_id, (u) => ({
+        ...u,
+        nickname: nickname.trim(),
+        sensitiveConsent: { agreed: true, at: new Date().toISOString() },
+      }));
       try {
         const current = await userApi.getNotificationSettings();
         await userApi.updateNotificationSettings({ ...current, marketing_consent: marketing });

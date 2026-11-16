@@ -11,6 +11,8 @@ import { TermsBody, type TermsKey } from '@/components/ui/terms';
 const ROWS: { key: TermsKey; label: string }[] = [
   { key: 'service', label: '서비스 이용 약관' },
   { key: 'privacy', label: '개인정보 처리방침' },
+  // 민감정보는 다른 동의와 묶지 않고 따로 받아야 한다(개인정보 보호법 제23조).
+  { key: 'sensitive', label: '[필수] 민감정보 처리 동의' },
   { key: 'marketing', label: '[선택] 마케팅 정보 수신' },
 ];
 
@@ -32,13 +34,13 @@ const ArrowRight = () => (
 export default function TermsPage() {
   const router = useRouter();
   const setTerms = useTermsStore((s) => s.setTerms);
-  const [agreed, setAgreed] = useState<Record<TermsKey, boolean>>({ service: false, privacy: false, marketing: false });
+  const [agreed, setAgreed] = useState<Record<TermsKey, boolean>>({ service: false, privacy: false, sensitive: false, marketing: false });
   const [detail, setDetail] = useState<TermsKey | null>(null);
 
-  const requiredAll = agreed.service && agreed.privacy;
+  const requiredAll = agreed.service && agreed.privacy && agreed.sensitive;
   // 전체 동의는 [선택] 마케팅 수신까지 함께 켜고 끈다. 다음 단계 진행 조건은 필수 약관(requiredAll)만 본다.
   const allAgreed = requiredAll && agreed.marketing;
-  const toggleAll = () => setAgreed({ service: !allAgreed, privacy: !allAgreed, marketing: !allAgreed });
+  const toggleAll = () => setAgreed({ service: !allAgreed, privacy: !allAgreed, sensitive: !allAgreed, marketing: !allAgreed });
 
   const submit = () => {
     if (!requiredAll) return;
