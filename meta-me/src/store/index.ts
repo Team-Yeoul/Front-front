@@ -37,6 +37,7 @@ export * from './local';
 interface TermsAgreement {
   service: boolean;
   privacy: boolean;
+  sensitive: boolean;
   marketing: boolean;
 }
 
@@ -45,7 +46,7 @@ interface TermsStore extends TermsAgreement {
   reset: () => void;
 }
 
-const initialTerms: TermsAgreement = { service: false, privacy: false, marketing: false };
+const initialTerms: TermsAgreement = { service: false, privacy: false, sensitive: false, marketing: false };
 
 export const useTermsStore = create<TermsStore>((set) => ({
   ...initialTerms,

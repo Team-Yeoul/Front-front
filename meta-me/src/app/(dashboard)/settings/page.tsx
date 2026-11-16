@@ -14,6 +14,7 @@ import type { NotificationSetting } from '@/entities/user';
 import { Screen } from '@/components/ui/Screen';
 import { Button, ChevronRight, Toast, Toggle, TopBar } from '@/components/ui/primitives';
 import { Modal } from '@/components/ui/overlays';
+import { useSensitiveConsent } from '@/hooks/useSensitiveConsent';
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -51,7 +52,9 @@ export default function SettingsPage() {
   const logout = useLogout();
   const withdraw = useWithdrawAccount();
   const alarm = noti?.push_enabled === false ? '꺼짐' : noti?.daily_question_time ? `매일 ${noti.daily_question_time}` : '';
+  const consent = useSensitiveConsent();
   const [confirm, setConfirm] = useState<'logout' | 'withdraw' | null>(null);
+  const [revoking, setRevoking] = useState(false);
   const [toast, setToast] = useState('');
   const busy = logout.isPending || withdraw.isPending;
 
@@ -110,6 +113,29 @@ export default function SettingsPage() {
             </Button>
           </div>
         </Modal>
+        <Modal open={revoking} onClose={() => setRevoking(false)}>
+          <p className="text-[17px] font-bold text-ink text-center">민감정보 처리 동의를 철회할까요?</p>
+          <p className="text-[13px] text-sub text-center mt-2 leading-relaxed">
+            철회하면 기록 쓰기, AI 분석·리포트, AI 대화를 쓸 수 없어요.
+            <br />
+            다시 동의하면 이어서 쓸 수 있어요.
+          </p>
+          <div className="grid grid-cols-2 gap-2 mt-5">
+            <Button variant="gray" onClick={() => setRevoking(false)}>
+              취소
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                consent.revoke();
+                setRevoking(false);
+                setToast('민감정보 처리 동의를 철회했어요');
+              }}
+            >
+              철회하기
+            </Button>
+          </div>
+        </Modal>
         </>
       }
     >
@@ -123,6 +149,13 @@ export default function SettingsPage() {
           <Row label="기록 리마인더" value={alarm} onClick={() => router.push('/notifications?from=settings')} />
           <Row label="푸시 알림" right={<Toggle on={noti?.push_enabled ?? true} disabled={!noti} onChange={(v) => setNoti({ push_enabled: v })} />} />
           <Row label="마케팅 정보 수신" right={<Toggle on={noti?.marketing_consent ?? false} disabled={!noti} onChange={(v) => setNoti({ marketing_consent: v })} />} />
+        </Group>
+        <Group title="개인정보">
+          <Row
+            label="민감정보 처리 동의"
+            right={<Toggle on={consent.agreed} onChange={(v) => (v ? consent.agree() : setRevoking(true))} />}
+          />
+          <Row label="동의 내용 보기" onClick={() => router.push('/settings/terms/sensitive')} />
         </Group>
         <Group title="데이터">
           <Row label="객관화 기록 보관" value="12개월" />

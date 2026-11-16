@@ -40,6 +40,8 @@ export interface UserLocal {
   onboardedAt?: string;
   cognis: CollectedCogni[];
   chats: SavedChat[];
+  /** 민감정보(기록·AI 분석) 처리 동의. 서버에 동의 API가 생기면 그쪽으로 옮긴다. */
+  sensitiveConsent?: { agreed: boolean; at: string };
 }
 
 const EMPTY: UserLocal = { cognis: [], chats: [] };
