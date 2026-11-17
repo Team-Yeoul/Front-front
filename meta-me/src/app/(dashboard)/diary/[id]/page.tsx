@@ -52,7 +52,7 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
     const message = isError ? '기록을 불러오지 못했어요.' : data ? '표시할 내용이 없는 기록이에요.' : '불러오는 중...';
     return (
       <Screen>
-        <TopBar />
+        <TopBar backHref="/diary" />
         <p className="text-center text-[14px] text-sub mt-24">{message}</p>
       </Screen>
     );
@@ -86,7 +86,8 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       }
     >
-      <TopBar title={<span className="font-mono">{detail.date}</span>} right={<span className="text-[18px] text-primary tracking-widest">···</span>} />
+      {/* 메인 '오늘 기록 다시 보기' 등 어디서 들어와도 뒤로가기는 다이어리 목록으로 간다. */}
+      <TopBar backHref="/diary" title={<span className="font-mono">{detail.date}</span>} right={<span className="text-[18px] text-primary tracking-widest">···</span>} />
       <div className="px-5 pt-3">
         <h1 className="text-[24px] font-bold text-ink">{detail.title}</h1>
         <p className="font-mono text-[13px] text-sub mt-1.5">{detail.meta}</p>
