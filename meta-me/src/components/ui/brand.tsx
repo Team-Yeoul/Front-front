@@ -19,6 +19,22 @@ export function LogoMark({ size = 24, color = '#1A1A1E' }: { size?: number; colo
   );
 }
 
+/** 스플래시 배경색 */
+export const SPLASH_BG = '#6367FF';
+
+/**
+ * 스플래시 첫 장면(보라 바탕 + 흰 심볼)만 정적으로 그린다.
+ * 새로고침 직후 로그인 정보를 불러오는 동안 이걸 먼저 보여줘서 흰 화면이 깜박이지 않게 한다.
+ * 폰 화면(#phone-screen)이 translateZ(0)라 fixed가 폰 화면 기준으로 붙는다(모바일은 전체 화면).
+ */
+export function SplashBoot() {
+  return (
+    <div className="fixed inset-0 z-[5] flex items-center justify-center" style={{ background: SPLASH_BG }} aria-hidden>
+      <LogoMark size={108} color="#FFFFFF" />
+    </div>
+  );
+}
+
 export function Wordmark({ size = 18 }: { size?: number }) {
   return (
     <span className="inline-flex items-center gap-1.5">

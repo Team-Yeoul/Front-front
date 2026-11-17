@@ -22,6 +22,7 @@ export function Screen({
   className = '',
   bodyRef,
   overlay,
+  footerClassName = 'px-5 pt-2 pb-4',
 }: {
   children: ReactNode;
   footer?: ReactNode;
@@ -39,6 +40,8 @@ export function Screen({
   bodyRef?: React.Ref<HTMLDivElement>;
   /** Sheets / modals / toasts — rendered outside the scroll body so they cover the viewport. */
   overlay?: ReactNode;
+  /** footer 감싸는 칸의 여백. v3 인증 화면은 좌우 24px · 아래 0 (아래 링크 줄이 높이를 차지한다). */
+  footerClassName?: string;
 }) {
   useStatusBarTheme(bleed ? 'transparent' : (statusBg ?? bg), statusFg, indicatorFg);
   const style: CSSProperties = { background: bleed ? 'transparent' : bg };
@@ -49,7 +52,7 @@ export function Screen({
       <div ref={bodyRef} className={`relative flex-1 overflow-y-auto no-scrollbar ${className}`}>
         {children}
       </div>
-      {footer && <div className="relative shrink-0 px-5 pt-2 pb-4">{footer}</div>}
+      {footer && <div className={`relative shrink-0 ${footerClassName}`}>{footer}</div>}
       {nav && <BottomNav />}
       {overlay}
     </div>

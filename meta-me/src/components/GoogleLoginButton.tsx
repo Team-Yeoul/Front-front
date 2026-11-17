@@ -114,14 +114,10 @@ export function GoogleLoginButton() {
     <div className="flex flex-col gap-2">
       <div className="relative w-full max-w-[382px] mx-auto">
         {/* 투명한 공식 버튼이 클릭을 받는다. 공식 버튼이 닿지 않는 가장자리를 누르면 One Tap을 띄운다. */}
-        <Button
-          variant="gray"
-          className="relative font-medium"
-          disabled={busy || !CLIENT_ID}
-          onClick={() => gsi?.prompt()}
-        >
-          <span className="absolute left-7">
-            <GoogleIcon />
+        {/* 로고는 왼쪽에 붙이고 글자는 버튼 가운데 둔다. */}
+        <Button variant="gray" className="relative font-medium" disabled={busy || !CLIENT_ID} onClick={() => gsi?.prompt()}>
+          <span className="absolute left-7 flex">
+            <GoogleIcon size={26} />
           </span>
           {busy ? '로그인 중...' : 'Google로 시작하기'}
         </Button>

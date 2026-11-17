@@ -1,7 +1,18 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { CloseIcon } from './primitives';
+
+/**
+ * 폰 화면(#phone-screen) 전체에 띄운다. 데스크톱 미리보기의 상태바·홈 인디케이터까지 함께 덮어서
+ * 어두운 배경이 상태바 아래에서 잘려 보이지 않게 한다. (#phone-screen이 없으면 제자리에 그린다)
+ */
+export function PhoneOverlay({ children }: { children: ReactNode }) {
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => setTarget(document.getElementById('phone-screen')), []);
+  return target ? createPortal(children, target) : <>{children}</>;
+}
 
 /** Bottom sheet over a dimmed backdrop. Positioned against the nearest `relative` Screen. */
 export function Sheet({
@@ -26,14 +37,16 @@ export function Sheet({
 }) {
   if (!open) return null;
   return (
+    <PhoneOverlay>
     <div className="absolute inset-0 z-50 flex flex-col justify-end">
       <button className="absolute inset-0 bg-black/40 animate-fade-in" onClick={onClose} aria-label="닫기" />
       <div
-        className={`relative bg-white rounded-t-[28px] flex flex-col animate-sheet-up ${className}`}
+        // className에 배경·모서리가 있으면 기본값 대신 그것을 쓴다.
+        className={`relative flex flex-col animate-sheet-up ${/\bbg-/.test(className) ? '' : 'bg-white'} ${/\brounded-t-/.test(className) ? '' : 'rounded-t-[28px]'} ${className}`}
         style={height ? { height } : undefined}
       >
         <div className="flex justify-center pt-3 pb-1 shrink-0">
-          <span className="w-10 h-1 rounded-full bg-[#DADAE0]" />
+          <span className="w-10 h-1 rounded-full bg-[#DCDCE4]" />
         </div>
         {(title || closeButton) && (
           <div className="flex items-start justify-between px-5 pt-3 shrink-0">
@@ -51,6 +64,7 @@ export function Sheet({
         {children}
       </div>
     </div>
+    </PhoneOverlay>
   );
 }
 

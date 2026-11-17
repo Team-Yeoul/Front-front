@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { AUTH_STORAGE_KEY, syncAuthFromStorage, useAuthStore, useLocalStore } from '@/store';
+import { SplashBoot } from '@/components/ui/brand';
 
 /** 로그인 없이 볼 수 있는 경로. 나머지는 로그인이 필요하다. */
 const PUBLIC = ['/login', '/signup', '/terms', '/forgot-password', '/notifications', '/feedback/'];
@@ -37,6 +38,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     if (blocked) router.replace('/');
   }, [blocked, router]);
 
-  if (!ready || blocked) return null;
+  // 시작 화면은 준비되는 동안에도 스플래시 첫 장면을 그려 둔다(새로고침 시 흰 화면 깜박임 방지).
+  if (!ready) return pathname === '/' ? <SplashBoot /> : null;
+  if (blocked) return null;
   return <>{children}</>;
 }

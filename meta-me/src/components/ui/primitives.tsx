@@ -152,7 +152,7 @@ export function Button({
   return (
     <button
       {...rest}
-      className={`w-full max-w-[382px] mx-auto h-[63px] rounded-2xl text-[16px] font-semibold flex items-center justify-center gap-2 transition-opacity disabled:opacity-40 ${VARIANT[variant]} ${className}`}
+      className={`w-full max-w-[382px] mx-auto h-16 rounded-2xl text-[16px] font-semibold flex items-center justify-center gap-2 transition-opacity disabled:opacity-40 ${VARIANT[variant]} ${className}`}
     >
       {children}
     </button>
@@ -167,19 +167,30 @@ export function TextButton({ children, className = '', ...rest }: ButtonHTMLAttr
   );
 }
 
+/** 뒤로가기 버튼 안의 꺾쇠 (v3 시안의 채운 아이콘). */
+const BackChevron = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
+    <path
+      fill="currentColor"
+      d="m10.414 12l4.95 4.95c.422.481.381 1.233-.207 1.573c-.407.235-.868.139-1.207-.159l-5.657-5.657C8.114 12.503 8 12.278 8 12s.114-.503.293-.707l5.657-5.657c.204-.179.429-.293.707-.293c.927 0 1.281 1.053.707 1.707Z"
+    />
+  </svg>
+);
+
+/** 44px 흰 원형 뒤로가기 버튼 (그림자로 배경과 구분). */
 export function BackButton({ onClick, href, className = '' }: { onClick?: () => void; href?: string; className?: string }) {
   const router = useRouter();
-  const cls = `w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center shrink-0 ${className}`;
+  const cls = `w-11 h-11 rounded-full bg-white text-ink flex items-center justify-center shrink-0 shadow-[0_2px_10px_rgba(30,30,60,0.10),0_0_0_0.5px_rgba(30,30,60,0.06)] ${className}`;
   if (href) {
     return (
       <Link href={href} className={cls} aria-label="뒤로가기">
-        <ChevronLeft />
+        <BackChevron />
       </Link>
     );
   }
   return (
     <button onClick={onClick ?? (() => router.back())} className={cls} aria-label="뒤로가기">
-      <ChevronLeft />
+      <BackChevron />
     </button>
   );
 }
