@@ -201,13 +201,13 @@ function QuestionBody({ q, answer, setAnswer }: { q: OnboardingQuestion; answer:
             <div className="relative">
               <div className="flex justify-between items-center px-1">
                 {q.options.map((o, i) => (
-                  <button key={o.label} onClick={() => setAnswer(i)} className="w-9 h-9 flex items-center justify-center" aria-label={o.label}>
+                  <button key={o.label} onClick={() => setAnswer(i)} className="w-10 h-10 flex items-center justify-center" aria-label={o.label}>
                     {i === idx ? (
-                      <span className="w-10 h-10 rounded-full bg-primary-line/60 flex items-center justify-center">
-                        <span className="w-7 h-7 rounded-full bg-primary" />
+                      <span className="shrink-0 w-10 h-10 rounded-full bg-primary-line/60 flex items-center justify-center">
+                        <span className="shrink-0 w-7 h-7 rounded-full bg-primary" />
                       </span>
                     ) : (
-                      <span className="w-4 h-4 rounded-full border-[1.5px] border-[#B4B4BB]" />
+                      <span className="shrink-0 w-4 h-4 rounded-full border-[1.5px] border-[#B4B4BB]" />
                     )}
                   </button>
                 ))}
