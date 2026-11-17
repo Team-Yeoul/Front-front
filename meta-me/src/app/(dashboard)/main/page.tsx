@@ -211,7 +211,7 @@ export default function MainPage() {
             </button>
           ) : (
             <button
-              onClick={() => router.push('/diary/chat')}
+              onClick={() => router.push('/diary/write')}
               className="w-full flex items-center gap-3 bg-white rounded-2xl px-4 py-3.5 mt-4 text-left shadow-[0_4px_16px_rgba(26,26,30,0.04)]"
             >
               <span className="w-10 h-10 rounded-xl bg-primary-soft flex items-center justify-center shrink-0">
