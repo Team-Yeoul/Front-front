@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { useStatusBarStore } from '@/store';
+import { DEFAULT_STATUS_BAR_THEME, useStatusBarStore, type StatusBarTheme } from '@/store';
 
 /**
  * 화면 전환: 상태바와 콘텐츠에 같은 페이드를 동시에 걸어 둘이 한 화면처럼 바뀌게 한다.
@@ -10,9 +10,13 @@ import { useStatusBarStore } from '@/store';
  */
 const ROUTE_FADE = { from: 0.7, ms: 180 };
 
+/** 시작 화면이 아직 상태바 색을 정하기 전(새로고침 직후): 스플래시 위에 투명한 흰 아이콘 상태바를 둔다. */
+const SPLASH_BOOT_THEME: StatusBarTheme = { bg: 'transparent', fg: 'light', indicator: 'light' };
+
 export function PhoneFrame({ children }: { children: React.ReactNode }) {
-  const theme = useStatusBarStore((s) => s.theme);
   const pathname = usePathname();
+  const storeTheme = useStatusBarStore((s) => s.theme);
+  const theme = pathname === '/' && storeTheme === DEFAULT_STATUS_BAR_THEME ? SPLASH_BOOT_THEME : storeTheme;
   const statusRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const firstRender = useRef(true);
