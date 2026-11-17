@@ -1,17 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLogin } from '@/entities/user';
 import { ApiError } from '@/shared/api';
 import { useAuthStore } from '@/store';
 import { loginDestination } from '@/lib/onboarding';
 import { Screen } from '@/components/ui/Screen';
-import { BackButton, Button } from '@/components/ui/primitives';
-import { Field, RememberRow } from '@/components/ui/Field';
-import { Wordmark } from '@/components/ui/brand';
-import { GoogleLoginButton } from '@/components/GoogleLoginButton';
+import { Button } from '@/components/ui/primitives';
+import { ErrorText, Field, RememberRow } from '@/components/ui/Field';
+import { AUTH_FOOTER, AuthHeader, FooterLink } from '@/components/ui/auth';
 
 /** '기억하기'로 저장해 두는 이메일. 비밀번호는 앱이 직접 저장하지 않고 브라우저 비밀번호 관리자에 맡긴다. */
 const REMEMBERED_EMAIL_KEY = 'metame-remembered-email';
@@ -49,14 +47,24 @@ export default function LoginPage() {
     }
   }, []);
 
-  const canSubmit = email.includes('@') && email.includes('.') && password.length >= 8; // 명세상 비밀번호는 8자 이상
+  // 칸이 비어 있지만 않으면 버튼을 켜 두고, 틀린 내용은 눌렀을 때 알려 준다.
+  const canSubmit = email.trim().length > 0 && password.length > 0;
 
   const handleSubmit = async () => {
     if (!canSubmit || loading) return;
-    setSubmitting(true);
     setError('');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('이메일 형식을 확인해 주세요.');
+      return;
+    }
+    // 가입할 때 비밀번호는 8자 이상이라, 그보다 짧으면 서버에 묻지 않고 바로 틀렸다고 알린다.
+    if (password.length < 8) {
+      setError('이메일 또는 비밀번호가 올바르지 않아요.');
+      return;
+    }
+    setSubmitting(true);
     try {
-      const res = await loginMutation.mutateAsync({ email, password });
+      const res = await loginMutation.mutateAsync({ email: email.trim(), password });
       setAuth(res.access_token, res.refresh_token, res.user_id);
       try {
         if (rememberMe) localStorage.setItem(REMEMBERED_EMAIL_KEY, email);
@@ -71,7 +79,7 @@ export default function LoginPage() {
       // 인증 실패(401)와 서버·네트워크 오류를 구분해 안내한다.
       setError(
         err instanceof ApiError && (err.status === 401 || err.status === 400)
-          ? '이메일 또는 비밀번호가 올바르지 않습니다.'
+          ? '이메일 또는 비밀번호가 올바르지 않아요.'
           : '로그인하지 못했어요. 잠시 후 다시 시도해 주세요.',
       );
     }
@@ -79,45 +87,60 @@ export default function LoginPage() {
 
   return (
     <Screen
+      footerClassName={AUTH_FOOTER}
       footer={
-        <div className="flex flex-col gap-3">
+        <>
           <Button onClick={handleSubmit} disabled={!canSubmit || loading}>
-            {loading ? '로그인 중...' : '로그인'}
+            {loading ? '로그인 중...' : '시작하기'}
           </Button>
-          <GoogleLoginButton />
-          <p className="text-center text-[14px] font-semibold text-ink mt-1">
-            계정이 존재하지 않는다면?
-            <Link href="/terms" className="text-primary">
-              회원가입
-            </Link>
-          </p>
-        </div>
+          <FooterLink question="계정이 존재하지 않는다면?" label="회원가입" href="/terms" />
+        </>
       }
     >
-      <div className="px-5 pt-2">
-        <BackButton href="/" />
-        <div className="mt-4">
-          <Wordmark />
-        </div>
-        <h1 className="text-[28px] font-bold text-ink mt-4">로그인</h1>
-        <p className="text-[14px] text-sub mt-1.5">이메일과 비밀번호를 입력하세요</p>
+      <AuthHeader title="로그인" sub="이메일과 비밀번호를 입력하세요" backHref="/" />
 
-        <form
-          className="flex flex-col gap-6 mt-12"
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSubmit();
+      <form
+        className="flex flex-col gap-5 px-6 mt-13"
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSubmit();
+        }}
+      >
+        <Field
+          label="이메일"
+          type="email"
+          value={email}
+          onChange={(v) => {
+            setEmail(v);
+            setError('');
           }}
-        >
-          <Field label="이메일" type="email" value={email} onChange={setEmail} placeholder="이메일을 입력해 주세요" name="email" id="email" autoComplete="username" />
-          <div className="flex flex-col gap-4">
-            <Field label="비밀번호" type="password" value={password} onChange={setPassword} placeholder="비밀번호를 입력해 주세요" name="password" id="password" autoComplete="current-password" />
-            <RememberRow checked={rememberMe} onChange={setRememberMe} />
-          </div>
-          {error && <p className="text-[13px] text-danger -mt-2">{error}</p>}
-          <button type="submit" className="hidden" />
-        </form>
-      </div>
+          placeholder="이메일을 입력해 주세요"
+          name="email"
+          id="email"
+          autoComplete="username"
+          error={!!error}
+        />
+        <div className="flex flex-col gap-2">
+          <Field
+            label="비밀번호"
+            type="password"
+            value={password}
+            onChange={(v) => {
+              setPassword(v);
+              setError('');
+            }}
+            placeholder="비밀번호를 입력해 주세요"
+            name="password"
+            id="password"
+            autoComplete="current-password"
+            error={!!error}
+          />
+          {/* 틀렸을 때 문구는 비밀번호 칸 바로 아래에 띄운다. */}
+          {error && <ErrorText>{error}</ErrorText>}
+        </div>
+        <RememberRow checked={rememberMe} onChange={setRememberMe} />
+        <button type="submit" className="hidden" />
+      </form>
     </Screen>
   );
 }

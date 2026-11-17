@@ -18,16 +18,29 @@ const ROWS: { key: TermsKey; label: string }[] = [
 
 function Box({ checked }: { checked: boolean }) {
   return (
-    <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${checked ? 'bg-primary-soft' : 'bg-surface-2'}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      {checked && <img src="/check.png" alt="" width={15} height={12} draggable={false} />}
+    <span
+      className={`w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 transition-colors ${
+        checked ? 'bg-primary' : 'bg-white border-[1.5px] border-[#C7C7D1]'
+      }`}
+    >
+      {checked && (
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
+          <path
+            fill="#FFFFFF"
+            d="M9.171 16.072L19.778 5.465c.409-.359 1.01-.404 1.414 0c.404.405.359 1.005 0 1.415L9.878 18.193c-.204.179-.429.293-.707.293s-.503-.114-.707-.293l-5.657-5.657c-.297-.339-.393-.8-.159-1.207c.34-.588 1.092-.629 1.574-.207Z"
+          />
+        </svg>
+      )}
     </span>
   );
 }
 
 const ArrowRight = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-    <path d="M5 12h14M13 6l6 6-6 6" stroke="#8E8E95" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
+    <path
+      fill="#999999"
+      d="M17.242 13H4c-.543-.036-1-.428-1-1s.457-.964 1-1h13.243l-3.95-3.95c-.423-.481-.381-1.233.207-1.573c.407-.235.867-.139 1.207.159l5.657 5.657c.238.271.355.607.259.966c-.053.194-.128.299-.259.448l-5.657 5.657c-.34.298-.8.394-1.207.159c-.588-.34-.63-1.092-.207-1.573Z"
+    />
   </svg>
 );
 
@@ -38,9 +51,8 @@ export default function TermsPage() {
   const [detail, setDetail] = useState<TermsKey | null>(null);
 
   const requiredAll = agreed.service && agreed.privacy && agreed.sensitive;
-  // 전체 동의는 [선택] 마케팅 수신까지 함께 켜고 끈다. 다음 단계 진행 조건은 필수 약관(requiredAll)만 본다.
-  const allAgreed = requiredAll && agreed.marketing;
-  const toggleAll = () => setAgreed({ service: !allAgreed, privacy: !allAgreed, sensitive: !allAgreed, marketing: !allAgreed });
+  // '필수 약관 전체 동의'는 필수 약관만 함께 켜고 끈다. [선택] 마케팅 수신은 따로 고른다.
+  const toggleAll = () => setAgreed((a) => ({ ...a, service: !requiredAll, privacy: !requiredAll, sensitive: !requiredAll }));
 
   const submit = () => {
     if (!requiredAll) return;
@@ -50,15 +62,16 @@ export default function TermsPage() {
 
   return (
     <Screen
+      footerClassName="px-6 pt-2 pb-8"
       overlay={
-      <Sheet open={!!detail} onClose={() => setDetail(null)} height="82%">
+      <Sheet open={!!detail} onClose={() => setDetail(null)} height="calc(100% - 116px)" className="rounded-t-[20px]">
         {detail && (
           <>
-            <div className="flex-1 overflow-y-auto no-scrollbar px-6 pt-5">
+            <div className="flex-1 overflow-y-auto no-scrollbar px-6 pt-4">
               <TermsBody termsKey={detail} />
               <div className="h-6" />
             </div>
-            <div className="px-5 pt-3 pb-5 border-t border-line">
+            <div className="px-6 pt-4 pb-8 border-t border-[#EDEDF2]">
               <Button
                 onClick={() => {
                   if (detail) setAgreed((a) => ({ ...a, [detail]: true }));
@@ -78,28 +91,30 @@ export default function TermsPage() {
         </Button>
       }
     >
-      <div className="px-5 pt-2">
+      <div className="px-7 pt-4">
         <BackButton href="/" />
-        <h1 className="text-[30px] font-bold text-ink mt-5">이용약관</h1>
-        <p className="text-[15px] text-sub mt-2 leading-relaxed">
+        <h1 className="text-[34px] font-extrabold text-[#0F0F14] tracking-[-0.02em] mt-8">이용약관</h1>
+        <p className="text-[17px] text-[#999999] leading-[1.5] mt-2.5">
           MetaMe 서비스 이용을 위해
           <br />
           약관에 동의해 주세요.
         </p>
+      </div>
 
-        <div className="mt-8 rounded-3xl border border-line bg-[#FEFEFF] px-5 py-2">
-          <button onClick={toggleAll} className="w-full flex items-center gap-4 py-4">
-            <Box checked={allAgreed} />
-            <span className="text-[16px] font-semibold text-ink">약관 전체 동의하기</span>
-          </button>
-          <div className="border-t border-dashed border-line" />
+      <div className="mx-6 mt-7 rounded-[22px] bg-card px-5 py-6.5">
+        <button onClick={toggleAll} className="w-full flex items-center gap-4 text-left">
+          <Box checked={requiredAll} />
+          <span className="text-[17px] font-bold text-ink">필수 약관 전체 동의하기</span>
+        </button>
+        <div className="mx-1 my-5.5 border-t-[1.5px] border-dashed border-[#C7C7D1]" />
+        <div className="flex flex-col gap-4.5">
           {ROWS.map(({ key, label }) => (
-            <div key={key} className="flex items-center gap-4 py-2.5">
+            <div key={key} className="flex items-center gap-4">
               <button onClick={() => setAgreed((a) => ({ ...a, [key]: !a[key] }))} className="flex items-center gap-4 flex-1 text-left">
                 <Box checked={agreed[key]} />
-                <span className="text-[16px] text-ink">{label}</span>
+                <span className="text-[17px] font-medium text-[#3F3F46]">{label}</span>
               </button>
-              <button onClick={() => setDetail(key)} className="p-1" aria-label={`${label} 보기`}>
+              <button onClick={() => setDetail(key)} className="p-0.5" aria-label={`${label} 보기`}>
                 <ArrowRight />
               </button>
             </div>
