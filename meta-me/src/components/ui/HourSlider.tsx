@@ -31,7 +31,7 @@ export function HourSlider({
   return (
     <div
       ref={trackRef}
-      className="relative h-10 flex items-center touch-none cursor-pointer select-none"
+      className="relative h-11 flex items-center touch-none cursor-pointer select-none"
       onPointerDown={(e) => {
         (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
         setFromClientX(e.clientX);
@@ -44,14 +44,14 @@ export function HourSlider({
       <div className="absolute left-0 h-2 rounded-full bg-primary" style={{ width: `${pct}%` }} />
       <span className="absolute left-1 w-1 h-1 rounded-full bg-white/80" />
       <div
-        className="absolute -translate-x-1/2 w-[62px] h-10 rounded-full bg-white shadow-[0_2px_10px_rgba(26,26,30,0.15)] flex items-center justify-center gap-2.5"
+        className="absolute -translate-x-1/2 w-16 h-11 rounded-full bg-white border border-[#E4E4EC] shadow-[0_4px_12px_rgba(30,30,60,0.12)] flex items-center justify-center gap-2.5"
         style={{ left: `${pct}%` }}
       >
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-          <path d="M15 5l-7 7 7 7" stroke="#6367FF" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <path d="M15 5l-7 7 7 7" stroke="#6367FF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-          <path d="M9 5l7 7-7 7" stroke="#6367FF" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <path d="M9 5l7 7-7 7" stroke="#6367FF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
     </div>

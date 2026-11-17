@@ -97,7 +97,7 @@ function inline(text: string): ReactNode {
   );
 }
 
-const TEXT = 'text-[15px] text-[#5A5A62] leading-[1.75]';
+const TEXT = 'text-[16px] text-[#52525B] leading-[1.65]';
 
 function Block({ block }: { block: TermsBlock }) {
   if (typeof block === 'string') return <p className={TEXT}>{inline(block)}</p>;
@@ -144,16 +144,16 @@ export function TermsBody({ termsKey }: { termsKey: TermsKey }) {
   const intro = typeof content.intro === 'string' ? [content.intro] : content.intro;
   return (
     <>
-      <h2 className="text-[22px] font-bold text-ink">{content.title}</h2>
-      <div className="mt-4 flex flex-col gap-3">
+      <h2 className="text-[24px] font-bold text-ink tracking-[-0.01em]">{content.title}</h2>
+      <div className="mt-5 flex flex-col gap-2">
         {intro.map((b, i) => (
           <Block key={i} block={b} />
         ))}
       </div>
       {content.sections.map((s) => (
-        <section key={s.heading} className="mt-7">
-          <h3 className="text-[17px] font-bold text-ink">{s.heading}</h3>
-          <div className="mt-3 border-l-2 border-line pl-3.5 flex flex-col gap-3">
+        <section key={s.heading} className="mt-6">
+          <h3 className="text-[18px] font-bold text-ink">{s.heading}</h3>
+          <div className="mt-3 border-l-2 border-[#DCDCE4] pl-3 flex flex-col gap-2">
             {s.paragraphs.map((b, i) => (
               <Block key={i} block={b} />
             ))}
