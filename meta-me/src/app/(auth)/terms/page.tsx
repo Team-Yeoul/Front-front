@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTermsStore } from '@/store';
+import { useAuthStore, useTermsStore } from '@/store';
+import { useLogout, userApi } from '@/entities/user';
+import { useMe } from '@/hooks/useMe';
 import { Screen } from '@/components/ui/Screen';
 import { BackButton, Button } from '@/components/ui/primitives';
 import { Sheet } from '@/components/ui/overlays';
@@ -42,10 +44,39 @@ export default function TermsPage() {
   const allAgreed = requiredAll && agreed.marketing;
   const toggleAll = () => setAgreed({ service: !allAgreed, privacy: !allAgreed, sensitive: !allAgreed, marketing: !allAgreed });
 
-  const submit = () => {
+  // Google로 막 가입한 사용자: 계정은 이미 있으므로 가입 화면 대신 동의를 저장하고 알림 설정으로 넘어간다.
+  const { termsPending, patch } = useMe();
+  const clearAuth = useAuthStore((s) => s.clearAuth);
+  const logout = useLogout();
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
     if (!requiredAll) return;
-    setTerms(agreed);
-    router.push('/signup');
+    if (!termsPending) {
+      setTerms(agreed);
+      router.push('/signup');
+      return;
+    }
+    setSaving(true);
+    try {
+      const current = await userApi.getNotificationSettings();
+      await userApi.updateNotificationSettings({ ...current, marketing_consent: agreed.marketing });
+    } catch {
+      // 마케팅 수신 설정 저장 실패는 가입 진행을 막지 않음(설정에서 다시 바꿀 수 있음)
+    }
+    patch((u) => ({ ...u, termsPending: false, sensitiveConsent: { agreed: true, at: new Date().toISOString() } }));
+    router.replace('/notifications');
+  };
+
+  // 동의하지 않고 나가면 로그인 상태를 정리해, 동의 없이 앱을 쓰지 못하게 한다.
+  const leave = async () => {
+    try {
+      await logout.mutateAsync();
+    } catch {
+      // 서버 실패와 관계없이 기기의 로그인은 정리
+    }
+    clearAuth();
+    router.replace('/');
   };
 
   return (
@@ -73,13 +104,13 @@ export default function TermsPage() {
       </Sheet>
       }
       footer={
-        <Button onClick={submit} disabled={!requiredAll}>
-          동의하고 계속하기
+        <Button onClick={submit} disabled={!requiredAll || saving}>
+          {saving ? '저장 중...' : '동의하고 계속하기'}
         </Button>
       }
     >
       <div className="px-5 pt-2">
-        <BackButton href="/" />
+        {termsPending ? <BackButton onClick={leave} /> : <BackButton href="/" />}
         <h1 className="text-[30px] font-bold text-ink mt-5">이용약관</h1>
         <p className="text-[15px] text-sub mt-2 leading-relaxed">
           MetaMe 서비스 이용을 위해

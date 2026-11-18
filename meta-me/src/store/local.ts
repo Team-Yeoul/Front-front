@@ -42,6 +42,8 @@ export interface UserLocal {
   chats: SavedChat[];
   /** 민감정보(기록·AI 분석) 처리 동의. 서버에 동의 API가 생기면 그쪽으로 옮긴다. */
   sensitiveConsent?: { agreed: boolean; at: string };
+  /** Google로 새로 가입해 아직 약관 동의를 하지 않은 상태. 동의할 때까지 약관 화면으로만 보낸다. */
+  termsPending?: boolean;
 }
 
 const EMPTY: UserLocal = { cognis: [], chats: [] };

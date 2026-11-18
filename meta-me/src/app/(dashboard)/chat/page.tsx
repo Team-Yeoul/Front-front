@@ -16,7 +16,30 @@ const OPENERS = [
   '요즘 가장 자주 떠오르는 사람이 있나요? 떠오르는 대로 편하게 이야기해 주세요.',
   '오늘 가장 오래 머문 감정은 뭐였나요?',
   '최근에 스스로 잘했다고 느낀 순간이 있었나요?',
+  '요즘 마음을 가장 많이 쓰고 있는 일은 뭐예요?',
+  '최근에 웃음이 났던 순간이 있었나요?',
+  '요즘 나를 지치게 하는 건 뭔가요?',
+  '누군가에게 하고 싶었지만 못 한 말이 있나요?',
+  '요즘 기다려지는 일이 있나요?',
+  '최근에 마음이 편안했던 순간은 언제였나요?',
+  '요즘 나에게 가장 필요한 건 뭐라고 생각해요?',
+  '최근에 생각이 바뀐 일이 있었나요?',
+  '요즘 혼자 있을 때 주로 무슨 생각을 하나요?',
+  '최근에 고마웠던 사람이 있나요?',
+  '요즘 잘 안 풀려서 답답한 일이 있나요?',
+  '지금 이 순간 기분을 한 단어로 말해 본다면요?',
 ];
+
+/** 이번 대화에 아직 안 나온 질문 중에서 무작위로 고른다. 다 나왔으면 방금 질문만 빼고 다시 고른다. */
+function pickOpener(messages: SavedChatMessage[]) {
+  const asked = new Set(messages.filter((m) => m.role === 'ai').map((m) => m.text));
+  let pool = OPENERS.filter((q) => !asked.has(q));
+  if (pool.length === 0) {
+    const last = [...messages].reverse().find((m) => m.role === 'ai' && OPENERS.includes(m.text))?.text;
+    pool = OPENERS.filter((q) => q !== last);
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 function ChatContent({ resumed }: { resumed?: SavedChat }) {
   const router = useRouter();
@@ -24,7 +47,6 @@ function ChatContent({ resumed }: { resumed?: SavedChat }) {
 
   const [chatId] = useState(() => resumed?.id ?? `chat-${Date.now()}`);
   const [startedAt] = useState(() => (resumed ? new Date(resumed.startedAt) : new Date()));
-  const [opener, setOpener] = useState(0);
   const [messages, setMessages] = useState<SavedChatMessage[]>(() => resumed?.messages ?? [{ role: 'ai', text: OPENERS[0] }]);
   const [sessionId, setSessionId] = useState<string | null>(resumed?.sessionId ?? null);
   const counseling = useCounselingChat(resumed?.sessionId ?? null, '자유 대화');
@@ -57,9 +79,8 @@ function ChatContent({ resumed }: { resumed?: SavedChat }) {
   };
 
   const newQuestion = () => {
-    const next = (opener + 1) % OPENERS.length;
-    setOpener(next);
-    setMessages((m) => [...m, { role: 'ai', text: OPENERS[next] }]);
+    if (typing) return;
+    setMessages((m) => [...m, { role: 'ai', text: pickOpener(m) }]);
   };
 
   // 내가 한 말이 있을 때만 대화를 저장하고 그 대화 화면으로 이동한다.

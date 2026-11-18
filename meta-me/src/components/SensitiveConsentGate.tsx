@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store';
 import { useSensitiveConsent } from '@/hooks/useSensitiveConsent';
+import { useMe } from '@/hooks/useMe';
 import { Screen } from '@/components/ui/Screen';
 import { Button, Img3D, TextButton } from '@/components/ui/primitives';
 import { Sheet } from '@/components/ui/overlays';
@@ -16,12 +17,24 @@ import { TermsBody } from '@/components/ui/terms';
 const GATED = ['/onboarding', '/diary', '/chat', '/report', '/dogam', '/mirror', '/mypage/report', '/challenge'];
 const isGated = (path: string) => GATED.some((p) => path === p || path.startsWith(`${p}/`));
 
-/** 민감정보 처리에 동의하지 않은 사용자가 기록·AI 화면에 들어오면 동의 화면을 대신 보여 준다. */
+/**
+ * 약관·민감정보 동의를 받기 전에는 앱 화면을 열지 않는다.
+ * - Google로 막 가입해 약관 동의가 남은 사용자는 어느 화면에 들어오든 약관 화면으로 보낸다.
+ * - 민감정보 처리에 동의하지 않은 사용자가 기록·AI 화면에 들어오면 동의 화면을 대신 보여 준다.
+ */
 export function SensitiveConsentGate({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const pathname = usePathname();
   const token = useAuthStore((s) => s.accessToken);
+  const { termsPending } = useMe();
   const { agreed } = useSensitiveConsent();
+  const mustAgreeTerms = !!token && !!termsPending && pathname !== '/terms';
 
+  useEffect(() => {
+    if (mustAgreeTerms) router.replace('/terms');
+  }, [mustAgreeTerms, router]);
+
+  if (mustAgreeTerms) return null;
   if (!token || agreed || !isGated(pathname)) return <>{children}</>;
   return <ConsentRequired />;
 }
