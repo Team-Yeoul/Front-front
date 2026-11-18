@@ -1,0 +1,21 @@
+@import 'tailwindcss';
+@import 'uniwind';
+
+/* ── v2 디자인 토큰 (웹 meta-me/src/styles/globals.css와 같은 값) ── */
+@theme {
+  --color-primary: #6367ff;
+  --color-primary-soft: #eef0ff;
+  --color-primary-line: #c9cbff;
+  --color-ink: #1a1a1e;
+  --color-surface: #f4f5f8;
+  --color-surface-2: #f2f2f7;
+  --color-card: #fafafc;
+  --color-line: #ececf1;
+  --color-sub: #8e8e95;
+  --color-mute: #b4b4bb;
+  --color-yellow: #ffe066;
+  --color-yellow-soft: #fff9e0;
+  --color-gold: #8a6d00;
+  --color-danger: #e5484d;
+  --color-danger-soft: #fdecec;
+}
