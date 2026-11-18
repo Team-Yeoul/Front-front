@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGoogleLogin } from '@/entities/user';
 import { ApiError } from '@/shared/api';
-import { useAuthStore } from '@/store';
+import { useAuthStore, useLocalStore } from '@/store';
 import { loginDestination } from '@/lib/onboarding';
 import { Button } from '@/components/ui/primitives';
 import { GoogleIcon } from '@/components/ui/brand';
@@ -76,8 +76,14 @@ export function GoogleLoginButton() {
     try {
       const res = await googleLogin.mutateAsync(idToken);
       setAuth(res.access_token, res.refresh_token, res.user_id);
-      // 방금 가입한 계정은 온보딩 기록이 있을 수 없으니 확인하지 않고 바로 온보딩으로 보낸다.
-      router.push(res.is_new_user ? '/onboarding' : await loginDestination(res.user_id));
+      if (res.is_new_user) {
+        // Google 가입은 약관 화면을 거치지 않고 계정이 바로 만들어지므로, 가입 직후 약관 동의를 받는다.
+        // 동의 전에 앱을 닫아도 다시 약관 화면으로 오도록 기기에 표시해 둔다.
+        useLocalStore.getState().update(res.user_id, (u) => ({ ...u, termsPending: true }));
+        router.push('/terms');
+        return;
+      }
+      router.push(await loginDestination(res.user_id));
     } catch (err) {
       setBusy(false);
       setError(
