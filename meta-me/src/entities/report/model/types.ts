@@ -16,7 +16,8 @@ export type ReportResponse = components['schemas']['ReportResponse'];
 export type ReportListResponse = components['schemas']['ReportListResponse'];
 export type GenerateReportRequest = components['schemas']['GenerateReportRequest'];
 
-export type ReportType = 'WEEK' | 'MONTH' | 'MY_REPORT' | 'OBJECTIVE_FEEDBACK';
+/** 생성·목록 조회에 함께 쓰는 리포트 유형(WEEKLY · MONTHLY · LIFETIME) */
+export type ReportType = GenerateReportRequest['report_type'];
 
 export interface ListQuestsParams {
   page?: number;

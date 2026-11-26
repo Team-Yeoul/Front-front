@@ -1,18 +1,23 @@
 'use client';
 
-import { use } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { router } from '@/lib/router';
+import { View } from '@/components/ui/rn';
 import { Screen } from '@/components/ui/Screen';
-import { Button, TopBar } from '@/components/ui/primitives';
-import { CogniHero, FeatureIcons } from '@/components/ui/flows';
+import { Button, TopBar, goBack } from '@/components/ui/primitives';
+import { FeatureIcons } from '@/components/ui/flows';
+import { CogniReveal } from '@/components/ui/CogniReveal';
+import { Text } from '@/components/ui/Text';
 import { useCollection } from '@/hooks/useCollection';
 import { useMe } from '@/hooks/useMe';
+import { withSensitiveGate } from '@/components/SensitiveGate';
 
-const ICONS = [FeatureIcons.target, FeatureIcons.clock, FeatureIcons.bolt];
+const ICONS = [FeatureIcons.clock, FeatureIcons.target, FeatureIcons.bolt];
 
-export default function CogniDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const id = decodeURIComponent(use(params).id);
-  const router = useRouter();
+/** 코그니 상세 (5b3) */
+function CogniDetailScreen() {
+  // Next useParams는 경로 값을 인코딩된 채로 줄 수 있어 한 번 디코딩한다(앱 라우터는 디코딩해서 넘긴다).
+  const id = decodeURIComponent(useParams<{ id: string }>().id);
   const { nickname } = useMe();
   const collection = useCollection();
   const index = collection.findIndex((c) => c.id === id);
@@ -20,26 +25,31 @@ export default function CogniDetailPage({ params }: { params: Promise<{ id: stri
 
   if (!cogni) {
     return (
-      <Screen footer={<Button onClick={() => router.push('/dogam')}>도감으로</Button>}>
+      <Screen footer={<Button onPress={() => router.navigate('/dogam')}>도감으로</Button>}>
         <TopBar backHref="/dogam" />
-        <p className="text-center text-[14px] text-sub mt-24">아직 모으지 않은 코그니예요.</p>
+        <View className="items-center mt-24">
+          <Text className="text-center text-[14px] text-sub">아직 모으지 않은 코그니예요.</Text>
+        </View>
       </Screen>
     );
   }
 
-  const lines = cogni.features?.length ? cogni.features : [cogni.desc];
+  const lines = cogni.features?.length ? cogni.features.slice(0, 3) : [];
   return (
-    <CogniHero
-      eyebrow={`${nickname ? `${nickname}님` : '나'} 안에서 발견된`}
-      name={cogni.name}
-      imageSrc={cogni.image}
+    <CogniReveal
+      title="코그니 상세"
+      no={index + 1}
+      eyebrow={`${nickname ? `${nickname}님` : '나'} 안에서 발견된 코그니`}
+      image={cogni.image}
       category={cogni.category}
+      name={cogni.name}
+      desc={cogni.desc}
       features={lines.map((text, i) => ({ icon: ICONS[i % ICONS.length], text }))}
-      counterLabel="도감에 저장했어요"
-      counter={`${String(index + 1).padStart(2, '0')} / 24`}
-      primaryLabel="잡은 순간 확인하기"
-      onPrimary={() => router.push(`/dogam/${encodeURIComponent(cogni.id)}/moments`)}
-      onBack={() => router.back()}
+      onBack={() => goBack('/dogam')}
+      footer={<Button onPress={() => router.push({ pathname: '/dogam/[id]/moments', params: { id: cogni.id } })}>잡은 순간 확인하기</Button>}
     />
   );
 }
+
+// 민감정보 처리 동의를 철회했거나 동의 기록이 없으면 화면 대신 동의 화면을 보여 준다.
+export default withSensitiveGate(CogniDetailScreen);

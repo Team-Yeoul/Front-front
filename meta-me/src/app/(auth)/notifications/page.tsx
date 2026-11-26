@@ -1,15 +1,20 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store';
 import { useGetNotificationSettings, useUpdateNotificationSettings, userApi } from '@/entities/user';
+import { router } from '@/lib/router';
 import { Screen } from '@/components/ui/Screen';
-import { BackButton, Button, Img3D, TextButton } from '@/components/ui/primitives';
+import { BackButton, Button, TextButton, goBack } from '@/components/ui/primitives';
+import { LogoMark } from '@/components/ui/brand';
 import { HourSlider } from '@/components/ui/HourSlider';
+import { Text } from '@/components/ui/Text';
+import { Img, LinearGradient, View, asset } from '@/components/ui/rn';
+import { useTheme } from '@/lib/theme';
 
-/** 오후 6시(18) ~ 새벽 2시(26) — 슬라이더 값은 18~26 사이 정수 시각. */
-const MIN_HOUR = 18;
+/** 오후 4시(16) ~ 새벽 2시(26) — 슬라이더 값은 16~26 사이 정수 시각. */
+const MIN_HOUR = 16;
 const MAX_HOUR = 26;
 
 const hourLabel = (h: number) => {
@@ -21,17 +26,48 @@ const hourLabel = (h: number) => {
   return `오후 ${hh - 12}시`;
 };
 
-function NotificationPreview({ dim = false }: { dim?: boolean }) {
+/** 폰 화면 위로 '오늘의 질문' 알림이 떠 있는 미리보기. 아래쪽은 화면 바탕색으로 흐려진다. */
+function NotificationPreview() {
+  const { bg } = useTheme();
   return (
-    <div className={`mx-auto w-[274px] h-[174px] rounded-2xl flex flex-col items-center justify-center gap-3 ${dim ? 'bg-[#F4F4F6]' : 'bg-[#EFEFF1]'}`}>
-      <span className="w-[138px] h-3 rounded-full bg-[#DCDCE0]" />
-      <span className="w-[190px] h-3 rounded-full bg-[#C6C6CB]" />
-      <span className="w-[130px] h-3 rounded-full bg-[#C6C6CB]" />
-      <div className="flex gap-6 mt-3">
-        <span className={`w-[76px] h-3 rounded-full ${dim ? 'bg-[#B8B8BD]' : 'bg-[#6E6E73]'}`} />
-        <span className={`w-[76px] h-3 rounded-full ${dim ? 'bg-[#8A8A8F]' : 'bg-black'}`} />
-      </div>
-    </div>
+    <View className="mt-[27px] h-[460px] shrink-0 overflow-hidden">
+      <View className="absolute left-[52px] right-[52px] top-0 bottom-0 rounded-t-[40px] border-[6px] border-b-0 bg-page" style={{ borderColor: bg('#F1F2F6') }}>
+        <View className="gap-2.5 px-[18px] pt-[96px]">
+          {[0, 1, 2].map((i) => (
+            <View key={i} className="h-14 shrink-0 rounded-[14px] bg-surface flex-row items-center gap-3 px-3.5">
+              <View className="w-7 h-7 shrink-0 rounded-lg bg-page" />
+              <View className="gap-[7px]">
+                <View className="w-[151px] h-2 shrink-0 rounded-full bg-border" />
+                <View className="w-[101px] h-2 shrink-0 rounded-full" style={{ backgroundColor: bg('#ECEDF2') }} />
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+      <View
+        className="absolute left-6 right-6 top-[26px] h-[68px] rounded-[18px] bg-page flex-row items-center gap-3 px-4"
+        style={{ boxShadow: '0 12px 32px rgba(30,30,60,0.14), 0 0 0 0.5px rgba(30,30,60,0.06)' }}
+      >
+        <View className="w-10 h-10 shrink-0 rounded-[11px] bg-primary items-center justify-center">
+          <LogoMark size={26} color="#FFFFFF" />
+        </View>
+        <View className="flex-1 min-w-0">
+          <View className="flex-row items-baseline justify-between">
+            <Text className="text-[14px] font-bold text-ink">오늘의 질문이 도착했어요</Text>
+            <Text className="text-[12px] text-mute">지금</Text>
+          </View>
+          <Text className="text-[12px] text-text-3 mt-0.5" numberOfLines={1}>
+            “오늘 하루는 어떤 장면으로 남았나요?”
+          </Text>
+        </View>
+      </View>
+      <LinearGradient
+        pointerEvents="none"
+        colors={[`${bg('#FFFFFF')}00`, bg('#FFFFFF')]}
+        locations={[0, 0.9]}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 160 }}
+      />
+    </View>
   );
 }
 
@@ -43,57 +79,97 @@ const toSliderHour = (time?: string | null) => {
   return v >= MIN_HOUR && v <= MAX_HOUR ? v : null;
 };
 
-export default function NotificationsPage() {
-  return (
-    <Suspense>
-      <NotificationsContent />
-    </Suspense>
-  );
+/**
+ * 브라우저 알림 권한을 묻는다(앱 expo-notifications 자리).
+ * 알림을 지원하지 않는 브라우저(홈 화면에 추가하지 않은 iOS Safari 등)는 거절한 것으로 본다.
+ */
+async function requestOsPermission() {
+  if (typeof window === 'undefined' || !('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  return (await Notification.requestPermission()) === 'granted';
 }
 
-function NotificationsContent() {
-  const router = useRouter();
+function NotificationsScreen() {
   const accessToken = useAuthStore((s) => s.accessToken);
   // 설정 > 기록 리마인더에서 들어오면 시간만 바꾸고 설정으로 돌아간다 (온보딩으로 보내지 않음).
   const fromSettings = useSearchParams().get('from') === 'settings';
   const { data: current } = useGetNotificationSettings(!!accessToken && fromSettings);
   const updateSettings = useUpdateNotificationSettings();
   const [step, setStep] = useState<'permission' | 'time'>(fromSettings ? 'time' : 'permission');
-  const [dialog, setDialog] = useState(false);
-  const [hour, setHour] = useState(22);
+  const [asking, setAsking] = useState(false);
+  // 사용자가 고르기 전에는, 설정에서 들어온 경우 저장된 시각을, 아니면 밤 10시를 보여준다.
+  const [picked, setHour] = useState<number | null>(null);
+  const hour = picked ?? toSliderHour(current?.daily_question_time) ?? 22;
 
-  // 설정에서 들어온 경우 현재 저장된 시각으로 슬라이더를 맞춘다.
-  const savedHour = toSliderHour(current?.daily_question_time);
-  useEffect(() => {
-    if (savedHour !== null) setHour(savedHour);
-  }, [savedHour]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const goOnboarding = () => router.push('/onboarding');
-  const goNext = () => (fromSettings ? router.back() : goOnboarding());
+  // 진행 중인 저장·권한 요청의 번호. 사용자가 취소·뒤로·나중에를 누르거나 화면을 떠나면 올려서,
+  // 늦게 끝난 요청이 그 뒤 화면에서 다시 이동하지 않게 한다.
+  const op = useRef(0);
+  const abandon = useCallback(() => {
+    op.current++;
+    setSaving(false);
+    setAsking(false);
+  }, []);
+  // 앱 useFocusEffect 자리: 화면을 떠나면(언마운트) 진행 중인 요청을 버린다.
+  useEffect(() => abandon, [abandon]);
+
+  const goOnboarding = () => router.replace('/onboarding');
+  const goNext = () => (fromSettings ? goBack('/settings') : goOnboarding());
+  const leave = (to: () => void) => () => {
+    abandon();
+    to();
+  };
 
   // 데일리 질문 알림 시각을 서버(daily_question_time, HH:mm)에 저장한다.
+  // 설정에서 들어온 경우 저장에 실패하면 화면에 남아 다시 시도하게 하고, 온보딩 중에는 흐름을 막지 않는다.
   const saveTime = async () => {
+    if (saving) return;
+    const id = ++op.current;
+    setError('');
+    setSaving(true);
+    let ok = true;
     if (accessToken) {
       try {
-        const current = await userApi.getNotificationSettings();
-        await updateSettings.mutateAsync({ ...current, daily_question_time: `${String(hour % 24).padStart(2, '0')}:00` });
+        const latest = await userApi.getNotificationSettings();
+        if (op.current !== id) return;
+        await updateSettings.mutateAsync({ ...latest, daily_question_time: `${String(hour % 24).padStart(2, '0')}:00` });
       } catch {
-        // 실패해도 흐름은 이어간다
+        ok = false;
       }
+    }
+    if (op.current !== id) return;
+    setSaving(false);
+    if (!ok && fromSettings) {
+      setError('알림 시간을 저장하지 못했어요. 다시 시도해 주세요.');
+      return;
     }
     goNext();
   };
 
-  const allow = async (enabled: boolean) => {
-    setDialog(false);
+  const allow = async () => {
+    const id = ++op.current;
+    setAsking(true);
+    let enabled = false;
+    try {
+      enabled = await requestOsPermission();
+    } catch {
+      // 권한 요청이 실패하면 거절한 것으로 본다
+    }
+    if (op.current !== id) return;
     if (accessToken) {
       try {
-        const current = await userApi.getNotificationSettings();
-        await updateSettings.mutateAsync({ ...current, push_enabled: enabled });
+        const latest = await userApi.getNotificationSettings();
+        if (op.current !== id) return;
+        await updateSettings.mutateAsync({ ...latest, push_enabled: enabled });
       } catch {
         // 알림 설정 실패는 흐름을 막지 않음
       }
     }
+    if (op.current !== id) return;
+    setAsking(false);
     if (enabled) setStep('time');
     else goOnboarding();
   };
@@ -103,107 +179,76 @@ function NotificationsContent() {
       <Screen
         footer={
           <>
-            <Button variant="dark" onClick={saveTime} disabled={updateSettings.isPending}>
-              이 시간에 알림 받기
+            {!!error && <Text className="text-[12px] text-danger text-center mb-2">{error}</Text>}
+            <Button onPress={saveTime} loading={saving}>
+              {error ? '다시 시도' : '이 시간에 알림 받기'}
             </Button>
-            <TextButton className="mt-1" onClick={goNext}>
+            <TextButton className="mt-1" onPress={leave(goNext)}>
               {fromSettings ? '취소' : '나중에 설정할게요'}
             </TextButton>
           </>
         }
       >
-        <div className="px-5 pt-2">
-          <BackButton onClick={() => (fromSettings ? router.back() : setStep('permission'))} />
-          <h1 className="text-[22px] font-bold text-ink leading-[1.45] mt-6">
-            매일 몇 시에
-            <br />
-            기록 알림을 드릴까요?
-          </h1>
-          <p className="text-[14px] text-sub mt-2">하루 3분, 이 시간에 오늘의 질문을 보내드려요</p>
-          <div className="flex flex-col items-center mt-12">
-            <Img3D name="alarm" size={96} />
-            <p className="text-[40px] font-bold text-ink mt-5">{hourLabel(hour)}</p>
-          </div>
-          <div className="mt-10">
+        <View className="px-6 pt-2">
+          <BackButton onPress={leave(() => (fromSettings ? goBack('/settings') : setStep('permission')))} />
+          <Text className="text-[24px] font-bold text-ink leading-[34px] tracking-tight mt-8">{'매일 몇 시에\n기록 알림을 드릴까요?'}</Text>
+          <Text className="text-[16px] text-text-4 mt-2">하루 3분, 이 시간에 오늘의 질문을 보내드려요</Text>
+          <View className="items-center mt-[52px]">
+            <Img src={asset('v2/clock-3d.png')} width={112} height={112} contentFit="contain" />
+            <Text className="text-[24px] font-bold text-ink tracking-tight mt-6">{hourLabel(hour)}</Text>
+          </View>
+          <View className="mt-8">
             <HourSlider min={MIN_HOUR} max={MAX_HOUR} value={hour} onChange={setHour} />
-            <div className="flex justify-between text-[13px] text-sub mt-4">
-              <span>{hourLabel(MIN_HOUR)}</span>
-              <span>{hourLabel(22)}</span>
-              <span>{hourLabel(MAX_HOUR)}</span>
-            </div>
-          </div>
-          <div className="mt-10 rounded-2xl bg-surface px-5 py-4 flex gap-3">
-            <span className="text-[14px] font-bold text-primary">TIP</span>
-            <div>
-              <p className="text-[15px] font-semibold text-ink">잠들기 전이 기록하기 좋아요</p>
-              <p className="text-[13px] text-sub mt-1 leading-relaxed">
+            <View className="flex-row justify-between mt-3">
+              <Text className="text-[14px] text-sub">{hourLabel(MIN_HOUR)}</Text>
+              <Text className="text-[14px] text-sub">{hourLabel((MIN_HOUR + MAX_HOUR) / 2)}</Text>
+              <Text className="text-[14px] text-sub">{hourLabel(MAX_HOUR)}</Text>
+            </View>
+          </View>
+          <View className="mt-9 rounded-2xl bg-surface px-5 py-[18px] flex-row gap-2.5">
+            <Text className="text-[16px] font-bold text-primary">TIP</Text>
+            <View className="flex-1">
+              <Text className="text-[16px] font-bold text-ink">잠들기 전이 기록하기 좋아요</Text>
+              <Text className="text-[12px] text-text-4 mt-1 leading-[19px]">
                 하루를 되돌아보기 좋은 밤 10시를 추천해요. 알림 시간은 설정에서 언제든 바꿀 수 있어요.
-              </p>
-            </div>
-          </div>
-        </div>
+              </Text>
+            </View>
+          </View>
+        </View>
       </Screen>
     );
   }
 
   return (
     <Screen
-      overlay={
-        dialog && (
-        <div className="absolute inset-x-0 top-[300px] z-40 flex justify-center animate-pop-in">
-          <div className="w-[300px] rounded-2xl bg-white/95 backdrop-blur shadow-[0_10px_40px_rgba(0,0,0,0.15)] overflow-hidden">
-            <div className="px-4 pt-5 pb-4 text-center">
-              <p className="text-[15px] font-semibold text-ink">‘메타미’ 에서 알림을 보내고자 합니다.</p>
-              <p className="text-[12px] text-[#5A5A62] mt-2 leading-relaxed">
-                경고, 사운드 및 아이콘 배지가 알림에 포함될 수 있습니다. 설정에서 이를 구성할 수 있습니다.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 border-t border-line">
-              <button onClick={() => allow(false)} className="h-12 text-[15px] text-ink border-r border-line">
-                허용하지 않음
-              </button>
-              <button onClick={() => allow(true)} className="h-12 text-[15px] font-semibold text-primary">
-                허용
-              </button>
-            </div>
-          </div>
-        </div>
-        )
-      }
       footer={
         <>
-          <Button variant={dialog ? 'gray' : 'primary'} onClick={() => setDialog(true)}>
+          <Button onPress={allow} disabled={asking}>
             알림받기
           </Button>
-          <TextButton className={`mt-1 ${dialog ? 'text-mute' : ''}`} onClick={goOnboarding}>
+          <TextButton className="mt-1" onPress={leave(goOnboarding)}>
             나중에
           </TextButton>
         </>
       }
     >
-      <div className="px-5 pt-3">
-        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-[14px] text-[#48484F]">
-          <span className="text-[16px]">‹</span> 뒤로가기
-        </button>
-      </div>
-      <div className={`pt-10 transition-opacity ${dialog ? 'opacity-40' : ''}`}>
-        <NotificationPreview dim={dialog} />
-        <h1 className="text-[20px] font-bold text-ink text-center leading-[1.5] mt-9">
-          푸시 알림을 활성화하여 나를 이해하는
-          <br />
-          여정을 시작해보세요
-        </h1>
-        <p className="text-[14px] text-sub text-center leading-[1.75] mt-4">
-          하루 한 번, 놓치기 쉬운 나의 감정과 생각을
-          <br />
-          자연스럽게 기록해보세요.
-          <br />
-          쌓인 답변은 나를 이해하는 인사이트로 이어져요.
-          <br />
-          놓치지 않으려면 알림을 활성화하세요.
-        </p>
-      </div>
-
+      <View className="px-6 pt-2">
+        <BackButton onPress={leave(() => goBack('/'))} />
+      </View>
+      <View className="px-6 mt-6">
+        <Text className="text-[24px] font-bold text-ink text-center leading-[35px] tracking-tight">{'오늘의 질문을 놓치지 않도록\n알림을 허용해 주세요'}</Text>
+        <Text className="text-[16px] text-sub text-center leading-[26px] mt-3">{'하루 한 번, 데일리 질문과 리포트 미 소식을\n알림으로 알려드릴게요.'}</Text>
+      </View>
+      <NotificationPreview />
     </Screen>
+  );
+}
+
+export default function NotificationsPage() {
+  // useSearchParams를 쓰는 화면은 Suspense로 감싸야 한다(Next).
+  return (
+    <Suspense>
+      <NotificationsScreen />
+    </Suspense>
   );
 }

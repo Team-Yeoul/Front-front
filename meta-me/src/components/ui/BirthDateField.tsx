@@ -1,7 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Sheet } from './overlays';
 import { Button } from './primitives';
+import { Text } from './Text';
+import { CalendarIcon } from './icons';
+import { Pressable, View } from './rn';
+import { useTheme } from '@/lib/theme';
 
 const ROW = 44;
 const VISIBLE = 5;
@@ -15,127 +20,161 @@ function parse(v: string) {
   return y && m && d ? { y, m, d } : null;
 }
 
-/** Scroll-snap wheel column. Tapping a row also selects it. */
-function Wheel({ items, value, unit, onChange }: { items: number[]; value: number; unit: string; onChange: (v: number) => void }) {
+/**
+ * 한 칸씩 멈추는 휠 열(CSS scroll-snap). 항목을 누르면 그 값으로 이동한다.
+ * 굴러가는 동안에는 onMovingChange(true)로 알려, 멈추기 전 값으로 확정되지 않게 한다.
+ */
+function Wheel({
+  items,
+  value,
+  unit,
+  onChange,
+  onMovingChange,
+}: {
+  items: number[];
+  value: number;
+  unit: string;
+  onChange: (v: number) => void;
+  onMovingChange: (moving: boolean) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
-  const timer = useRef<number | undefined>(undefined);
+  const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 처음 열 때 선택값 위치로 맞추는 스크롤. 이 스크롤로는 값을 바꾸지 않는다.
+  const syncing = useRef(false);
 
   // 처음 열릴 때, 그리고 항목 수가 바뀔 때(월별 일수) 선택값 위치로 맞춘다.
-  useEffect(() => {
-    const el = ref.current;
+  useLayoutEffect(() => {
     const i = items.indexOf(value);
-    if (el && i >= 0) el.scrollTop = i * ROW;
+    if (i < 0 || !ref.current) return;
+    if (Math.abs(ref.current.scrollTop - i * ROW) < 1) return;
+    syncing.current = true;
+    ref.current.scrollTop = i * ROW;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.length]);
 
+  useEffect(() => () => void (idle.current && clearTimeout(idle.current)), []);
+
   const onScroll = () => {
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => {
-      const el = ref.current;
-      if (!el) return;
-      const i = Math.max(0, Math.min(items.length - 1, Math.round(el.scrollTop / ROW)));
+    if (syncing.current) {
+      syncing.current = false;
+      return;
+    }
+    onMovingChange(true);
+    if (idle.current) clearTimeout(idle.current);
+    // 잠시 멈추면(스냅이 끝나면) 그 위치의 값으로 반영한다.
+    idle.current = setTimeout(() => {
+      idle.current = null;
+      const y = ref.current?.scrollTop ?? 0;
+      const i = Math.max(0, Math.min(items.length - 1, Math.round(y / ROW)));
       if (items[i] !== value) onChange(items[i]);
-    }, 90);
+      onMovingChange(false);
+    }, 150);
   };
 
   return (
     <div
       ref={ref}
       onScroll={onScroll}
-      className="relative flex-1 overflow-y-auto snap-y snap-mandatory no-scrollbar overscroll-contain"
-      style={{ height: ROW * VISIBLE, paddingBlock: PAD }}
+      className="flex-1 overflow-y-auto no-scrollbar snap-y snap-mandatory overscroll-contain"
+      style={{ height: ROW * VISIBLE, paddingTop: PAD, paddingBottom: PAD, scrollPaddingTop: PAD }}
     >
       {items.map((n, i) => (
-        <button
+        <Pressable
           key={n}
-          type="button"
-          onClick={() => ref.current?.scrollTo({ top: i * ROW, behavior: 'smooth' })}
-          className={`w-full snap-center flex items-center justify-center text-[18px] transition-colors ${
-            n === value ? 'font-bold text-ink' : 'text-[#B4B4BB]'
-          }`}
+          onPress={() => {
+            ref.current?.scrollTo({ top: i * ROW, behavior: 'smooth' });
+            onChange(n);
+          }}
+          className="items-center justify-center snap-start"
           style={{ height: ROW }}
         >
-          {n}
-          {unit}
-        </button>
+          <Text className={`text-[18px] ${n === value ? 'font-bold text-ink' : 'text-[#B4B4BB] dark:text-[#6E6D82]'}`}>
+            {n}
+            {unit}
+          </Text>
+        </Pressable>
       ))}
     </div>
   );
 }
 
-/** 생년월일 입력: 탭하면 하단 시트 휠 피커가 열린다 (네이티브 date input 대신). */
-export function BirthDateField({ label = '생년월일', value, onChange }: { label?: string; value: string; onChange: (v: string) => void }) {
-  const now = new Date();
-  const maxYear = now.getFullYear();
+/** 생년월일 입력: 누르면 하단 시트 휠 피커가 열린다. */
+export function BirthDateField({ label, value, onChange }: { label?: string; value: string; onChange: (v: string) => void }) {
+  const today = new Date();
+  const maxYear = today.getFullYear();
   const minYear = maxYear - 100;
   const parsed = parse(value);
+  const { fg, bg } = useTheme();
+  const page = bg('#FFFFFF');
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(() => parsed ?? { y: maxYear - 20, m: 1, d: 1 });
+  type YMD = { y: number; m: number; d: number };
+  // 올해는 이번 달·오늘까지만 고를 수 있다(미래 날짜 막기).
+  const lastMonth = (y: number) => (y === maxYear ? today.getMonth() + 1 : 12);
+  const lastDay = (y: number, m: number) => (y === maxYear && m === today.getMonth() + 1 ? today.getDate() : daysIn(y, m));
+  // 2월 30일·미래 날짜처럼 없는(고를 수 없는) 날짜가 되지 않게 줄인다.
+  const clamp = ({ y, m, d }: YMD): YMD => {
+    const yy = Math.min(Math.max(y, minYear), maxYear);
+    const mm = Math.min(m, lastMonth(yy));
+    return { y: yy, m: mm, d: Math.min(d, lastDay(yy, mm)) };
+  };
+  const [draft, setDraft] = useState<YMD>(() => clamp(parsed ?? { y: maxYear - 20, m: 1, d: 1 }));
+  // 굴러가는 휠(년·월·일). 하나라도 굴러가면 완료를 막는다.
+  const [moving, setMoving] = useState<Record<string, boolean>>({});
+  const anyMoving = Object.values(moving).some(Boolean);
+  const movingOf = (k: string) => (v: boolean) => setMoving((s) => (s[k] === v ? s : { ...s, [k]: v }));
 
   const openSheet = () => {
-    setDraft(parsed ?? { y: maxYear - 20, m: 1, d: 1 });
+    setDraft(clamp(parsed ?? { y: maxYear - 20, m: 1, d: 1 }));
+    setMoving({});
     setOpen(true);
   };
 
   const years = Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i);
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
-  const days = Array.from({ length: daysIn(draft.y, draft.m) }, (_, i) => i + 1);
-  // 2월 30일처럼 없는 날짜가 되지 않게 월/연 변경 시 일을 줄인다.
-  const set = (next: Partial<typeof draft>) =>
-    setDraft((d) => {
-      const merged = { ...d, ...next };
-      return { ...merged, d: Math.min(merged.d, daysIn(merged.y, merged.m)) };
-    });
+  const months = Array.from({ length: lastMonth(draft.y) }, (_, i) => i + 1);
+  const days = Array.from({ length: lastDay(draft.y, draft.m) }, (_, i) => i + 1);
+  const set = (next: Partial<YMD>) => setDraft((d) => clamp({ ...d, ...next }));
 
   const confirm = () => {
-    onChange(`${draft.y}-${pad2(draft.m)}-${pad2(draft.d)}`);
+    if (anyMoving) return;
+    const v = clamp(draft);
+    onChange(`${v.y}-${pad2(v.m)}-${pad2(v.d)}`);
     setOpen(false);
   };
 
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[13px] font-medium text-[#48484F]">{label}</span>
-      <button
-        type="button"
-        onClick={openSheet}
-        className={`flex items-center justify-between h-14 rounded-2xl px-4 border-[1.5px] text-left transition-colors ${
-          open ? 'bg-white border-primary' : 'bg-surface border-transparent'
-        }`}
+    <View className="gap-2">
+      {!!label && <Text className="text-[14px] font-semibold text-text-2">{label}</Text>}
+      {/* 인풋과 같은 모양: 회색 채움 · 열려 있으면 1px 보라 테두리 · 앞에 달력 아이콘 */}
+      <Pressable
+        onPress={openSheet}
+        accessibilityRole="button"
+        accessibilityLabel="생년월일"
+        className={`flex-row items-center gap-3 h-14 rounded-xl px-4 border bg-surface ${open ? 'border-primary' : 'border-transparent'}`}
       >
-        <span className={`text-[16px] ${parsed ? 'text-ink' : 'text-mute'}`}>
-          {parsed ? `${parsed.y}. ${pad2(parsed.m)}. ${pad2(parsed.d)}.` : '생년월일을 선택해 주세요'}
-        </span>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <rect x="4" y="5" width="16" height="15" rx="2.5" stroke="#A8A8B0" strokeWidth="1.7" />
-          <path d="M4 10h16M9 3v4M15 3v4" stroke="#A8A8B0" strokeWidth="1.7" strokeLinecap="round" />
-        </svg>
-      </button>
+        <CalendarIcon size={20} color={fg(open || parsed ? '#1A1A1E' : '#A1A1AA')} width={1.8} />
+        <Text className={`text-[16px] ${parsed ? 'text-ink' : 'text-placeholder'}`}>
+          {parsed ? `${parsed.y}. ${pad2(parsed.m)}. ${pad2(parsed.d)}.` : '생년월일'}
+        </Text>
+      </Pressable>
 
-      {open && (
-        // PhoneFrame의 translateZ(0) 덕분에 데스크톱 미리보기에선 폰 화면 안에, 모바일에선 전체 화면에 붙는다.
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          <button type="button" className="absolute inset-0 bg-black/40 animate-fade-in" onClick={() => setOpen(false)} aria-label="닫기" />
-          <div className="relative bg-white rounded-t-[28px] px-5 pt-3 pb-[max(16px,env(safe-area-inset-bottom))] animate-sheet-up">
-            <div className="flex justify-center pb-3">
-              <span className="w-10 h-1 rounded-full bg-[#DADAE0]" />
-            </div>
-            <h2 className="text-[18px] font-bold text-ink">생년월일</h2>
-            <div className="relative mt-4">
-              <div className="pointer-events-none absolute inset-x-0 rounded-xl bg-surface-2" style={{ top: PAD, height: ROW }} />
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-16 z-10 bg-gradient-to-b from-white to-transparent" />
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 z-10 bg-gradient-to-t from-white to-transparent" />
-              <div className="relative flex">
-                <Wheel items={years} value={draft.y} unit="년" onChange={(y) => set({ y })} />
-                <Wheel items={months} value={draft.m} unit="월" onChange={(m) => set({ m })} />
-                <Wheel items={days} value={draft.d} unit="일" onChange={(d) => set({ d })} />
-              </div>
-            </div>
-            <Button className="mt-5" onClick={confirm}>
-              완료
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
+      <Sheet open={open} onClose={() => setOpen(false)} title="생년월일">
+        <View className="px-5 pb-5">
+          <View className="mt-4">
+            <View pointerEvents="none" className="absolute left-0 right-0 rounded-xl bg-surface-2" style={{ top: PAD, height: ROW }} />
+            {/* 시트는 열릴 때 붙으므로 휠도 그때 선택값 위치로 맞춰진다. */}
+            <View className="flex-row">
+                <Wheel items={years} value={draft.y} unit="년" onChange={(y) => set({ y })} onMovingChange={movingOf('y')} />
+                <Wheel items={months} value={draft.m} unit="월" onChange={(m) => set({ m })} onMovingChange={movingOf('m')} />
+                <Wheel items={days} value={draft.d} unit="일" onChange={(d) => set({ d })} onMovingChange={movingOf('d')} />
+            </View>
+            <View pointerEvents="none" className="absolute left-0 right-0 top-0 h-16" style={{ backgroundImage: `linear-gradient(${page}, ${page}00)` }} />
+            <View pointerEvents="none" className="absolute left-0 right-0 bottom-0 h-16" style={{ backgroundImage: `linear-gradient(${page}00, ${page})` }} />
+          </View>
+          <Button className="mt-5" onPress={confirm} disabled={anyMoving}>
+            완료
+          </Button>
+        </View>
+      </Sheet>
+    </View>
   );
 }

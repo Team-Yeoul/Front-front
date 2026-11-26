@@ -1,23 +1,21 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import {
-  useCreateTailQuestion,
-  useGetTodayDailyQuestion,
-  useUpdateTailQuestionAnswer,
-} from '@/entities/diary';
-import { useGetMyProfile } from '@/entities/user';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useCreateTailQuestion, useGetTodayDailyQuestion, useUpdateTailQuestionAnswer } from '@/entities/diary';
+import { useGetMyAccount, useGetMyProfile } from '@/entities/user';
 import { TodayRecordExistsError, useSaveTodayRecord, useTodayRecord } from '@/hooks/useSaveTodayRecord';
 import { TodayRecordExists } from '@/components/ui/TodayRecordExists';
 import { useAuthStore } from '@/store';
-import { Screen } from '@/components/ui/Screen';
-import { BackButton, Button, ChevronLeft, Img3D, ProgressBar, TextButton } from '@/components/ui/primitives';
-import { AiBubble, Composer, OutlineChip, TypingBubble, UserBubble } from '@/components/ui/chat';
-import { AccuracyDonut } from '@/components/ui/AccuracyDonut';
 import { useMe } from '@/hooks/useMe';
+import { Screen } from '@/components/ui/Screen';
+import { Text } from '@/components/ui/Text';
+import { LinearGradient, Pressable, ScrollView, View, scrollToEnd } from '@/components/ui/rn';
+import { AiMessage, ChatBackdrop, GlassBack, GlassCircle, PillComposer, QuickChip, TypingMessage, UserMessage } from '@/components/ui/chatV3';
+import { PencilIcon } from '@/components/ui/chatIcons';
+import { ChatIntro } from '@/components/chat/ChatIntro';
+import { router } from '@/lib/router';
+import { withSensitiveGate } from '@/components/SensitiveGate';
 
-type Mode = 'AI' | 'FREE';
 type TurnKey = 'main' | 'tail1' | 'emotion' | 'yesno' | 'tail2' | 'summary';
 
 interface Msg {
@@ -42,6 +40,8 @@ const FALLBACK_TAIL_2 = '이 조합, 어떤 상황이었나요?';
 const MAX_ANSWER = 2000;
 const MAX_SCENE = 1000;
 const EMOTION_CHIPS = ['몰입', '조급함', '뿌듯함', '지침', '무던함', '편안함', '설렘', '답답함'];
+/** 직접 쓰기(기록 B) 경로 */
+const WRITE_HREF = '/diary/write';
 
 // 답이 '모르겠음', 'ㅋㅋ'처럼 내용이 거의 없으면 한 번 더 쉽게 다시 묻는다.
 const RETRY_PROMPT: Partial<Record<TurnKey, string>> = {
@@ -62,15 +62,19 @@ const isVagueAnswer = (raw: string) => {
 let uid = 0;
 const nextId = () => `m${++uid}`;
 
-export default function DiaryChatPage() {
-  const router = useRouter();
+// 기록 화면을 기록에 남기지 않도록 홈 탭으로 바꿔 간다.
+const toMain = () => router.dismissTo('/main');
+
+function DiaryChatScreen() {
   const accessToken = useAuthStore((s) => s.accessToken);
-  const { nickname } = useMe();
+  const me = useMe();
+  const { data: account } = useGetMyAccount(!!accessToken && !me.nickname);
+  const displayName = me.nickname || account?.user?.username || account?.user?.email?.split('@')[0];
   const { data: fetchedQuestion, isPending: questionPending } = useGetTodayDailyQuestion(!!accessToken);
   // 이 화면에 들어와 처음 받은 질문을 끝까지 쓴다(저장 후 무효화로 다시 불러와도 문구가 바뀌지 않게).
   const [questionData, setQuestionData] = useState(fetchedQuestion);
   if (fetchedQuestion && !questionData) setQuestionData(fetchedQuestion);
-  // 질문을 불러오는 동안 기본 문구를 띄웠다가 실제 질문으로 바뀌지 않게 한다(실패하면 기본 문구를 쓴다).
+  // 질문을 불러오는 동안에는 대화를 시작하지 않는다(기본 문구로 시작했다가 실제 질문으로 바뀌지 않게).
   const questionLoading = !!accessToken && questionPending;
   const { data: profile, refetch: refetchProfile } = useGetMyProfile(!!accessToken);
   const createTailQuestion = useCreateTailQuestion();
@@ -80,9 +84,7 @@ export default function DiaryChatPage() {
   // 저장 시점에 409로 오늘 기록이 있다는 걸 알게 된 경우(undefined = 해당 없음)
   const [existingId, setExistingId] = useState<string | null | undefined>(undefined);
 
-  const [phase, setPhase] = useState<'intro' | 'chat' | 'done'>('intro');
-  const [mode, setMode] = useState<Mode>('AI');
-  const [freeText, setFreeText] = useState('');
+  const [phase, setPhase] = useState<'intro' | 'chat'>('intro');
   const [turn, setTurn] = useState<TurnKey>('main');
   const [messages, setMessages] = useState<Msg[]>([]);
   const [typing, setTyping] = useState(false);
@@ -91,12 +93,11 @@ export default function DiaryChatPage() {
   const [yesNo, setYesNo] = useState<'yes' | 'no' | null>(null);
   const [accuracy, setAccuracy] = useState<{ before: number; after: number }>({ before: 0, after: 0 });
   const [finding, setFinding] = useState('');
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
-  const [freeError, setFreeError] = useState('');
   const [startedAt] = useState(() => new Date());
 
   const answers = useRef({ main: '', tail1: '', tail2: '', myselfMoment: '' });
-  const questionIdRef = useRef<string | null>(null);
   const tail1IdRef = useRef<string | null>(null);
   const tail2IdRef = useRef<string | null>(null);
   const tail1Saved = useRef(false);
@@ -105,49 +106,39 @@ export default function DiaryChatPage() {
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
+    scrollToEnd(listRef.current);
   }, [messages, typing, turn]);
 
-  useEffect(() => {
-    if (turn !== 'summary') return;
-    const t = setTimeout(() => setPhase('done'), 2600);
-    return () => clearTimeout(t);
-  }, [turn]);
-
   // 기록 전 정확도를 처음 한 번만 잡아 둔다. 저장 후 프로필을 다시 불러와도 before가 덮어써지지 않게 한다.
-  const baselineSet = useRef(false);
-  useEffect(() => {
-    if (baselineSet.current || !profile) return;
-    baselineSet.current = true;
+  const [baselineSet, setBaselineSet] = useState(false);
+  if (!baselineSet && profile) {
+    setBaselineSet(true);
     const current = profile.latest_accuracy?.accuracy_percent ?? 0;
     setAccuracy({ before: current, after: current });
-  }, [profile]);
+  }
 
   const rawQuestion = questionData?.question?.question_text;
   const questionText = rawQuestion && /[가-힣]/.test(rawQuestion) ? rawQuestion : FALLBACK_QUESTION;
   const questionBadge = QUESTION_TYPE_LABEL[questionData?.question?.question_type ?? ''];
-  questionIdRef.current = questionData?.question?.question_id ?? null;
+  // 처음 받은 질문을 끝까지 쓰므로 값이 바뀌지 않아 그대로 읽는다.
+  const questionId = questionData?.question?.question_id ?? null;
   // 메인 질문이 이미 '나다운 순간'을 물었다면 예/아니오 턴에서 같은 걸 다시 묻지 않는다.
   const mainAsksMyselfMoment = questionText.includes('나답');
-  const totalTurns = mainAsksMyselfMoment ? 4 : 5;
-  const turnNumber: Record<TurnKey, number> = { main: 1, tail1: 2, emotion: 3, yesno: 4, tail2: totalTurns, summary: totalTurns };
 
   const today = new Date();
-  const weekday = ['일', '월', '화', '수', '목', '금', '토'][today.getDay()];
   const dateLabel = `${today.getMonth() + 1}월 ${today.getDate()}일`;
   const h = startedAt.getHours();
   const timeLabel = `오늘 · ${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${String(startedAt.getMinutes()).padStart(2, '0')}`;
 
-  const appendAi = (text: string, badge?: string, kind?: Msg['kind']) =>
-    setMessages((m) => [...m, { id: nextId(), role: 'ai', badge, text, kind }]);
+  const appendAi = (text: string, badge?: string, kind?: Msg['kind']) => setMessages((m) => [...m, { id: nextId(), role: 'ai', badge, text, kind }]);
   const appendUser = (text: string) => setMessages((m) => [...m, { id: nextId(), role: 'user', text }]);
 
-  const askTail = async (ref: React.MutableRefObject<string | null>, fallback: string) => {
+  const askTail = async (ref: RefObject<string | null>, fallback: string) => {
     setTyping(true);
     let text = fallback;
     try {
-      if (questionIdRef.current) {
-        const res = await createTailQuestion.mutateAsync(questionIdRef.current);
+      if (questionId) {
+        const res = await createTailQuestion.mutateAsync(questionId);
         const tq = res?.tail_question;
         ref.current = tq?.tail_id ?? null;
         if (tq?.question_text && /[가-힣]/.test(tq.question_text)) text = tq.question_text;
@@ -157,11 +148,6 @@ export default function DiaryChatPage() {
     }
     setTyping(false);
     return text;
-  };
-
-  const begin = () => {
-    setPhase('chat');
-    appendAi(questionText, questionBadge);
   };
 
   const goTail1 = async () => {
@@ -184,12 +170,16 @@ export default function DiaryChatPage() {
   const goTail2 = async () => {
     // 감정 칩은 모두 받침으로 끝나서 '과/이'로 고정해도 된다.
     const fallback =
-      emotions.length >= 2
-        ? `${emotions[0]}과 ${emotions[1]}이 같이 왔네요. ${FALLBACK_TAIL_2}`
-        : `'${emotions[0]}' 감정이 든 순간, 어떤 상황이었나요?`;
+      emotions.length >= 2 ? `${emotions[0]}과 ${emotions[1]}이 같이 왔네요. ${FALLBACK_TAIL_2}` : `'${emotions[0]}' 감정이 든 순간, 어떤 상황이었나요?`;
     const text = await askTail(tail2IdRef, fallback);
-    appendAi(text, `자동 추가 · 태그 ${emotions.length}개`);
+    appendAi(text);
     setTurn('tail2');
+  };
+
+  // '다르게 물어봐줘': 꼬리 질문을 새로 받아 다시 묻는다.
+  const reask = async () => {
+    if (turn === 'tail1') appendAi(await askTail(tail1IdRef, FALLBACK_TAIL_1), questionBadge);
+    else if (turn === 'tail2') appendAi(await askTail(tail2IdRef, FALLBACK_TAIL_2));
   };
 
   const finish = async () => {
@@ -202,15 +192,15 @@ export default function DiaryChatPage() {
       [tail2IdRef.current, answers.current.tail2],
     ];
     for (const [tailId, answer] of tails) {
-      if (!tailId || !answer || !questionIdRef.current) continue;
+      if (!tailId || !answer || !questionId) continue;
       try {
-        await updateTailAnswer.mutateAsync({ questionId: questionIdRef.current, tailId, body: { user_answer: answer } });
+        await updateTailAnswer.mutateAsync({ questionId, tailId, body: { user_answer: answer } });
       } catch {
         // 무시
       }
     }
     try {
-      await createRecord.mutateAsync({
+      const res = await createRecord.mutateAsync({
         answer_type: 'TEXT',
         user_answer: answers.current.main,
         emotion_tag: emotions.join(', '),
@@ -218,6 +208,7 @@ export default function DiaryChatPage() {
         is_myself_moment: !!answers.current.myselfMoment,
         myself_moment_desc: answers.current.myselfMoment ? answers.current.myselfMoment.slice(0, MAX_SCENE) : undefined,
       });
+      setSavedId(res?.record?.record_id ?? null);
     } catch (err) {
       setTyping(false);
       if (err instanceof TodayRecordExistsError) {
@@ -236,7 +227,7 @@ export default function DiaryChatPage() {
     }
     setTyping(false);
     setAccuracy((a) => ({ ...a, after }));
-    setFinding(emotions.length > 0 ? `오늘은 '${emotions.join(', ')}'을(를) 느꼈다고 기록했어요.` : '오늘 기록을 바탕으로 문장을 업데이트해둘게요.');
+    setFinding(emotions.length > 0 ? `오늘은 ${emotions.join(', ')}` : '오늘의 장면을 남겼어요');
     setTurn('summary');
   };
 
@@ -251,23 +242,27 @@ export default function DiaryChatPage() {
     return true;
   };
 
+  const answerMain = async (text: string) => {
+    answers.current.main = text;
+    if (mainAsksMyselfMoment) answers.current.myselfMoment = text;
+    appendUser(text);
+    setInput('');
+    await goTail1();
+  };
+
   const send = async () => {
     const text = input.trim();
     if ((turn === 'main' || turn === 'tail1' || turn === 'tail2') && text && retryIfVague(text)) return;
     if (turn === 'main' && text) {
-      answers.current.main = text;
-      if (mainAsksMyselfMoment) answers.current.myselfMoment = text;
-      appendUser(text);
-      setInput('');
-      await goTail1();
+      await answerMain(text);
     } else if (turn === 'tail1' && text) {
       answers.current.tail1 = text;
       appendUser(text);
       setInput('');
       // 다음 꼬리 질문을 만들 때 서버가 이 답을 참고할 수 있도록 바로 저장한다(실패해도 finish에서 다시 보낸다).
-      if (tail1IdRef.current && questionIdRef.current) {
+      if (tail1IdRef.current && questionId) {
         updateTailAnswer
-          .mutateAsync({ questionId: questionIdRef.current, tailId: tail1IdRef.current, body: { user_answer: text } })
+          .mutateAsync({ questionId, tailId: tail1IdRef.current, body: { user_answer: text } })
           .then(() => (tail1Saved.current = true))
           .catch(() => {});
       }
@@ -301,253 +296,220 @@ export default function DiaryChatPage() {
     }
   };
 
-  const submitFree = async () => {
-    const text = freeText.trim();
-    if (!text || createRecord.isPending) return;
-    setFreeError('');
-    try {
-      await createRecord.mutateAsync({
-        answer_type: 'TEXT',
-        user_answer: text,
-        emotion_tag: '자유 기록',
-        scene_description: text.slice(0, MAX_SCENE),
-        is_myself_moment: false,
-      });
-    } catch (err) {
-      if (err instanceof TodayRecordExistsError) setExistingId(err.recordId);
-      else setFreeError('기록을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
-      return;
-    }
-    setFinding('자유롭게 남겨주신 기록, 잘 저장해뒀어요.');
-    setPhase('done');
+  /** 첫 화면에서 대화로 넘어간다. 첫 화면 입력칸에 쓴 말이 있으면 그걸 첫 질문의 답으로 바로 보낸다. */
+  const begin = (firstAnswer?: string) => {
+    setPhase('chat');
+    appendAi(questionText, questionBadge);
+    if (firstAnswer?.trim()) void answerMain(firstAnswer.trim());
   };
 
   if (existingId !== undefined) return <TodayRecordExists recordId={existingId} />;
-  // 이미 오늘 기록이 있으면 대화를 시작하기 전에 수정으로 안내한다(저장 후 완료 화면에서는 보여주지 않는다).
+  // 이미 오늘 기록이 있으면 대화를 시작하기 전에 수정으로 안내한다.
   if (phase === 'intro' && todayRecord.record) return <TodayRecordExists recordId={todayRecord.record.record_id} />;
 
-  /* ── 인트로 ── */
+  /* ── 첫 화면 (4c) ── */
   if (phase === 'intro') {
     return (
-      <Screen
-        footer={
-          <Composer
-            value={mode === 'FREE' ? freeText : ''}
-            onChange={setFreeText}
-            onSend={mode === 'AI' ? begin : submitFree}
-            sendEnabled={mode === 'AI' ? !questionLoading : freeText.trim().length > 0 && !createRecord.isPending}
-            maxLength={MAX_ANSWER}
-            placeholder={mode === 'AI' ? '첫 질문을 기다리는 중' : '오늘을 자유롭게 적어보세요'}
-            chips={
-              <>
-                <button
-                  onClick={() => setMode('AI')}
-                  className={`h-8 px-3 rounded-full flex items-center gap-1.5 text-[13px] ${mode === 'AI' ? 'bg-white font-semibold text-ink' : 'text-sub'}`}
-                >
-                  <span className="w-3.5 h-3.5 rounded-full bg-[radial-gradient(circle_at_35%_30%,#B7B9FF,#6367FF)]" />
-                  AI 질문
-                </button>
-                <button
-                  onClick={() => setMode('FREE')}
-                  className={`h-8 px-3 rounded-full text-[13px] ${mode === 'FREE' ? 'bg-white font-semibold text-ink' : 'text-sub'}`}
-                >
-                  자유 기록
-                </button>
-              </>
-            }
-          />
-        }
-      >
-        <div className="relative flex items-center justify-center h-14 px-5">
-          <BackButton className="absolute left-5" />
-          <div className="text-center">
-            <p className="text-[15px] font-semibold text-ink">오늘의 기록</p>
-            <p className="text-[12px] text-sub mt-0.5">
-              {dateLabel} {weekday}요일
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-col items-center pt-[110px]">
-          <Img3D name="star-pink" size={210} />
-          <h1 className="text-[22px] font-bold text-ink text-center leading-[1.5] mt-9 whitespace-pre-line">
-            {questionLoading ? '\u00a0' : `${nickname ? `${nickname}님, ` : ''}${questionText.replace(/^오늘 하루는 /, '오늘 하루는\n')}`}
-          </h1>
-          {mode === 'FREE' && freeError && <p className="text-[13px] text-danger mt-4">{freeError}</p>}
-        </div>
-      </Screen>
+      <ChatIntro
+        name={displayName}
+        onBack={() => (router.canGoBack() ? router.back() : toMain())}
+        onTopic={() => begin()}
+        onSend={(t) => begin(t)}
+        disabled={questionLoading}
+        maxLength={MAX_ANSWER}
+      />
     );
   }
 
-  /* ── 완료 ── */
-  if (phase === 'done') {
-    return (
-      <Screen
-        footer={
-          <>
-            <Button className="shadow-[0_8px_24px_rgba(99,103,255,0.3)]" onClick={() => router.push('/report/sentence')}>
-              오늘의 문장 보기 <span className="text-[18px] font-normal">›</span>
-            </Button>
-            <TextButton className="mt-1" onClick={() => router.push('/diary/streak')}>
-              연속 기록 보기
-            </TextButton>
-          </>
-        }
-      >
-        <div className="flex justify-end px-5 h-14 items-center">
-          <button onClick={() => router.push('/main')} className="text-[15px] text-sub">
-            닫기
-          </button>
-        </div>
-        <div className="flex flex-col items-center">
-          <Img3D name="check" size={96} />
-          <h1 className="text-[24px] font-bold text-ink mt-3">오늘 기록 완료</h1>
-          <p className="text-[14px] text-sub mt-2">{mode === 'FREE' ? '오늘 기록이 저장됐어요.' : `${totalTurns}개 질문에 답했어요. 문장이 조금 더 정확해졌습니다.`}</p>
-          <div className="mt-8">
-            <AccuracyDonut percent={accuracy.after} delta={Math.max(0, accuracy.after - accuracy.before)} />
-          </div>
-        </div>
-        <div className="mx-5 mt-8 rounded-3xl bg-white px-5 py-5 shadow-[0_6px_24px_rgba(26,26,30,0.06)]">
-          <p className="text-[12px] font-semibold text-primary">오늘 발견한 것</p>
-          <p className="text-[17px] font-bold text-ink leading-snug mt-2">{finding}</p>
-          {emotions.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-4">
-              {emotions.map((e) => (
-                <span key={e} className="h-8 px-3.5 rounded-full bg-surface-2 text-[13px] font-semibold text-primary inline-flex items-center">
-                  {e}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      </Screen>
-    );
-  }
-
-  /* ── 대화 ── */
+  /* ── 대화 (4a · 4b) ── */
   const lastAiId = [...messages].reverse().find((m) => m.role === 'ai')?.id;
-  const composerDisabled = typing || turn === 'summary' || saveFailed;
+  const done = turn === 'summary';
+  const composerDisabled = typing || saveFailed;
   const canSend =
     turn === 'emotion' ? emotions.length > 0 : turn === 'yesno' ? yesNo === 'no' || (yesNo === 'yes' && input.trim().length > 0) : input.trim().length > 0;
+  const delta = Math.max(0, accuracy.after - accuracy.before);
 
   return (
     <Screen
-      bodyRef={listRef}
+      bg="#F1EFF8"
+      background={<ChatBackdrop />}
+      // 새 메시지마다 맨 아래로 내려야 해서 스크롤은 이 화면이 직접 갖는다.
+      scroll={false}
+      footerClassName="px-5 pt-2"
       footer={
-          <Composer
-            value={turn === 'emotion' ? emotions.join(', ') : turn === 'yesno' && yesNo !== 'yes' ? '' : input}
-            onChange={setInput}
-            onSend={() => canSend && send()}
-            sendEnabled={canSend}
-            placeholder={turn === 'yesno' && yesNo === 'yes' ? '어떤 순간이었나요?' : turn === 'emotion' ? '위에서 감정을 골라주세요' : '답을 적어보세요'}
-            disabled={composerDisabled}
-            maxLength={turn === 'tail1' ? MAX_SCENE : MAX_ANSWER}
-            disabledLabel="metame가 질문을 쓰는 중이에요"
-            disabledHint="질문이 도착하면 입력창이 열려요"
-            chips={
-              <>
-                {turn === 'tail1' && <OutlineChip onClick={goEmotion}>태그로 답하기</OutlineChip>}
-                {(turn === 'tail1' || turn === 'tail2') && <OutlineChip onClick={skip}>건너뛰기</OutlineChip>}
-              </>
-            }
-          />
+        done ? (
+          <Pressable onPress={() => router.push('/diary/streak')} accessibilityRole="button">
+            <LinearGradient
+              colors={['#8A6BFF', '#6367FF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ height: 64, borderRadius: 16, alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(99,103,255,0.3)' }}
+            >
+              <Text className="text-[16px] font-bold text-white">오늘 기록 완료</Text>
+            </LinearGradient>
+          </Pressable>
+        ) : (
+          <View className="gap-3">
+            {!typing && (turn === 'tail1' || turn === 'tail2') && (
+              <ScrollView horizontal className="-mx-5" contentContainerClassName="px-5 gap-2 py-1">
+                {turn === 'tail1' && <QuickChip onPress={goEmotion}>태그로 답하기</QuickChip>}
+                <QuickChip onPress={skip}>건너뛰기</QuickChip>
+                <QuickChip onPress={reask}>다르게 물어봐줘</QuickChip>
+              </ScrollView>
+            )}
+            <PillComposer
+              value={turn === 'emotion' ? emotions.join(', ') : turn === 'yesno' && yesNo !== 'yes' ? '' : input}
+              onChange={setInput}
+              onSend={() => canSend && send()}
+              sendEnabled={canSend}
+              readOnly={turn === 'emotion' || (turn === 'yesno' && yesNo !== 'yes')}
+              placeholder={
+                typing
+                  ? '메타미가 질문을 쓰는 중이에요'
+                  : turn === 'yesno' && yesNo === 'yes'
+                    ? '어떤 순간이었나요?'
+                    : turn === 'emotion'
+                      ? '위에서 감정을 골라주세요'
+                      : turn === 'yesno'
+                        ? '위에서 골라주세요'
+                        : '답을 적어보세요'
+              }
+              disabled={composerDisabled}
+              maxLength={turn === 'tail1' ? MAX_SCENE : MAX_ANSWER}
+            />
+          </View>
+        )
       }
     >
-      <div className="sticky top-0 z-10 flex items-center justify-between h-14 px-5 bg-surface-2">
-        <button onClick={() => router.push('/main')} aria-label="나가기">
-          <ChevronLeft size={20} />
-        </button>
-        <span className="text-[14px] font-semibold text-ink">오늘의 기록 · {dateLabel}</span>
-        <span className="text-[13px] font-semibold text-primary w-8 text-right">
-          {turnNumber[turn]} / {totalTurns}
-        </span>
-      </div>
+      <View className="h-[52px] shrink-0 flex-row items-center justify-between px-5">
+        <GlassBack onPress={toMain} />
+        <View className="absolute left-0 right-0 items-center" pointerEvents="none">
+          <Text className="text-[16px] font-bold text-ink">오늘의 대화</Text>
+          <View className="mt-0.5 flex-row items-center gap-1.5">
+            <View className="w-[7px] h-[7px] shrink-0 rounded-full bg-[#34C759]" />
+            <Text className="text-[12px] text-text-4">{dateLabel} · 3분 남짓</Text>
+          </View>
+        </View>
+        <GlassCircle onPress={() => router.push(WRITE_HREF)} label="직접 쓰기로 바꾸기">
+          <PencilIcon />
+        </GlassCircle>
+      </View>
 
-      <div className="px-4 pt-2 pb-4 flex flex-col gap-4">
-        <p className="text-center text-[12px] text-mute">{timeLabel}</p>
+      <ScrollView ref={listRef} className="flex-1 min-h-0" contentContainerClassName="px-5 pt-4 pb-4 gap-4">
+        <View className="self-center rounded-full bg-page/60 px-3 py-1">
+          <Text className="text-[12px] text-text-4">{timeLabel}</Text>
+        </View>
         {messages.map((m) =>
           m.role === 'user' ? (
             m.kind === 'chips' ? (
-              <div key={m.id} className="flex justify-end flex-wrap gap-2 pl-12">
-                {m.text.split(', ').map((e) => (
-                  <span key={e} className="h-9 px-4 rounded-full bg-primary text-white text-[14px] font-semibold inline-flex items-center">
-                    {e}
-                  </span>
-                ))}
-              </div>
+              <View key={m.id} className="items-end gap-1.5 pl-12">
+                <View className="flex-row justify-end flex-wrap gap-1.5">
+                  {m.text.split(', ').map((e) => (
+                    <View key={e} className="h-7 px-3 rounded-full bg-primary items-center justify-center">
+                      <Text className="text-white text-[12px] font-semibold">{e}</Text>
+                    </View>
+                  ))}
+                </View>
+                <Text className="text-[12px] text-sub">감정 태그 {m.text.split(', ').length}개</Text>
+              </View>
             ) : (
-              <UserBubble key={m.id}>{m.text}</UserBubble>
+              <UserMessage key={m.id}>{m.text}</UserMessage>
             )
           ) : (
-            <AiBubble
+            <AiMessage
               key={m.id}
               badge={m.badge}
               footer={
                 m.kind === 'emotion' ? (
-                  <div className="mt-3">
-                    <div className="flex flex-wrap gap-2">
+                  <View className="mt-3">
+                    <View className="flex-row flex-wrap gap-1.5">
                       {EMOTION_CHIPS.map((e) => {
                         const on = emotions.includes(e);
+                        // 보낸 뒤 다음 질문을 기다리는 동안(typing)에도 잠가, 보낸 감정과 저장할 감정이 달라지지 않게 한다.
+                        const disabled = m.id !== lastAiId || turn !== 'emotion' || typing;
                         return (
-                          <button
+                          <Pressable
                             key={e}
-                            disabled={m.id !== lastAiId || turn !== 'emotion'}
-                            onClick={() => setEmotions((prev) => (on ? prev.filter((x) => x !== e) : [...prev, e]))}
-                            className={`h-9 px-3.5 rounded-full text-[14px] ${on ? 'bg-primary text-white font-semibold' : 'bg-surface-2 text-[#48484F]'}`}
+                            disabled={disabled}
+                            onPress={() => setEmotions((prev) => (on ? prev.filter((x) => x !== e) : [...prev, e]))}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: on, disabled }}
+                            className={`h-8 shrink-0 px-3.5 rounded-full items-center justify-center ${on ? 'bg-primary-soft' : 'bg-surface'}`}
                           >
-                            {e}
-                          </button>
+                            <Text className={`text-[12px] font-semibold ${on ? 'text-primary-pressed' : 'text-text-3'}`}>{e}</Text>
+                          </Pressable>
                         );
                       })}
-                    </div>
-                    <p className="text-[12px] text-mute mt-3">
+                    </View>
+                    <Text className="text-[12px] text-mute mt-3">
                       {emotions.length}개 선택됨{turn === 'emotion' ? ' · 아래에서 보내기' : ''}
-                    </p>
-                  </div>
+                    </Text>
+                  </View>
                 ) : m.kind === 'yesno' ? (
-                  <div className="flex gap-2 mt-3">
+                  <View className="flex-row gap-2 mt-3">
                     {(['yes', 'no'] as const).map((v) => (
-                      <button
+                      <Pressable
                         key={v}
-                        disabled={turn !== 'yesno'}
-                        onClick={() => setYesNo(v)}
-                        className={`h-11 px-5 rounded-xl text-[14px] font-semibold ${
-                          yesNo === v ? 'border-2 border-primary text-primary bg-white' : 'bg-surface-2 text-sub'
-                        }`}
+                        disabled={turn !== 'yesno' || typing}
+                        onPress={() => setYesNo(v)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: yesNo === v, disabled: turn !== 'yesno' || typing }}
+                        className={`flex-1 h-10 rounded-xl items-center justify-center ${yesNo === v ? 'bg-primary' : 'bg-surface'}`}
                       >
-                        {v === 'yes' ? '있었어요' : '잘 모르겠어요'}
-                      </button>
+                        <Text className={`text-[14px] ${yesNo === v ? 'text-white font-bold' : 'text-text-4'}`}>{v === 'yes' ? '있었어요' : '잘 모르겠어요'}</Text>
+                      </Pressable>
                     ))}
-                  </div>
+                  </View>
                 ) : undefined
               }
             >
               {m.text}
-            </AiBubble>
+            </AiMessage>
           ),
         )}
-        {typing && <TypingBubble />}
+        {typing && <TypingMessage />}
         {saveFailed && (
-          <div className="rounded-3xl bg-surface-2 px-5 py-5 animate-fade-in text-center">
-            <p className="text-[15px] font-bold text-ink">기록을 저장하지 못했어요</p>
-            <p className="text-[13px] text-sub mt-1">답변은 그대로 남아 있어요. 다시 시도해 주세요.</p>
-            <Button className="mt-4" onClick={finish}>
-              다시 시도
-            </Button>
-          </div>
+          <AiMessage
+            footer={
+              <Pressable onPress={finish} accessibilityRole="button" className="mt-3 h-10 rounded-xl bg-primary items-center justify-center">
+                <Text className="text-[14px] font-bold text-white">다시 저장하기</Text>
+              </Pressable>
+            }
+          >
+            기록을 저장하지 못했어요. 답변은 그대로 남아 있으니 다시 시도해 주세요.
+          </AiMessage>
         )}
-        {turn === 'summary' && (
-          <div className="rounded-3xl bg-surface-2 px-5 py-5 animate-fade-in">
-            <div className="flex items-center justify-between">
-              <span className="text-[16px] font-bold text-ink">오늘 기록 정리됨</span>
-              <span className="text-[13px] font-semibold text-primary">
-                정확도 {accuracy.before}% → {accuracy.after}%
-              </span>
-            </div>
-            <ProgressBar value={accuracy.after} className="mt-3" track="#DCDDFB" height={6} />
-            <p className="text-[13px] text-[#48484F] mt-3">{finding}</p>
-          </div>
+        {done && (
+          <>
+            <AiMessage
+              footer={
+                <View className="mt-3 flex-row gap-2">
+                  <View className="flex-1 rounded-xl bg-surface px-3 py-3">
+                    <Text className="text-[12px] text-text-4">나의 문장 정확도</Text>
+                    <View className="mt-0.5 flex-row items-baseline gap-1">
+                      <Text className="text-[18px] font-semibold tabular-nums text-ink">{accuracy.after}%</Text>
+                      {delta > 0 && <Text className="text-[12px] font-bold text-primary tabular-nums">▲ {delta}%p</Text>}
+                    </View>
+                  </View>
+                  <View className="flex-1 rounded-xl bg-surface px-3 py-3">
+                    <Text className="text-[12px] text-text-4">오늘 남긴 감정</Text>
+                    <Text className="mt-0.5 text-[14px] leading-[20px] font-semibold text-ink">{finding}</Text>
+                  </View>
+                </View>
+              }
+            >
+              오늘 이야기 고마워요. 오늘 대화는 여기까지예요.
+            </AiMessage>
+            <View className="flex-row flex-wrap gap-2 pl-11">
+              <QuickChip onPress={() => router.push('/chat')}>더 얘기할래요</QuickChip>
+              {savedId && <QuickChip onPress={() => router.push({ pathname: '/diary/[id]', params: { id: savedId } })}>오늘 정리 보기</QuickChip>}
+            </View>
+          </>
         )}
-      </div>
+      </ScrollView>
     </Screen>
   );
 }
+
+// 민감정보 처리 동의를 철회했거나 동의 기록이 없으면 화면 대신 동의 화면을 보여 준다.
+export default withSensitiveGate(DiaryChatScreen);

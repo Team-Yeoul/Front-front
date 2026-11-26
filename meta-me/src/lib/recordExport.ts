@@ -156,14 +156,20 @@ export function buildExportHtml(entries: ExportEntry[], nickname?: string): stri
 </html>`;
 }
 
-export function downloadExportHtml(entries: ExportEntry[], nickname?: string) {
+/** 내려받는 파일 이름: meta-me-기록-2026-05-10.html (앱과 같은 이름) */
+export const exportFileName = () => `meta-me-기록-${new Date().toLocaleDateString('sv-SE')}.html`;
+
+/** 웹에서는 HTML 파일을 바로 내려받는다. (앱은 같은 파일을 공유 시트로 넘긴다) */
+export async function shareExportHtml(entries: ExportEntry[], nickname?: string): Promise<void> {
   const blob = new Blob([buildExportHtml(entries, nickname)], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `meta-me-기록-${new Date().toLocaleDateString('sv-SE')}.html`;
+  a.download = exportFileName();
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+export const downloadExportHtml = shareExportHtml;

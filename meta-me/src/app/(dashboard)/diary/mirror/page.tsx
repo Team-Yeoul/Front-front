@@ -1,84 +1,150 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Screen } from '@/components/ui/Screen';
-import { Button, ChatFab, Segmented, TopBar } from '@/components/ui/primitives';
+import { BackButton, Button, ChatFab } from '@/components/ui/primitives';
 import { AskSheet } from '@/components/ui/AskSheet';
+import { Pressable, View, useSafeAreaInsets } from '@/components/ui/rn';
+import { Text } from '@/components/ui/Text';
 import { readLastWrite, type LastWrite } from '@/lib/lastWrite';
+import { router } from '@/lib/router';
+import { monsterName } from '@/lib/onboardingCogni';
+import { withSensitiveGate } from '@/components/SensitiveGate';
 
-export default function MirrorPage() {
-  const router = useRouter();
-  const [result, setResult] = useState<LastWrite | null>(null);
-  const [loaded, setLoaded] = useState(false);
+// 작성 흐름 화면을 기록에 남기지 않도록 다이어리 탭으로 바꿔 간다.
+const toDiary = () => router.dismissTo('/diary');
+const PATTERN_TONE = [
+  ['bg-primary', 'text-white'],
+  // 다크(12c-dk)는 노란 칩을 서피스 칩으로 바꾼다.
+  ['bg-[#FFD966] dark:bg-surface', 'text-ink'],
+] as const;
+
+function Header() {
+  return (
+    <View className="h-11 mt-2 flex-row items-center justify-center px-5">
+      <View className="absolute left-5">
+        <BackButton onPress={toDiary} />
+      </View>
+      <Text accessibilityRole="header" className="text-[16px] font-semibold text-ink">
+        객관화 미러
+      </Text>
+    </View>
+  );
+}
+
+/** 객관화 미러 — 변환 결과 (12c) */
+function DiaryMirrorScreen() {
+  const insets = useSafeAreaInsets();
+  // 마지막 결과는 클라이언트 메모리에 있어 서버 렌더에서는 읽지 못한다. 붙은 뒤 한 번 읽는다(undefined = 아직 안 읽음).
+  const [result, setResult] = useState<LastWrite | null | undefined>(undefined);
+  useEffect(() => setResult(readLastWrite()), []);
   const [tab, setTab] = useState<'objective' | 'original'>('objective');
   const [ask, setAsk] = useState(false);
 
-  useEffect(() => {
-    setResult(readLastWrite());
-    setLoaded(true);
-  }, []);
-
-  if (!loaded) return null;
+  if (result === undefined) return null;
 
   if (!result) {
     return (
-      <Screen footer={<Button onClick={() => router.push('/diary')}>다이어리로</Button>}>
-        <TopBar title="객관화 미러" onBack={() => router.push('/diary')} />
-        <p className="text-center text-[14px] text-sub mt-24">표시할 객관화 결과가 없어요.</p>
+      <Screen footer={<Button onPress={toDiary}>다이어리로</Button>}>
+        <Header />
+        <Text className="text-center text-[14px] text-sub mt-24">표시할 객관화 결과가 없어요.</Text>
       </Screen>
     );
   }
 
-  const hasCogni = result.unlocked.length > 0;
+  const patterns = result.unlocked;
+  const hasCogni = patterns.length > 0;
 
   return (
     <Screen
       footer={
-        <Button onClick={() => router.push(hasCogni ? '/diary/cogni' : '/diary/streak')}>{hasCogni ? '발견된 코그니 보기' : '기록 마치기'}</Button>
+        <Button onPress={() => router.push(hasCogni ? '/diary/cogni' : '/diary/streak')}>{hasCogni ? '발견된 코그니 보기' : '기록 마치기'}</Button>
       }
       overlay={
         <>
-          <ChatFab className="absolute right-5 bottom-[96px] z-20" onClick={() => setAsk(true)} />
+          {/* 하단 버튼(64px + 여백) 바로 위에 띄운다. */}
+          <View pointerEvents="box-none" className="absolute right-5 z-20" style={{ bottom: insets.bottom + 96 }}>
+            <ChatFab onPress={() => setAsk(true)} />
+          </View>
           <AskSheet open={ask} onClose={() => setAsk(false)} context="객관화 미러" />
         </>
       }
     >
-      <TopBar title="객관화 미러" onBack={() => router.push('/diary')} />
-      <div className="px-5 pt-3 pb-6">
-        <Segmented
-          options={[
-            { value: 'objective', label: '객관화' },
-            { value: 'original', label: '내가 쓴 원문' },
-          ]}
-          value={tab}
-          onChange={setTab}
-        />
-        <div className="mt-4 rounded-3xl bg-surface px-5 py-6">
-          <p className="font-mono text-[12px] tracking-[0.12em] text-mute">{tab === 'objective' ? 'OBSERVER VIEW' : 'MY WORDS'}</p>
-          <p className="text-[17px] text-ink leading-[1.85] mt-3">
-            {tab === 'original'
-              ? result.original
-              : result.objective || '객관화 결과를 받아오지 못했어요. 기록은 다이어리에 저장됐는지 확인해 주세요.'}
-          </p>
-        </div>
+      <Header />
+      <View className="px-6 pt-5 pb-6">
+        <View className="flex-row p-1 rounded-[14px] bg-surface-2" accessibilityRole="tablist">
+          {(
+            [
+              ['objective', '객관화'],
+              ['original', '내가 쓴 원문'],
+            ] as const
+          ).map(([v, label]) => {
+            const on = tab === v;
+            return (
+              <Pressable
+                key={v}
+                onPress={() => setTab(v)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}
+                className={`flex-1 h-10 rounded-[11px] items-center justify-center ${on ? 'bg-page' : ''}`}
+                style={on ? { boxShadow: '0 1px 3px rgba(0,0,0,0.06)' } : undefined}
+              >
+                <Text className={`text-[14px] ${on ? 'font-semibold text-ink' : 'text-sub'}`}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
-        {result.emotions.length > 0 && (
-          <div className="mt-4 rounded-3xl border border-line px-5 py-5">
-            <span className="text-[15px] font-bold text-ink">오늘 고른 감정</span>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {result.emotions.map((e, i) => (
-                <span
-                  key={e}
-                  className={`h-9 px-4 rounded-full text-[14px] font-semibold inline-flex items-center ${i % 2 ? 'bg-yellow text-ink' : 'bg-primary text-white'}`}
-                >
-                  {e}
-                </span>
-              ))}
-            </div>
-          </div>
+        <View className="mt-4 rounded-[20px] bg-surface px-[22px] py-5">
+          <Text className="text-[16px] leading-[27px] text-ink">
+            {tab === 'original' ? result.original : result.objective || '객관화 결과를 받아오지 못했어요. 기록은 다이어리에 저장됐어요.'}
+          </Text>
+        </View>
+
+        {(result.scene || result.emotions.length > 0) && (
+          <View className="mt-6">
+            <Text accessibilityRole="header" className="text-[16px] font-bold text-ink">
+              사실과 감정 분리
+            </Text>
+            <View className="mt-3 flex-row gap-2.5">
+              <View className="flex-1 rounded-2xl bg-primary-soft px-4 py-4">
+                <Text className="text-[12px] font-bold text-primary">사실</Text>
+                <Text numberOfLines={4} className="mt-1.5 text-[14px] leading-[22px] text-text-2">
+                  {result.scene || '오늘 남긴 장면이 없어요'}
+                </Text>
+              </View>
+              <View className="flex-1 rounded-2xl bg-yellow-soft px-4 py-4">
+                <Text className="text-[12px] font-bold text-gold">감정</Text>
+                <Text className="mt-1.5 text-[14px] leading-[22px] text-text-2">{result.emotions.length ? result.emotions.join(', ') : '고른 감정이 없어요'}</Text>
+              </View>
+            </View>
+          </View>
         )}
-      </div>
+
+        {hasCogni && (
+          <View className="mt-4 rounded-[20px] bg-surface px-[18px] py-4">
+            <View className="flex-row items-center justify-between">
+              <Text accessibilityRole="header" className="text-[16px] font-bold text-ink">
+                감지된 패턴
+              </Text>
+              <Text className="text-[12px] text-mute tabular-nums">{patterns.length}</Text>
+            </View>
+            <View className="mt-3 flex-row flex-wrap gap-2">
+              {patterns.map((p, i) => (
+                <View key={p.monster.monster_id} className={`h-8 px-3.5 rounded-full justify-center ${PATTERN_TONE[i % 2][0]}`}>
+                  <Text className={`text-[12px] font-semibold ${PATTERN_TONE[i % 2][1]}`}>{monsterName(p.monster)}</Text>
+                </View>
+              ))}
+            </View>
+            {patterns[0].monster.monster_description ? (
+              <Text className="mt-3 text-[12px] leading-[19px] text-text-4">{patterns[0].monster.monster_description}</Text>
+            ) : null}
+          </View>
+        )}
+      </View>
     </Screen>
   );
 }
+
+// 민감정보 처리 동의를 철회했거나 동의 기록이 없으면 화면 대신 동의 화면을 보여 준다.
+export default withSensitiveGate(DiaryMirrorScreen);

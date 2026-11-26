@@ -30,3 +30,8 @@ export interface ListDailyRecordsParams {
   page?: number;
   size?: number;
 }
+
+export type DiaryDraft = components['schemas']['DiaryDraft'];
+
+export type TriggerDomain = 'STUDY' | 'WORK' | 'HOBBY' | 'RELATION';
+export type TriggerDeviationsResponse = components['schemas']['TriggerDeviationsResponse'];

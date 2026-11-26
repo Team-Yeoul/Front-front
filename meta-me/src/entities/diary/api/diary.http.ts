@@ -4,6 +4,7 @@ import type {
   CreateBettingRequest,
   CreateTriggerRequest,
   DailyQuestion,
+  DiaryDraft,
   DailyRecordListResponse,
   DailyRecordResponse,
   ListDailyRecordsParams,
@@ -12,6 +13,8 @@ import type {
   SubmitDailyRecordRequest,
   TailQuestionResponse,
   TriggerAnalysisResponse,
+  TriggerDeviationsResponse,
+  TriggerDomain,
   UpdateTailAnswerRequest,
 } from '../model/types';
 
@@ -89,3 +92,22 @@ export const submitMetacogTriggerResult = (triggerId: string, body: SubmitActual
     method: 'PATCH',
     body,
   });
+
+// ── 임시저장(사용자당 1개, revision으로 낙관적 잠금) ─────────────────────
+/** 임시저장본. 없으면 서버가 404를 준다. */
+export const getDiaryDraft = () => apiRequest<DiaryDraft>('/v1/daily-records/draft');
+
+/** 처음 저장할 때는 revision=0, 이후엔 마지막으로 받은 revision을 보낸다. 다른 기기가 먼저 저장했으면 409 DRAFT_CONFLICT. */
+export const saveDiaryDraft = (content: SubmitDailyRecordRequest, revision: number) =>
+  apiRequest<DiaryDraft>('/v1/daily-records/draft', { method: 'PUT', body: { content, revision } });
+
+export const deleteDiaryDraft = (revision: number) =>
+  apiRequest<void>('/v1/daily-records/draft', { method: 'DELETE', query: { revision } });
+
+/** 임시저장본으로 데일리 기록을 만들고(POST /v1/daily-records와 같음) 임시저장본은 지운다. */
+export const publishDiaryDraft = (revision: number) =>
+  apiRequest<DailyRecordResponse>('/v1/daily-records/draft/publish', { method: 'POST', body: { revision } });
+
+/** 완료된 트리거의 영역별 편차 누적과 패턴. domain을 빼면 전체 영역. */
+export const getMetacogDeviations = (domain?: TriggerDomain) =>
+  apiRequest<TriggerDeviationsResponse>('/v1/metacog-triggers/deviations', { query: { domain } });

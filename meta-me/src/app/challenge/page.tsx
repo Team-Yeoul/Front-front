@@ -1,19 +1,29 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '@/store';
 import { useListDailyRecords } from '@/entities/diary';
+import { toDateKey } from '@/lib/date';
+import { useAccountToday } from '@/hooks/useSaveTodayRecord';
 import { Screen } from '@/components/ui/Screen';
-import { BackButton, ChevronLeft, ChevronRight, ProgressBar } from '@/components/ui/primitives';
+import { BackButton } from '@/components/ui/primitives';
+import { ChevronLeft, ChevronRight } from '@/components/ui/icons';
+import { Pressable, View } from '@/components/ui/rn';
+import { Text } from '@/components/ui/Text';
+import { StatusView } from '@/components/ui/states';
+import { StandaloneNav } from '@/components/layout/BottomNav';
+import { useTheme } from '@/lib/theme';
+import { withSensitiveGate } from '@/components/SensitiveGate';
 
-const CHALLENGE_DAYS = 30;
 const WEEK_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
-const toDateKey = (d: Date) => d.toLocaleDateString('sv-SE');
-
-export default function ChallengePage() {
+/** 기록 챌린지 달성 현황 (10c). 챌린지는 달마다 새로 시작하고, 그달 일수가 목표 일수다. */
+function ChallengeScreen() {
+  const { fg } = useTheme();
   const accessToken = useAuthStore((s) => s.accessToken);
-  const now = new Date();
+  // 기록 날짜(recorded_date)와 같은 계정 시간대 기준 오늘
+  const { today: now } = useAccountToday();
   const [cursor, setCursor] = useState<Date | null>(null);
   const shown = cursor ?? new Date(now.getFullYear(), now.getMonth(), 1);
   const year = shown.getFullYear();
@@ -21,94 +31,101 @@ export default function ChallengePage() {
   const monthStart = new Date(year, month, 1);
   const monthEnd = new Date(year, month + 1, 0);
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
+  const goal = monthEnd.getDate();
 
-  const { data } = useListDailyRecords(
-    { start_date: toDateKey(monthStart), end_date: toDateKey(monthEnd), size: 100 },
-    !!accessToken,
-  );
+  const { data, isError, refetch, isFetching } = useListDailyRecords({ start_date: toDateKey(monthStart), end_date: toDateKey(monthEnd), size: 100 }, !!accessToken);
 
-  const written = useMemo(() => {
-    return new Set((data?.records ?? []).map((r) => Number(r.recorded_date.slice(8, 10))));
-  }, [data]);
-  // 출석(앱만 연 날) API가 없어 다이어리를 쓴 날만 표시한다.
+  const written = useMemo(() => new Set((data?.records ?? []).map((r) => Number(r.recorded_date.slice(8, 10)))), [data]);
+  // 출석(앱만 연 날) 기록은 아직 쓰지 않아 다이어리를 쓴 날만 표시한다.
   const attended = useMemo(() => new Set<number>(), []);
 
   const achieved = written.size + attended.size;
-  const rate = Math.round((achieved / CHALLENGE_DAYS) * 100);
+  const rate = Math.round((achieved / goal) * 100);
   const today = isCurrentMonth ? now.getDate() : -1;
+  // 기록을 받기 전이거나 못 받았으면 0일·0%(=한 번도 안 씀)로 보이지 않게 '-'로 둔다.
+  const ready = !!data;
+  const failed = isError && !data;
 
-  const cells: (number | null)[] = [
-    ...Array(monthStart.getDay()).fill(null),
-    ...Array.from({ length: monthEnd.getDate() }, (_, i) => i + 1),
-  ];
+  const cells: (number | null)[] = [...Array(monthStart.getDay()).fill(null), ...Array.from({ length: goal }, (_, i) => i + 1)];
   while (cells.length % 7) cells.push(null);
   const weeks = Array.from({ length: cells.length / 7 }, (_, w) => cells.slice(w * 7, w * 7 + 7));
 
   return (
-    <Screen nav>
-      <div className="px-5 pt-2">
+    <Screen inTabs overlay={<StandaloneNav active="main" />}>
+      <View className="px-5 pt-2">
         <BackButton href="/main" />
-        <h1 className="text-[18px] font-bold text-ink mt-4">기록 챌린지</h1>
-        <button className="mt-5 h-9 px-3.5 rounded-xl bg-primary-soft text-[14px] font-semibold text-primary">챌린지 내용 보기</button>
-        <div className="flex items-end justify-between mt-4">
-          <span className="text-[16px] font-bold text-primary">
-            {achieved} / {CHALLENGE_DAYS} 일
-          </span>
-          <div className="text-right">
-            <p className="text-[11px] text-sub">내 달성률</p>
-            <p className="text-[30px] font-bold text-ink leading-none mt-1">{rate}%</p>
-          </div>
-        </div>
-        <ProgressBar value={rate} className="mt-3" height={9} />
-        <div className="mt-4 rounded-2xl bg-surface px-4 py-3.5 flex flex-col gap-2.5 text-[14px]">
-          <div className="flex justify-between">
-            <span className="text-sub">진행 기간</span>
-            <span className="font-mono text-ink">
-              {year}.{month + 1}.1 - {month + 1}.{monthEnd.getDate()}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sub">기록 주기</span>
-            <span className="text-ink">매일</span>
-          </div>
-        </div>
-      </div>
+      </View>
+      <View className="px-6">
+        <Text className="mt-1 text-[16px] font-bold text-ink">기록 챌린지</Text>
+        <Link href="/challenge/info" className="mt-6 self-start h-9 flex flex-col justify-center rounded-[10px] bg-primary-soft px-3.5">
+          <Text className="text-[14px] font-semibold text-primary-pressed">챌린지 내용 보기</Text>
+        </Link>
+        <View className="mt-4 flex-row items-end justify-between">
+          <Text className="text-[16px] font-semibold text-primary-pressed tabular-nums">
+            {ready ? achieved : '-'} / {goal} 일
+          </Text>
+          <View className="items-end">
+            <Text className="text-[12px] text-mute">내 달성률</Text>
+            <Text className="mt-0.5 text-[24px] font-bold tracking-tight text-ink tabular-nums">{ready ? `${rate}%` : '-'}</Text>
+          </View>
+        </View>
+        <View
+          className="mt-3.5 h-2.5 shrink-0 rounded-full bg-surface-2 overflow-hidden"
+          accessibilityRole="progressbar"
+          accessibilityValue={ready ? { min: 0, max: 100, now: rate } : undefined}
+        >
+          {ready && <View className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, rate)}%` }} />}
+        </View>
+        {failed && <StatusView kind="error" compact title="이번 달 기록을 불러오지 못했어요" onRetry={() => void refetch()} retrying={isFetching} className="py-6" />}
+        <View className="mt-4 rounded-xl bg-surface px-4 py-3.5 gap-3">
+          <View className="flex-row justify-between">
+            <Text className="text-[14px] text-sub">진행 기간</Text>
+            <Text className="text-[14px] text-ink tabular-nums">
+              {year}.{month + 1}.1 - {month + 1}.{goal}
+            </Text>
+          </View>
+          <View className="flex-row justify-between">
+            <Text className="text-[14px] text-sub">기록 주기</Text>
+            <Text className="text-[14px] text-ink">매일</Text>
+          </View>
+        </View>
+      </View>
 
-      <div className="h-2 bg-surface-2 mt-6" />
+      <View className="h-2 shrink-0 bg-surface mt-6" />
 
-      <div className="px-5 pt-6 pb-6">
-        <div className="flex items-center justify-center gap-9">
-          <button
-            onClick={() => setCursor(new Date(year, month - 1, 1))}
-            className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center"
-            aria-label="이전 달"
+      <View className="px-6 pt-6 pb-4">
+        <View className="flex-row items-center justify-center gap-5">
+          <Pressable
+            onPress={() => setCursor(new Date(year, month - 1, 1))}
+            className="w-10 h-10 shrink-0 rounded-full bg-surface items-center justify-center"
+            accessibilityLabel="이전 달"
           >
-            <ChevronLeft size={16} />
-          </button>
-          <span className="text-[17px] font-bold text-ink">
+            <ChevronLeft size={18} />
+          </Pressable>
+          <Text className="w-[120px] text-center text-[16px] font-bold tracking-tight text-ink">
             {year}년 {month + 1}월
-          </span>
-          <button
-            onClick={() => setCursor(new Date(year, month + 1, 1))}
+          </Text>
+          <Pressable
+            onPress={() => setCursor(new Date(year, month + 1, 1))}
             disabled={isCurrentMonth}
-            className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center disabled:opacity-50"
-            aria-label="다음 달"
+            className={`w-10 h-10 shrink-0 rounded-full bg-surface items-center justify-center ${isCurrentMonth ? 'opacity-50' : ''}`}
+            accessibilityLabel="다음 달"
           >
-            <ChevronRight size={16} color={isCurrentMonth ? '#C4C4CC' : '#1A1A1E'} />
-          </button>
-        </div>
+            <ChevronRight size={18} color={fg(isCurrentMonth ? '#C4C4CC' : '#1A1A1E')} />
+          </Pressable>
+        </View>
 
-        <div className="grid grid-cols-7 mt-6 pb-2 border-b border-line">
+        <View className="flex-row mt-4 pb-2 border-b border-surface-2">
           {WEEK_LABELS.map((w, i) => (
-            <span key={w} className={`text-center text-[14px] ${i === 0 ? 'text-danger' : 'text-sub'}`}>
+            <Text key={w} className={`flex-1 text-center text-[12px] font-medium ${i === 0 ? 'text-[#E05252]' : 'text-sub'}`}>
               {w}
-            </span>
+            </Text>
           ))}
-        </div>
+        </View>
 
-        <div className="flex flex-col gap-1.5 mt-3">
+        <View className="gap-1.5 mt-4">
           {weeks.map((week, wi) => (
-            <div key={wi} className="relative grid grid-cols-7 h-[40px]">
+            <View key={wi} className="flex-row h-10 shrink-0">
               {/* 연속으로 다이어리를 쓴 구간을 하나의 캡슐로 묶는다 */}
               {week.map((day, i) => {
                 if (!day || !written.has(day) || day === today) return null;
@@ -117,53 +134,61 @@ export default function ChallengePage() {
                 let len = 1;
                 while (i + len < 7 && week[i + len] && written.has(week[i + len]!) && week[i + len] !== today) len++;
                 return (
-                  <span
-                    key={`run-${day}`}
-                    className="absolute top-0 h-[40px] rounded-full bg-primary-soft"
-                    style={{ left: `calc(${(i / 7) * 100}% + 2px)`, width: `calc(${(len / 7) * 100}% - 4px)` }}
-                  />
+                  <View key={`run-${day}`} className="absolute top-0 h-10 rounded-full bg-primary-soft" style={{ left: `${(i / 7) * 100}%`, width: `${(len / 7) * 100}%` }} />
                 );
               })}
               {week.map((day, i) => {
-                if (!day) return <span key={i} />;
+                if (!day) return <View key={i} className="flex-1" />;
                 const isToday = day === today;
                 const future = isCurrentMonth && day > now.getDate();
                 const isWritten = written.has(day);
                 return (
-                  <div key={i} className="relative flex flex-col items-center justify-center">
+                  <View
+                    key={i}
+                    className="flex-1 items-center justify-center"
+                    accessible
+                    // 기록한 날은 색으로만 구분되므로 화면 낭독기에는 날짜와 기록 여부를 함께 읽어 준다.
+                    accessibilityLabel={`${month + 1}월 ${day}일${isToday ? ', 오늘' : ''}${ready && !future ? (isWritten ? ', 기록함' : ', 기록 없음') : ''}`}
+                  >
                     {isToday ? (
-                      <span className="w-[34px] h-[34px] rounded-full bg-primary text-white text-[15px] font-bold flex items-center justify-center">
-                        {day}
-                      </span>
+                      <View className="w-8 h-8 shrink-0 rounded-full bg-primary items-center justify-center">
+                        <Text className="text-[14px] font-bold text-white tabular-nums">{day}</Text>
+                      </View>
                     ) : (
-                      <span
-                        className={`text-[15px] ${
-                          future ? 'text-[#C4C4CC]' : isWritten ? 'font-bold text-primary' : i === 0 ? 'text-danger' : 'text-ink'
+                      <Text
+                        className={`text-[14px] tabular-nums ${
+                          future ? 'text-disabled' : isWritten ? 'font-semibold text-primary-pressed' : i === 0 ? 'text-[#E05252]' : 'text-ink'
                         }`}
                       >
                         {day}
-                      </span>
+                      </Text>
                     )}
-                    {!isWritten && attended.has(day) && <span className="absolute bottom-0.5 w-1 h-1 rounded-full bg-primary" />}
-                  </div>
+                    {!isWritten && attended.has(day) && <View className="absolute bottom-0.5 w-1 h-1 rounded-full bg-primary" />}
+                  </View>
                 );
               })}
-            </div>
+            </View>
           ))}
-        </div>
+        </View>
 
-        <div className="flex items-center gap-4 mt-6 text-[12px] text-sub">
-          <span className="flex items-center gap-1.5">
-            <span className="w-5 h-2.5 rounded-full bg-primary-soft" /> 출석 + 다이어리
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-1 h-1 rounded-full bg-primary" /> 출석만
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-primary" /> 오늘
-          </span>
-        </div>
-      </div>
+        <View className="flex-row items-center gap-3.5 mt-6">
+          <View className="flex-row items-center gap-1.5">
+            <View className="w-[18px] h-2.5 shrink-0 rounded-full bg-primary-soft" />
+            <Text className="text-[12px] text-text-4">출석 + 다이어리</Text>
+          </View>
+          <View className="flex-row items-center gap-1.5">
+            <View className="w-1 h-1 shrink-0 rounded-full bg-primary" />
+            <Text className="text-[12px] text-text-4">출석만</Text>
+          </View>
+          <View className="flex-row items-center gap-1.5">
+            <View className="w-2.5 h-2.5 shrink-0 rounded-full bg-primary" />
+            <Text className="text-[12px] text-text-4">오늘</Text>
+          </View>
+        </View>
+      </View>
     </Screen>
   );
 }
+
+// 민감정보 처리 동의를 철회했거나 동의 기록이 없으면 화면 대신 동의 화면을 보여 준다.
+export default withSensitiveGate(ChallengeScreen);

@@ -1,27 +1,24 @@
 'use client';
 
 import { Suspense, useState, type ReactNode } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
+import { router } from '@/lib/router';
+import { Img, Pressable, TextInput, View, asset } from '@/components/ui/rn';
 import { Screen } from '@/components/ui/Screen';
-import {
-  BackButton,
-  Badge,
-  Button,
-  CheckIcon,
-  ChoiceChip,
-  FlagIcon,
-  Img3D,
-  LockIcon,
-  MessageSquareIcon,
-  OptionRow,
-  ProgressBar,
-  Segmented,
-  TextButton,
-} from '@/components/ui/primitives';
-import { GradientBg } from '@/components/ui/overlays';
+import { BackButton, Badge, Button, ChoiceChip, Img3D, OptionRow, ProgressBar, Segmented, TextButton } from '@/components/ui/primitives';
+import { CheckIcon, FlagIcon, MessageSquareIcon } from '@/components/ui/icons';
+import { GradientBg } from '@/components/ui/flows';
 import { Wordmark } from '@/components/ui/brand';
-import { AXES, TYPE_OPTIONS } from '@/lib/mock';
+import { Span, Text } from '@/components/ui/Text';
+import { AXES } from '@/lib/mock';
+import { HARD, ROLES, TITLES } from '@/lib/peerFeedback';
 import { useGetPeerFeedbackInvitation, useSubmitPeerFeedback, type SubmitPeerFeedbackRequest } from '@/entities/peer-feedback';
+
+/*
+ * 친구가 앱 없이 여는 답변 화면 (웹 전용). 질문별 답을 "머리말: 값" 줄로 담아 보내고,
+ * 앱·웹의 결과 화면(/mirror/results)은 lib/peerFeedback의 parseFeedback으로 같은 머리말을 다시 읽는다.
+ * 고르는 값(역할·힘들어 보였던 때·칭호)은 lib/peerFeedback의 ROLES · HARD · TITLES를 그대로 써서 결과 집계와 이름이 어긋나지 않게 한다.
+ */
 
 const RELATIONS = ['학교 · 같은 반', '동아리 · 팀 프로젝트', '가족', '온라인에서 알게 된 사이', '기타'];
 const YEARS = [
@@ -35,15 +32,39 @@ const SCENES = [
   { title: '급한 상황에서', sub: '일이 꼬이거나 시간이 없을 때' },
   { title: '여럿이 놀 때', sub: '모임이나 약속 자리에서' },
 ];
-const ROLES = ['앞에서 이끌었어요', '내용을 정리하고 설명했어요', '분위기와 사람을 챙겼어요', '뒤에서 묵묵히 해냈어요', '잘 모르겠어요'];
 const WORDS = ['꼼꼼한', '차분한', '말을 잘하는', '걱정이 많은', '책임감 있는', '느긋한', '솔직한', '눈치 빠른', '고집 있는'];
 const MESSAGE_TOPICS = ['고마웠던 점', '응원', '바라는 점'];
 const TOPIC_PREFIX = new RegExp(`^(${MESSAGE_TOPICS.join('|')}): `);
-const HARD = ['시작하기 전, 준비가 길어질 때', '여러 사람 의견이 부딪힐 때', '계획이 갑자기 바뀔 때', '힘들어 보인 적이 없어요'];
 const AXIS_DESC = ['설명하거나 발표할 때', '일을 끌고 가는 정도', '상대 감정을 알아채는 정도', '끝까지 밀고 가는 정도', '급한 상황에서의 태도'];
-const OTHERS_AVG = [4.2, 3.2, 3.9, 3.6, 3.3];
 const MAX_FIELD = 2000;
 const SKIPPED = '답하지 않음';
+
+/** 칭호 그림. lib/peerFeedback TITLES의 그림(앱 require)과 같은 파일을 웹 주소로 둔다. */
+const TITLE_IMAGE: Record<string, string> = {
+  '메타인지 대천사장': asset('feedback/cogni-meta.png'),
+  '경청의 달인': asset('feedback/cogni-listen.png'),
+  '인정 선생': asset('feedback/cogni-approval.png'),
+};
+const titleImage = (label: string) => TITLE_IMAGE[label] ?? asset('v2/cogni-default.png');
+
+/**
+ * 머리말. lib/peerFeedback의 P와 글자 하나까지 같아야 결과 화면이 읽는다(머리말을 바꾸면 양쪽 함께).
+ * 이름은 묻지 않으므로(익명) 보내지 않는다.
+ */
+const P = {
+  relation: '관계: ',
+  scene: '기준 장면: ',
+  role: '그 장면에서의 역할: ',
+  words: '떠오르는 단어: ',
+  hard: '힘들어 보였던 때: ',
+  hardWhy: '이유: ',
+  scores: '점수(1–5): ',
+  message: '한 마디: ',
+  title: '칭호: ',
+};
+
+/** 머리말 뒤 값은 한 줄이어야 다시 읽을 때 잘리지 않는다. */
+const oneLine = (s: string) => s.replace(/\s*\n+\s*/g, ' ').trim();
 
 // 서버는 장점·아쉬운 점·인상 세 칸의 글만 받으므로, 질문별 답을 줄 단위로 나눠 담는다.
 function buildFeedback(a: {
@@ -58,77 +79,109 @@ function buildFeedback(a: {
   strength: string;
   scores: (number | null)[];
   message: string;
+  title: string | null;
 }): SubmitPeerFeedbackRequest {
   const lines = (...xs: (string | false | null)[]) => xs.filter(Boolean).join('\n').slice(0, MAX_FIELD) || SKIPPED;
   const scored = AXES.flatMap((axis, i) => (a.scores[i] === null ? [] : [`${axis} ${a.scores[i]}`]));
+  const note = oneLine(a.sceneNote);
+  const why = oneLine(a.hardWhy);
+  const message = oneLine(a.message);
   return {
-    strengths: lines(a.strength.trim(), a.words.length > 0 && `떠오르는 단어: ${a.words.join(', ')}`),
-    growth_areas: lines(a.hard ? `힘들어 보였던 때: ${a.hard}` : false, a.hardWhy.trim() && `이유: ${a.hardWhy.trim()}`),
+    // 장점 칸의 머리말 없는 줄은 결과 화면에서 Q4 장점 글로 읽힌다.
+    strengths: lines(oneLine(a.strength), a.words.length > 0 && `${P.words}${a.words.join(', ')}`),
+    growth_areas: lines(a.hard && `${P.hard}${a.hard}`, why && `${P.hardWhy}${why}`),
     impression: lines(
-      `관계: ${a.relation} (알고 지낸 지 ${a.years})`,
-      `기준 장면: ${a.scene}${a.sceneNote.trim() ? ` — ${a.sceneNote.trim()}` : ''}`,
-      a.role && `그 장면에서의 역할: ${a.role}`,
-      scored.length > 0 && `점수(1–5): ${scored.join(' · ')}`,
-      a.message.trim() && `한 마디: ${a.message.trim()}`,
+      `${P.relation}${a.relation} (알고 지낸 지 ${a.years})`,
+      `${P.scene}${a.scene}${note ? ` — ${note}` : ''}`,
+      a.role && `${P.role}${a.role}`,
+      scored.length > 0 && `${P.scores}${scored.join(' · ')}`,
+      message && `${P.message}${message}`,
+      a.title && `${P.title}${a.title}`,
     ),
   };
 }
 
-type Step = 'landing' | 'relation' | 'scene' | 'q1' | 'q2' | 'q3' | 'q4' | 'q5' | 'q6' | 'vote' | 'done';
+type Step = 'landing' | 'relation' | 'scene' | 'q1' | 'q2' | 'q3' | 'q4' | 'q5' | 'q6' | 'title' | 'done';
 const Q_STEPS: Step[] = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'];
 
 function Stepper({ at }: { at: 0 | 1 | 2 }) {
   const items = ['관계', '장면', '질문 6개'];
   return (
-    <div className="flex items-center gap-2">
+    <View className="flex-row items-center gap-2">
       {items.map((l, i) => (
-        <div key={l} className="flex items-center gap-2">
-          {i > 0 && <span className="w-4 h-px bg-[#D5D5DC]" />}
-          <span
-            className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold ${
-              i < at ? 'bg-primary' : i === at ? 'bg-ink text-white' : 'border border-[#C4C4CC] text-mute'
+        <View key={l} className="flex-row items-center gap-2">
+          {i > 0 && <View className="w-4 h-px bg-line" />}
+          <View
+            className={`w-[18px] h-[18px] shrink-0 rounded-full items-center justify-center ${
+              i < at ? 'bg-primary-soft' : i === at ? 'bg-primary' : 'border border-line'
             }`}
           >
-            {i < at ? <CheckIcon size={10} /> : i + 1}
-          </span>
-          <span className={`text-[12px] ${i < at ? 'text-primary' : i === at ? 'font-bold text-ink' : 'text-mute'}`}>{l}</span>
-        </div>
+            {i < at ? <CheckIcon size={10} color="#6367FF" /> : <Text className={`text-[10px] font-bold ${i === at ? 'text-white' : 'text-mute'}`}>{i + 1}</Text>}
+          </View>
+          <Text className={`text-[12px] ${i < at ? 'text-primary' : i === at ? 'font-bold text-ink' : 'text-mute'}`}>{l}</Text>
+        </View>
       ))}
-    </div>
+    </View>
+  );
+}
+
+function StepHeader({ at, onBack }: { at: 0 | 1 | 2; onBack: () => void }) {
+  return (
+    <View className="flex-row items-center gap-6 px-5 h-14 shrink-0">
+      <BackButton onPress={onBack} />
+      <Stepper at={at} />
+    </View>
   );
 }
 
 function QHeader({ index, onBack }: { index: number; onBack: () => void }) {
   return (
-    <div className="px-5">
-      <div className="flex items-center justify-between h-14">
-        <BackButton onClick={onBack} />
-        <span className="font-mono text-[13px] text-mute">
+    <View className="px-5">
+      <View className="flex-row items-center justify-between h-14">
+        <BackButton onPress={onBack} />
+        <Text className="text-[14px] font-semibold text-primary tabular-nums">
           {index + 1} / {Q_STEPS.length}
-        </span>
-      </div>
-      <ProgressBar value={((index + 1) / Q_STEPS.length) * 100} height={4} className="mt-1" />
-    </div>
+        </Text>
+      </View>
+      <ProgressBar value={((index + 1) / Q_STEPS.length) * 100} height={4} className="mt-2" />
+    </View>
   );
 }
 
 function QTitle({ type, scene, title, caption }: { type: string; scene: string; title: ReactNode; caption?: string }) {
   return (
-    <div className="px-5 pt-6">
-      <div className="flex gap-2">
+    <View className="px-5 pt-6">
+      <View className="flex-row gap-2">
         <Badge>{type}</Badge>
         <Badge tone="primary" icon={<FlagIcon />}>
           기준 장면 · {scene}
         </Badge>
-      </div>
-      <h1 className="text-[22px] font-bold text-ink leading-[1.45] mt-4">{title}</h1>
-      {caption && <p className="text-[13px] text-sub mt-2">{caption}</p>}
-    </div>
+      </View>
+      <Text accessibilityRole="header" className="text-[24px] font-bold text-ink leading-[34px] mt-4">
+        {title}
+      </Text>
+      {caption && <Text className="text-[14px] text-sub leading-[22px] mt-2">{caption}</Text>}
+    </View>
+  );
+}
+
+/** 회색 칸 안의 한 줄 입력 (라벨 + 입력) */
+function InputBox({ label, value, onChange, placeholder, maxLength = 200 }: { label: ReactNode; value: string; onChange: (v: string) => void; placeholder: string; maxLength?: number }) {
+  return (
+    <View className="rounded-2xl bg-surface px-4 py-3.5">
+      {label}
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        className="w-full mt-1.5 text-[16px] text-ink"
+      />
+    </View>
   );
 }
 
 function FriendFlow() {
-  const router = useRouter();
   const params = useSearchParams();
   const { token } = useParams<{ token: string }>();
   // 없는 링크는 404, 만료·사용·취소된 링크는 410으로 온다.
@@ -136,8 +189,6 @@ function FriendFlow() {
   const submit = useSubmitPeerFeedback(token);
   // 링크를 보낸 사람의 닉네임 (/mirror/invite에서 ?n=으로 담는다)
   const OWNER = params.get('n')?.trim() || '친구';
-  // 친구 응답 API가 없어 이미 모인 다른 친구 응답 수는 알 수 없다(0으로 둔다).
-  const priorResponses = 0;
 
   const [step, setStep] = useState<Step>('landing');
   const [relation, setRelation] = useState(RELATIONS[1]);
@@ -153,17 +204,16 @@ function FriendFlow() {
   const [strength, setStrength] = useState('');
   const [scores, setScores] = useState<(number | null)[]>([null, null, null, null, null]);
   const [message, setMessage] = useState('');
-  const [voteTab, setVoteTab] = useState<'vote' | 'scale'>('vote');
-  const [vote, setVote] = useState<string | null>(null);
-  const [voted, setVoted] = useState(false);
+  const [title, setTitle] = useState<string | null>(null);
 
   const sceneTitle = SCENES[scene].title;
   const go = (s: Step) => setStep(s);
   const qIndex = Q_STEPS.indexOf(step);
   const prevQ = () => go(qIndex === 0 ? 'scene' : Q_STEPS[qIndex - 1]);
-  const nextQ = () => go(qIndex === Q_STEPS.length - 1 ? 'vote' : Q_STEPS[qIndex + 1]);
+  const nextQ = () => go(qIndex === Q_STEPS.length - 1 ? 'title' : Q_STEPS[qIndex + 1]);
 
-  const finish = () =>
+  const finish = (withTitle: string | null) => {
+    if (submit.isPending) return;
     submit.mutate(
       buildFeedback({
         relation,
@@ -177,138 +227,153 @@ function FriendFlow() {
         strength,
         scores,
         message,
+        title: withTitle,
       }),
       { onSuccess: () => go('done') },
     );
+  };
+
+  const addWord = () => {
+    // 단어는 쉼표로 나눠 읽으므로 쉼표는 뺀다.
+    const w = (wordDraft ?? '').replace(/,/g, ' ').trim();
+    if (w) {
+      if (![...WORDS, ...customWords].includes(w)) setCustomWords((p) => [...p, w]);
+      setWords((p) => (p.includes(w) || p.length >= 3 ? p : [...p, w]));
+    }
+    setWordDraft(null);
+  };
 
   if (invitation.isError && step !== 'done') {
     return (
-      <Screen footer={<Button onClick={() => router.push('/')}>메타미 둘러보기</Button>}>
-        <div className="flex flex-col items-center text-center px-8 pt-[200px]">
+      <Screen footer={<Button onPress={() => router.push('/')}>메타미 둘러보기</Button>}>
+        <View className="items-center px-8 pt-[200px]">
           <Img3D name="envelope" size={96} />
-          <h1 className="text-[22px] font-bold text-ink mt-4">이 링크는 더 쓸 수 없어요</h1>
-          <p className="text-[14px] text-[#5A5A62] leading-[1.7] mt-3">
-            이미 답했거나, 7일이 지났거나, 취소된 링크예요.
-            <br />
-            {OWNER}님에게 새 링크를 받아 주세요.
-          </p>
-        </div>
+          <Text accessibilityRole="header" className="text-[24px] font-bold text-ink mt-4 text-center">
+            이 링크는 더 쓸 수 없어요
+          </Text>
+          <Text className="text-[14px] text-body leading-[23px] mt-3 text-center">{`이미 답했거나, 7일이 지났거나, 취소된 링크예요.\n${OWNER}님에게 새 링크를 받아 주세요.`}</Text>
+        </View>
       </Screen>
     );
   }
 
   if (step === 'landing') {
     return (
-      <Screen statusBg="#E6E6FF" background={<GradientBg variant="a" />}>
-        <div className="flex flex-col min-h-full">
-          <div className="flex justify-center pt-5">
+      <Screen bg="#E6E6FF" background={<GradientBg variant="a" />} contentClassName="min-h-full">
+        <View className="flex-1 min-h-full">
+          <View className="items-center pt-5">
             <Wordmark size={18} />
-          </div>
-          <div className="flex flex-col items-center text-center px-6 pt-10">
-            <div className="relative">
+          </View>
+          <View className="items-center px-6 pt-10">
+            <View>
               <Img3D name="envelope" size={120} />
-              <span className="absolute -right-6 -top-4 w-11 h-11 rounded-full bg-white shadow flex items-center justify-center text-[16px] text-primary">
-                {OWNER[0]}
-              </span>
-            </div>
-            <span className="mt-8 h-8 px-3.5 rounded-full bg-white text-[13px] font-semibold text-primary inline-flex items-center">{OWNER}님의 요청</span>
-            <h1 className="text-[24px] font-bold text-ink leading-[1.45] mt-4">
-              {OWNER}님이 당신이 보는
-              <br />
-              {OWNER}님을 궁금해해요
-            </h1>
-            <p className="text-[14px] text-[#5A5A62] leading-[1.7] mt-3">
-              {OWNER}님의 기록은 보여주지 않아요.
-              <br />
-              당신이 직접 본 모습 그대로 답해주세요.
-            </p>
-          </div>
-          <div className="mt-auto bg-white rounded-t-[28px] px-5 pt-5 pb-4 mt-8">
-            <div className="rounded-2xl bg-primary-soft px-4 py-3.5">
-              <p className="text-[12px] font-semibold text-primary">{OWNER}님이 남긴 말</p>
-              <p className="text-[15px] text-ink mt-1">솔직하게 말해줘. 좋은 말만 안 해도 돼</p>
-            </div>
-            <div className="grid grid-cols-3 gap-2.5 mt-3">
-              {[
-                { icon: 'spy' as const, title: '이름 비공개', sub: '로그인·이름 입력 없음' },
-                { icon: 'lock3d' as const, title: '3명부터 공개', sub: '모인 결과만 전달' },
-                { icon: 'clock' as const, title: '약 3분', sub: '질문 6개' },
-              ].map((f) => (
-                <div key={f.title} className="rounded-2xl bg-surface flex flex-col items-center text-center px-2 pt-4 pb-3.5">
-                  <Img3D name={f.icon} size={44} />
-                  <p className="text-[14px] font-bold text-ink mt-2">{f.title}</p>
-                  <p className="text-[11px] text-sub mt-1">{f.sub}</p>
-                </div>
-              ))}
-            </div>
-
-            <Button variant="dark" className="mt-3" onClick={() => go('relation')}>
-              답하러 가기
-            </Button>
-          </div>
-        </div>
+              <View
+                className="absolute -right-6 -top-4 w-11 h-11 rounded-full bg-page items-center justify-center"
+                style={{ boxShadow: '0 4px 12px rgba(30,30,60,0.12)' }}
+              >
+                <Text className="text-[16px] font-bold text-primary">{OWNER[0]}</Text>
+              </View>
+            </View>
+            <View className="mt-8 h-8 px-3.5 rounded-full bg-page justify-center">
+              <Text className="text-[12px] font-semibold text-primary">{OWNER}님의 요청</Text>
+            </View>
+            <Text accessibilityRole="header" className="text-[24px] font-bold text-ink leading-[34px] mt-4 text-center">
+              {`${OWNER}님이 당신이 보는\n${OWNER}님을 궁금해해요`}
+            </Text>
+            <Text className="text-[14px] text-body leading-[23px] mt-3 text-center">{`${OWNER}님의 기록은 보여주지 않아요.\n당신이 직접 본 모습 그대로 답해주세요.`}</Text>
+          </View>
+          <View className="mt-auto pt-8">
+            <View className="bg-page rounded-t-[28px] px-5 pt-5 pb-4">
+              <View className="rounded-2xl bg-primary-soft px-4 py-3.5">
+                <Text className="text-[12px] font-semibold text-primary">이렇게 답해 주세요</Text>
+                <Text className="text-[16px] text-ink leading-[24px] mt-1">좋은 말만 하지 않아도 괜찮아요. 본 그대로가 가장 도움이 돼요.</Text>
+              </View>
+              <View className="flex-row gap-2.5 mt-3">
+                {[
+                  { icon: 'spy' as const, title: '이름 비공개', sub: '로그인·이름 입력 없음' },
+                  { icon: 'lock3d' as const, title: '3명부터 공개', sub: '모인 결과만 전달' },
+                  { icon: 'clock' as const, title: '약 3분', sub: '질문 6개' },
+                ].map((f) => (
+                  <View key={f.title} className="flex-1 rounded-2xl bg-surface items-center px-2 pt-4 pb-3.5">
+                    <Img3D name={f.icon} size={44} />
+                    <Text className="text-[14px] font-bold text-ink mt-2 text-center">{f.title}</Text>
+                    <Text className="text-[10px] text-sub mt-1 text-center">{f.sub}</Text>
+                  </View>
+                ))}
+              </View>
+              <Button className="mt-3" onPress={() => go('relation')}>
+                답하러 가기
+              </Button>
+            </View>
+          </View>
+        </View>
       </Screen>
     );
   }
 
   if (step === 'relation') {
     return (
-      <Screen footer={<Button variant="dark" onClick={() => go('scene')}>다음</Button>}>
-        <div className="flex items-center gap-8 px-5 h-14">
-          <BackButton onClick={() => go('landing')} />
-          <Stepper at={0} />
-        </div>
-        <div className="px-5 pt-6">
-          <h1 className="text-[22px] font-bold text-ink">{OWNER}님과 어떤 사이인가요?</h1>
-          <p className="text-[13px] text-sub mt-2">{OWNER}님은 ‘동아리 친구들은 이렇게 봤어요’처럼 관계별로만 볼 수 있어요.</p>
-          <div className="flex flex-col gap-2.5 mt-5">
+      <Screen footer={<Button onPress={() => go('scene')}>다음</Button>}>
+        <StepHeader at={0} onBack={() => go('landing')} />
+        <View className="px-5 pt-6 pb-6">
+          <Text accessibilityRole="header" className="text-[24px] font-bold text-ink">
+            {OWNER}님과 어떤 사이인가요?
+          </Text>
+          <Text className="text-[14px] text-sub leading-[22px] mt-2">{OWNER}님은 ‘동아리 친구들은 이렇게 봤어요’처럼 관계별로만 볼 수 있어요.</Text>
+          <View className="gap-2.5 mt-5">
             {RELATIONS.map((r) => (
-              <OptionRow key={r} label={r} selected={relation === r} onClick={() => setRelation(r)} round />
+              <OptionRow key={r} label={r} selected={relation === r} onPress={() => setRelation(r)} round />
             ))}
-          </div>
-          <p className="text-[16px] font-bold text-ink mt-7">알고 지낸 지 얼마나 됐나요?</p>
-          <div className="mt-3">
+          </View>
+          <Text className="text-[16px] font-bold text-ink mt-7">알고 지낸 지 얼마나 됐나요?</Text>
+          <View className="mt-3">
             <Segmented options={[...YEARS]} value={years} onChange={setYears} />
-          </div>
-        </div>
+          </View>
+        </View>
       </Screen>
     );
   }
 
   if (step === 'scene') {
     return (
-      <Screen footer={<Button variant="dark" onClick={() => go('q1')}>질문 시작하기</Button>}>
-        <div className="flex items-center gap-8 px-5 h-14">
-          <BackButton onClick={() => go('relation')} />
-          <Stepper at={1} />
-        </div>
-        <div className="px-5 pt-6">
-          <h1 className="text-[22px] font-bold text-ink leading-[1.45]">
-            {OWNER}님과 함께한 장면 하나를
-            <br />
-            떠올려주세요
-          </h1>
-          <p className="text-[13px] text-sub mt-2 leading-relaxed">이어지는 질문은 이 장면을 기준으로 답하면 돼요. 가장 최근에 본 모습이면 충분해요.</p>
-          <div className="grid grid-cols-2 gap-2.5 mt-5">
-            {SCENES.map((s, i) => (
-              <button key={s.title} onClick={() => setScene(i)} className={`rounded-2xl px-4 py-4 text-left ${scene === i ? 'bg-primary' : 'bg-surface'}`}>
-                <p className={`text-[15px] font-bold ${scene === i ? 'text-white' : 'text-ink'}`}>{s.title}</p>
-                <p className={`text-[12px] mt-1 ${scene === i ? 'text-white/80' : 'text-sub'}`}>{s.sub}</p>
-              </button>
-            ))}
-          </div>
-          <label className="block mt-4 rounded-2xl border border-line px-4 py-3.5">
-            <span className="text-[13px] font-semibold text-ink">
-              그 장면을 한 줄로 적어도 좋아요 <span className="font-normal text-sub">(선택)</span>
-            </span>
-            <input
+      <Screen footer={<Button onPress={() => go('q1')}>질문 시작하기</Button>}>
+        <StepHeader at={1} onBack={() => go('relation')} />
+        <View className="px-5 pt-6 pb-6">
+          <Text accessibilityRole="header" className="text-[24px] font-bold text-ink leading-[34px]">
+            {`${OWNER}님과 함께한 장면 하나를\n떠올려주세요`}
+          </Text>
+          <Text className="text-[14px] text-sub leading-[22px] mt-2">이어지는 질문은 이 장면을 기준으로 답하면 돼요. 가장 최근에 본 모습이면 충분해요.</Text>
+          <View className="flex-row flex-wrap mt-5" style={{ marginLeft: -5, marginRight: -5 }}>
+            {SCENES.map((s, i) => {
+              const on = scene === i;
+              return (
+                <View key={s.title} className="w-1/2 shrink-0 px-[5px] pb-2.5">
+                  <Pressable
+                    onPress={() => setScene(i)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: on }}
+                    className={`rounded-2xl px-4 py-4 ${on ? 'bg-primary' : 'bg-surface'}`}
+                  >
+                    <Text className={`text-[16px] font-bold ${on ? 'text-white' : 'text-ink'}`}>{s.title}</Text>
+                    <Text className={`text-[12px] mt-1 ${on ? 'text-white/80' : 'text-sub'}`}>{s.sub}</Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+          <View className="mt-1.5">
+            <InputBox
+              label={
+                <Text className="text-[12px] font-semibold text-ink">
+                  그 장면을 한 줄로 적어도 좋아요 <Span className="font-normal text-sub">(선택)</Span>
+                </Text>
+              }
               value={sceneNote}
-              onChange={(e) => setSceneNote(e.target.value)}
+              onChange={setSceneNote}
               placeholder="예: 발표 자료 정리를 맡았을 때"
-              className="w-full mt-1.5 bg-transparent outline-none text-[14px] text-ink placeholder:text-mute"
             />
-          </label>
-        </div>
+          </View>
+        </View>
       </Screen>
     );
   }
@@ -319,108 +384,77 @@ function FriendFlow() {
     const value = isQ1 ? role : hard;
     const set = isQ1 ? setRole : setHard;
     return (
-      <Screen footer={<Button variant="dark" onClick={nextQ} disabled={!value}>다음</Button>}>
+      <Screen footer={<Button onPress={nextQ} disabled={!value}>다음</Button>}>
         <QHeader index={qIndex} onBack={prevQ} />
         <QTitle
           type="객관식"
           scene={sceneTitle}
-          title={
-            isQ1 ? (
-              <>
-                그 장면에서 {OWNER}님은
-                <br />
-                어떤 역할이었나요?
-              </>
-            ) : (
-              <>
-                {OWNER}님이 가장 힘들어 보였던 건
-                <br />
-                어떤 때였나요?
-              </>
-            )
-          }
+          title={isQ1 ? `그 장면에서 ${OWNER}님은\n어떤 역할이었나요?` : `${OWNER}님이 가장 힘들어 보였던 건\n어떤 때였나요?`}
           caption={isQ1 ? '가장 가까운 하나를 골라주세요' : undefined}
         />
-        <div className="px-5 pt-5 flex flex-col gap-2.5">
+        <View className="px-5 pt-5 pb-6 gap-2.5">
           {opts.map((o) => (
-            <OptionRow key={o} label={o} selected={value === o} onClick={() => set(o)} round />
+            <OptionRow key={o} label={o} selected={value === o} onPress={() => set(o)} round />
           ))}
           {!isQ1 && (
-            <label className="block rounded-2xl bg-surface px-4 py-3.5 mt-2">
-              <span className="flex items-center gap-1.5 text-[12px] font-semibold text-primary">
-                <MessageSquareIcon /> 왜 그렇게 보였어요? <span className="font-normal text-sub">(선택)</span>
-              </span>
-              <input
+            <View className="mt-2">
+              <InputBox
+                label={
+                  <View className="flex-row items-center gap-1.5">
+                    <MessageSquareIcon />
+                    <Text className="text-[12px] font-semibold text-primary">
+                      왜 그렇게 보였어요? <Span className="font-normal text-sub">(선택)</Span>
+                    </Text>
+                  </View>
+                }
                 value={hardWhy}
-                onChange={(e) => setHardWhy(e.target.value)}
+                onChange={setHardWhy}
                 placeholder="예: 자료를 계속 다시 고치고 있었어요"
-                className="w-full mt-1.5 bg-transparent outline-none text-[14px] text-ink placeholder:text-mute"
               />
-            </label>
+            </View>
           )}
-        </div>
+        </View>
       </Screen>
     );
   }
 
   if (step === 'q2') {
     return (
-      <Screen footer={<Button variant="dark" onClick={nextQ} disabled={words.length === 0}>다음</Button>}>
+      <Screen footer={<Button onPress={nextQ} disabled={words.length === 0}>다음</Button>}>
         <QHeader index={qIndex} onBack={prevQ} />
-        <QTitle
-          type="복수 선택"
-          scene={sceneTitle}
-          title={
-            <>
-              {OWNER}님을 떠올리면
-              <br />
-              먼저 생각나는 단어는?
-            </>
-          }
-          caption="최대 3개까지 골라주세요"
-        />
-        <div className="px-5 pt-5">
-          <div className="flex flex-wrap gap-2">
+        <QTitle type="복수 선택" scene={sceneTitle} title={`${OWNER}님을 떠올리면\n먼저 생각나는 단어는?`} caption="최대 3개까지 골라주세요" />
+        <View className="px-5 pt-5 pb-6">
+          <View className="flex-row flex-wrap gap-2">
             {[...WORDS, ...customWords].map((w) => (
               <ChoiceChip
                 key={w}
                 label={w}
                 selected={words.includes(w)}
-                onClick={() => setWords((p) => (p.includes(w) ? p.filter((x) => x !== w) : p.length < 3 ? [...p, w] : p))}
+                onPress={() => setWords((p) => (p.includes(w) ? p.filter((x) => x !== w) : p.length < 3 ? [...p, w] : p))}
               />
             ))}
             {wordDraft === null ? (
-              <ChoiceChip label="+ 직접 입력" selected={false} onClick={() => setWordDraft('')} />
+              <ChoiceChip label="+ 직접 입력" selected={false} onPress={() => setWordDraft('')} />
             ) : (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const w = wordDraft.trim();
-                  if (w) {
-                    if (![...WORDS, ...customWords].includes(w)) setCustomWords((p) => [...p, w]);
-                    setWords((p) => (p.includes(w) || p.length >= 3 ? p : [...p, w]));
-                  }
-                  setWordDraft(null);
-                }}
-                className="h-9 pl-4 pr-1 rounded-full bg-surface-2 border border-primary flex items-center gap-1"
-              >
-                <input
+              <View className="h-9 pl-3.5 pr-1 rounded-full bg-surface border border-primary flex-row items-center gap-1">
+                <TextInput
                   autoFocus
                   value={wordDraft}
-                  onChange={(e) => setWordDraft(e.target.value)}
-                  onBlur={(e) => !e.currentTarget.value.trim() && setWordDraft(null)}
+                  onChangeText={setWordDraft}
+                  onSubmitEditing={addWord}
+                  onBlur={() => !wordDraft.trim() && setWordDraft(null)}
                   maxLength={12}
                   placeholder="단어 입력"
-                  className="w-24 bg-transparent outline-none text-[14px] text-ink placeholder:text-mute caret-primary"
+                  className="w-24 text-[14px] text-ink"
                 />
-                <button type="submit" className="h-7 px-3 rounded-full bg-primary text-[13px] font-semibold text-white">
-                  추가
-                </button>
-              </form>
+                <Pressable onPress={addWord} accessibilityRole="button" className="h-7 px-3 rounded-full bg-primary justify-center active:opacity-80">
+                  <Text className="text-[12px] font-semibold text-white">추가</Text>
+                </Pressable>
+              </View>
             )}
-          </div>
-          <p className="font-mono text-[12px] text-sub mt-4">{words.length} / 3 선택</p>
-        </div>
+          </View>
+          <Text className="text-[12px] text-sub mt-4 tabular-nums">{words.length} / 3 선택</Text>
+        </View>
       </Screen>
     );
   }
@@ -433,10 +467,10 @@ function FriendFlow() {
       <Screen
         footer={
           <>
-            <Button variant="dark" onClick={nextQ} disabled={!value.trim()}>
+            <Button onPress={nextQ} disabled={!value.trim()}>
               다음
             </Button>
-            <TextButton className="mt-1" onClick={nextQ}>
+            <TextButton className="mt-1" onPress={nextQ}>
               넘어가기
             </TextButton>
           </>
@@ -446,32 +480,19 @@ function FriendFlow() {
         <QTitle
           type="서술형"
           scene={sceneTitle}
-          title={
-            isQ4 ? (
-              <>
-                {OWNER}님이 스스로는 잘 모를 것 같은
-                <br />
-                장점이 있다면?
-              </>
-            ) : (
-              <>
-                마지막으로 {OWNER}님에게
-                <br />한 마디 남긴다면?
-              </>
-            )
-          }
+          title={isQ4 ? `${OWNER}님이 스스로는 잘 모를 것 같은\n장점이 있다면?` : `마지막으로 ${OWNER}님에게\n한 마디 남긴다면?`}
           caption={isQ4 ? '한 줄이면 충분해요. 건너뛰어도 괜찮아요.' : '익명으로 그대로 전달돼요. 건너뛰어도 괜찮아요.'}
         />
-        <div className="px-5 pt-5">
+        <View className="px-5 pt-5 pb-6">
           {!isQ4 && (
-            <div className="flex gap-2 mb-3">
+            <View className="flex-row gap-2 mb-3">
               {MESSAGE_TOPICS.map((c) => (
                 <ChoiceChip
                   key={c}
                   size="sm"
                   label={c}
                   selected={value.startsWith(`${c}: `)}
-                  onClick={() =>
+                  onPress={() =>
                     set((v) => {
                       // 말머리는 하나만: 같은 칩을 다시 누르면 빼고, 다른 칩이면 바꾼다.
                       const rest = v.replace(TOPIC_PREFIX, '');
@@ -480,18 +501,20 @@ function FriendFlow() {
                   }
                 />
               ))}
-            </div>
+            </View>
           )}
-          <div className="rounded-3xl bg-surface px-5 py-5 h-[180px] flex flex-col">
-            <textarea
+          <View className="rounded-[24px] bg-surface px-5 py-5 min-h-[180px]">
+            <TextInput
+              multiline
               value={value}
-              onChange={(e) => set(e.target.value)}
+              onChangeText={set}
+              maxLength={500}
               placeholder={isQ4 ? '예: 복잡한 걸 설명해주면 다들 바로 이해해요.' : '예: 시작이 늦어도 끝은 늘 좋더라.'}
-              className="flex-1 bg-transparent outline-none resize-none text-[15px] text-ink leading-[1.75] placeholder:text-mute caret-primary"
+              className="flex-1 min-h-[110px] text-[16px] text-ink leading-[26px]"
             />
-            <span className="text-right text-[12px] text-mute">{value.length}자</span>
-          </div>
-        </div>
+            <Text className="text-right text-[12px] text-mute tabular-nums mt-2">{value.length}자</Text>
+          </View>
+        </View>
       </Screen>
     );
   }
@@ -499,233 +522,127 @@ function FriendFlow() {
   if (step === 'q5') {
     const answered = scores.filter((s) => s !== null).length;
     return (
-      <Screen footer={<Button variant="dark" onClick={nextQ} disabled={answered < 3}>다음</Button>}>
-        <div className="px-5">
-          <div className="flex items-center h-14">
-            <BackButton onClick={prevQ} />
-          </div>
-          <div className="flex items-center gap-3 mt-1">
-            <ProgressBar value={(5 / 6) * 100} height={4} />
-            <span className="font-mono text-[13px] font-semibold text-primary shrink-0">5 / 6</span>
-          </div>
-        </div>
-        <div className="px-5 pt-6">
-          <h1 className="text-[20px] font-bold text-ink">이 다섯 가지는 어느 정도라고 느껴요?</h1>
-          <p className="text-[13px] text-sub mt-2">감으로 답해도 괜찮아요 · 3개만 골라도 돼요</p>
-          <div className="flex justify-between text-[11px] text-sub mt-5 px-1">
-            <span>1 · 전혀 아니에요</span>
-            <span>5 · 매우 그래요</span>
-          </div>
-          <div className="flex flex-col gap-2.5 mt-2 pb-4">
+      <Screen footer={<Button onPress={nextQ} disabled={answered < 3}>다음</Button>}>
+        <QHeader index={qIndex} onBack={prevQ} />
+        <View className="px-5 pt-6 pb-6">
+          <View className="flex-row gap-2">
+            <Badge>척도</Badge>
+          </View>
+          <Text accessibilityRole="header" className="text-[24px] font-bold text-ink leading-[34px] mt-4">
+            이 다섯 가지는 어느 정도라고 느껴요?
+          </Text>
+          <Text className="text-[14px] text-sub mt-2">감으로 답해도 괜찮아요 · 3개만 골라도 돼요</Text>
+          <View className="flex-row justify-between mt-5 px-1">
+            <Text className="text-[10px] text-sub">1 · 전혀 아니에요</Text>
+            <Text className="text-[10px] text-sub">5 · 매우 그래요</Text>
+          </View>
+          <View className="gap-2.5 mt-2">
             {AXES.map((a, i) => (
-              <div key={a} className="rounded-2xl bg-surface px-4 pt-3.5 pb-4">
-                <p className="text-[15px] font-bold text-ink">
-                  {a} <span className="text-[12px] font-normal text-sub ml-1">{AXIS_DESC[i]}</span>
-                </p>
-                <div className="grid grid-cols-5 gap-2 mt-3">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      onClick={() => setScores((s) => s.map((v, j) => (j === i ? n : v)))}
-                      className={`h-10 rounded-xl text-[14px] ${scores[i] === n ? 'bg-primary text-white font-semibold' : 'bg-white border border-line text-[#48484F]'}`}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <View key={a} className="rounded-2xl bg-surface px-4 pt-3.5 pb-4">
+                <Text className="text-[16px] font-bold text-ink">
+                  {a} <Span className="text-[12px] font-normal text-sub ml-1">{AXIS_DESC[i]}</Span>
+                </Text>
+                <View className="flex-row gap-2 mt-3">
+                  {[1, 2, 3, 4, 5].map((n) => {
+                    const on = scores[i] === n;
+                    return (
+                      <Pressable
+                        key={n}
+                        onPress={() => setScores((s) => s.map((v, j) => (j === i ? n : v)))}
+                        accessibilityRole="radio"
+                        accessibilityLabel={`${a} ${n}점`}
+                        accessibilityState={{ checked: on }}
+                        className={`flex-1 h-10 rounded-xl items-center justify-center ${on ? 'bg-primary' : 'bg-page border border-line'}`}
+                      >
+                        <Text className={`text-[14px] tabular-nums ${on ? 'font-semibold text-white' : 'text-body'}`}>{n}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
             ))}
-          </div>
-        </div>
+          </View>
+        </View>
       </Screen>
     );
   }
 
-  if (step === 'vote') {
-    const locked = priorResponses < 2;
-    const total = priorResponses + 1;
+  if (step === 'title') {
     return (
       <Screen
         footer={
           <>
-            <p className={`text-center text-[12px] mb-3 ${submit.isError ? 'text-danger' : 'text-sub'}`}>
-              {submit.isError
-                ? '답을 보내지 못했어요. 다시 눌러 주세요.'
-                : locked
-                  ? '응답 완료를 누르면 답이 익명으로 전달돼요'
-                  : voted
-                    ? '누가 무엇을 골랐는지는 공개되지 않아요'
-                    : '투표하면 다른 친구들의 선택 비율이 보여요'}
-            </p>
-            {locked || voted ? (
-              <Button onClick={finish} disabled={submit.isPending}>
-                {submit.isPending ? '보내는 중…' : '응답 완료'}
-              </Button>
-            ) : (
-              <Button variant="dark" disabled={!vote} onClick={() => setVoted(true)}>
-                투표하기
-              </Button>
-            )}
+            <Text className={`text-center text-[12px] mb-3 ${submit.isError ? 'text-danger' : 'text-sub'}`}>
+              {submit.isError ? '답을 보내지 못했어요. 다시 눌러 주세요.' : '응답 완료를 누르면 답이 익명으로 전달돼요'}
+            </Text>
+            <Button onPress={() => finish(title)} disabled={!title} loading={submit.isPending && !!title}>
+              응답 완료
+            </Button>
+            <TextButton className="mt-1" onPress={() => finish(null)} disabled={submit.isPending}>
+              칭호 없이 보내기
+            </TextButton>
           </>
         }
       >
-        <div className="flex items-center gap-3 px-5 h-14">
-          <BackButton onClick={() => go('q6')} />
-          <span className="text-[16px] font-bold text-ink">{OWNER}님을 보는 눈</span>
-        </div>
-        <div className="flex gap-6 px-5 border-b border-line">
-          {[
-            { k: 'vote' as const, l: '투표' },
-            { k: 'scale' as const, l: '척도' },
-          ].map((t) => (
-            <button key={t.k} onClick={() => setVoteTab(t.k)} className={`relative py-3 text-[15px] ${voteTab === t.k ? 'font-bold text-ink' : 'text-mute'}`}>
-              {t.l}
-              {voteTab === t.k && <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-ink" />}
-            </button>
-          ))}
-        </div>
-
-        {voteTab === 'scale' ? (
-          <div className="px-5 pt-6 flex flex-col gap-4">
-            <p className="text-[14px] text-sub">내 답과 다른 친구들의 평균이에요 (1–5)</p>
-            {AXES.map((a, i) => (
-              <div key={a}>
-                <div className="flex justify-between text-[13px]">
-                  <span className="font-semibold text-ink">{a}</span>
-                  <span className="font-mono text-sub">
-                    나 {scores[i] ?? '-'} · 평균 {OTHERS_AVG[i]}
-                  </span>
-                </div>
-                <ProgressBar value={(OTHERS_AVG[i] / 5) * 100} className="mt-2" height={6} fill="#A9ABFF" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="px-5 pt-8">
-            <div className="text-center">
-              <p className="text-[12px] font-semibold text-primary">마지막 · 유형 투표</p>
-              <h1 className="text-[24px] font-bold text-ink leading-[1.45] mt-2">
-                {OWNER}님은 어떤 사람인
-                <br />
-                것 같아요?
-              </h1>
-              <p className="text-[14px] text-sub mt-3">
-                {locked ? (
-                  '친구들의 답이 모이면 유형이 만들어져요'
-                ) : voted ? (
-                  <>
-                    나 포함 <b className="text-primary">{total + 2}명</b>의 선택
-                  </>
-                ) : (
-                  <>
-                    친구 <b className="text-primary">{total}명</b>의 답에서 뽑은 유형이에요
-                  </>
-                )}
-              </p>
-            </div>
-
-            <div className="relative flex flex-col gap-3 mt-6">
-              {TYPE_OPTIONS.map((o) => {
-                if (locked) {
-                  return (
-                    <div key={o.key} className="flex items-center gap-4 rounded-2xl bg-surface px-4 h-[72px]">
-                      <span className="w-9 h-9 rounded-lg bg-[#E4E4EA]" />
-                      <div className="flex-1">
-                        <span className="block w-28 h-3 rounded bg-[#E4E4EA]" />
-                        <span className="block w-full h-2.5 rounded bg-[#ECECF1] mt-2" />
-                      </div>
-                    </div>
-                  );
-                }
-                const selected = vote === o.label;
-                if (voted) {
-                  return (
-                    <div key={o.key} className={`relative overflow-hidden flex items-center gap-4 rounded-2xl px-4 h-[72px] ${selected ? 'bg-yellow-soft' : 'bg-surface'}`}>
-                      <span className={`absolute inset-y-0 left-0 ${selected ? 'bg-yellow' : 'bg-[#E4E4EA]'}`} style={{ width: `${o.pct}%` }} />
-                      <span className={`relative w-9 h-9 rounded-lg bg-ink flex items-center justify-center text-[14px] font-bold ${selected ? 'text-yellow' : 'text-white'}`}>
-                        {o.key}
-                      </span>
-                      <span className="relative flex-1 text-[16px] font-bold text-ink">
-                        {o.label} <span className="ml-2 text-[14px] font-normal text-sub">{o.pct}%</span>
-                      </span>
-                      {selected && (
-                        <span className="relative">
-                          <CheckIcon size={16} color="#1A1A1E" />
-                        </span>
-                      )}
-                    </div>
-                  );
-                }
-                return (
-                  <button
-                    key={o.key}
-                    onClick={() => setVote(o.label)}
-                    className={`flex items-center gap-4 rounded-2xl px-4 h-[72px] text-left border ${selected ? 'bg-primary-soft border-primary' : 'bg-surface border-transparent'}`}
+        <View className="flex-row items-center h-14 px-5 shrink-0">
+          <BackButton onPress={() => go('q6')} />
+        </View>
+        <View className="px-5 pt-4 pb-6">
+          <Text className="text-[12px] font-semibold text-primary">마지막 · 칭호</Text>
+          <Text accessibilityRole="header" className="text-[24px] font-bold text-ink leading-[34px] mt-2">
+            {`${OWNER}님에게 칭호를\n붙여 준다면?`}
+          </Text>
+          <Text className="text-[14px] text-sub leading-[22px] mt-2">가장 잘 어울리는 하나를 골라주세요. 누가 골랐는지는 공개되지 않아요.</Text>
+          <View className="flex-row flex-wrap mt-5" style={{ marginLeft: -5, marginRight: -5 }}>
+            {TITLES.map((t) => {
+              const on = title === t.label;
+              return (
+                <View key={t.label} className="w-1/2 shrink-0 px-[5px] pb-2.5">
+                  <Pressable
+                    onPress={() => setTitle(on ? null : t.label)}
+                    accessibilityRole="radio"
+                    accessibilityLabel={t.label}
+                    accessibilityState={{ checked: on }}
+                    className={`rounded-[20px] items-center px-3 pt-4 pb-4 border ${on ? 'bg-primary-soft border-primary' : 'bg-surface border-transparent'}`}
                   >
-                    <span className={`w-9 h-9 rounded-lg bg-ink flex items-center justify-center text-[14px] font-bold ${selected ? 'text-yellow' : 'text-white'}`}>
-                      {o.key}
-                    </span>
-                    <span className="flex-1">
-                      <span className="block text-[16px] font-bold text-ink">{o.label}</span>
-                      <span className="block text-[13px] text-sub mt-0.5">{o.desc}</span>
-                    </span>
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center ${selected ? 'bg-primary' : 'border-[1.5px] border-[#C4C4CC]'}`}>
-                      {selected && <CheckIcon size={12} />}
-                    </span>
-                  </button>
-                );
-              })}
-              {locked && (
-                <div className="absolute inset-x-10 top-[70px] rounded-3xl bg-white shadow-[0_10px_40px_rgba(26,26,30,0.12)] px-5 py-6 flex flex-col items-center">
-                  <span className="w-12 h-12 rounded-full bg-primary-soft flex items-center justify-center">
-                    <LockIcon size={20} color="#6367FF" />
-                  </span>
-                  <p className="text-[16px] font-bold text-ink mt-3">친구 답이 2개 이상 모이면 열려요</p>
-                  <p className="text-[13px] text-sub mt-1.5">지금까지 모인 답</p>
-                  <div className="flex items-center gap-3 w-full mt-3">
-                    <ProgressBar value={(priorResponses / 2) * 100} height={6} />
-                    <span className="font-mono text-[13px] font-semibold text-primary shrink-0">{priorResponses} / 2</span>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex justify-center gap-1.5 mt-7">
-              <span className="w-6 h-1.5 rounded-full bg-ink" />
-              <span className="w-1.5 h-1.5 rounded-full bg-[#D0D0D6]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-[#D0D0D6]" />
-            </div>
-          </div>
-        )}
+                    <View className="w-[72px] h-[72px] shrink-0 rounded-full bg-page items-center justify-center overflow-hidden">
+                      <Img src={titleImage(t.label)} size={60} contentFit="contain" alt="" />
+                    </View>
+                    <Text className={`text-[14px] font-bold mt-2.5 text-center ${on ? 'text-primary-pressed' : 'text-ink'}`}>{t.label}</Text>
+                    {on && (
+                      <View className="absolute top-3 right-3 w-[22px] h-[22px] rounded-full bg-primary items-center justify-center">
+                        <CheckIcon size={13} />
+                      </View>
+                    )}
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        </View>
       </Screen>
     );
   }
 
   /* done */
-  const total = priorResponses + 1;
   return (
     <Screen
       footer={
         <>
-          <Button onClick={() => router.push('/')}>나도 메타미 시작하기</Button>
-          <TextButton className="mt-1" onClick={() => window.close()}>
+          <Button onPress={() => router.push('/')}>나도 메타미 시작하기</Button>
+          <TextButton className="mt-1" onPress={() => window.close()}>
             창 닫기
           </TextButton>
         </>
       }
     >
-      <div className="flex flex-col items-center text-center px-8 pt-[200px]">
+      <View className="items-center px-8 pt-[200px]">
         <Img3D name="check" size={96} />
-        <h1 className="text-[24px] font-bold text-ink mt-4">답변을 보냈어요</h1>
-        <p className="text-[14px] text-[#5A5A62] leading-[1.7] mt-3">
-          {OWNER}님에게는 누가 무엇을 골랐는지 공개되지 않아요. 3명 이상 모이면 결과가 열립니다.
-        </p>
-        <span className="mt-6 h-9 px-4 rounded-full bg-surface-2 text-[13px] text-[#48484F] inline-flex items-center gap-1.5">
-          <b className="font-mono text-ink">
-            {Math.min(total, 3)} / 3
-          </b>
-          명 응답 완료
-        </span>
-      </div>
+        <Text accessibilityRole="header" className="text-[24px] font-bold text-ink mt-4 text-center">
+          답변을 보냈어요
+        </Text>
+        <Text className="text-[14px] text-body leading-[23px] mt-3 text-center">{`${OWNER}님에게는 누가 무엇을 골랐는지 공개되지 않아요.\n친구 3명 이상이 답하면 결과가 열립니다.`}</Text>
+      </View>
     </Screen>
   );
 }

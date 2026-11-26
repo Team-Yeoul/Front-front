@@ -1,5 +1,3 @@
-'use client';
-
 import { useQuery } from '@tanstack/react-query';
 import { diaryApi, diaryKeys } from '@/entities/diary';
 import type { DailyRecord, DailyRecordResponse } from '@/entities/diary';

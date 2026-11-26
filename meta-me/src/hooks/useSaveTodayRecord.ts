@@ -1,10 +1,28 @@
+import { useMemo } from 'react';
+import { DEFAULT_TIMEZONE, toDateKey, todayIn } from '@/lib/date';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { diaryApi, diaryKeys, useListDailyRecords } from '@/entities/diary';
+import { useGetNotificationSettings } from '@/entities/user';
 import type { SubmitDailyRecordRequest } from '@/entities/diary';
 import { ApiError } from '@/shared/api';
 import { useAuthStore } from '@/store';
 
-const today = () => new Date().toLocaleDateString('sv-SE');
+/**
+ * 계정 시간대(알림 설정의 timezone, 기본 Asia/Seoul) 기준 오늘.
+ * 서버는 recorded_date를 계정 시간대로 정하므로, recorded_date와 비교하는 곳(오늘 기록·이번 주·연속 기록)은 모두 이 값을 쓴다.
+ */
+export function useAccountToday() {
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const { data } = useGetNotificationSettings(!!accessToken);
+  const timeZone = data?.timezone || DEFAULT_TIMEZONE;
+  const todayKey = toDateKey(todayIn(timeZone));
+  // 같은 날 안에서는 같은 Date를 돌려줘 의존성 비교가 흔들리지 않게 한다.
+  const today = useMemo(() => {
+    const [y, m, d] = todayKey.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }, [todayKey]);
+  return { today, todayKey, timeZone };
+}
 
 /** 오늘 기록이 이미 있어서 새로 만들 수 없을 때. recordId가 있으면 수정 화면으로 보낼 수 있다. */
 export class TodayRecordExistsError extends Error {
@@ -39,7 +57,7 @@ export function useSaveTodayRecord() {
 /** 오늘 이미 남긴 기록. 새로 쓰기 화면에 들어오기 전에 확인해 덮어쓰기 대신 수정으로 안내한다. */
 export function useTodayRecord(enabled = true) {
   const accessToken = useAuthStore((s) => s.accessToken);
-  const key = today();
+  const { todayKey: key } = useAccountToday();
   const { data, isLoading } = useListDailyRecords({ start_date: key, end_date: key, size: 1 }, enabled && !!accessToken);
   return { record: data?.records.find((r) => r.recorded_date === key) ?? null, isLoading: enabled && !!accessToken && isLoading };
 }

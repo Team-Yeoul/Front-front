@@ -40,28 +40,146 @@
   font-display: swap;
 }
 
-body {
-  font-family: 'Pretendard', sans-serif;
-}
+@custom-variant dark (&:where(.dark, .dark *));
 
-/* ── v2 디자인 토큰 (Desktop/UX/metame-v2 시안 기준) ── */
+/*
+ * ── 디자인 시스템 v2 토큰 (앱 meta-me-app/src/global.css와 같은 값) ──
+ * 라이트 값은 @theme에, 다크 값은 <html class="dark">(lib/theme의 useApplyTheme)에서 같은 변수를 덮어쓴다.
+ * 클래스(text-ink, bg-page …)는 테마에 따라 자동으로 바뀐다.
+ * JS에서 색을 직접 넘길 때(SVG stroke 등)는 lib/theme의 useTheme().fg / .bg를 쓴다. 두 곳의 값을 함께 맞춘다.
+ */
 @theme {
   --color-primary: #6367ff;
   --color-primary-soft: #eef0ff;
   --color-primary-line: #c9cbff;
+  --color-primary-pressed: #4a4ed9;
+  --color-primary-200: #c5c7ff;
   --color-ink: #1a1a1e;
+  /* 진한 면(토스트·dark 버튼). 다크에서는 글자색이 아니라 한 단계 밝은 서피스가 된다. */
+  --color-inverse: #1a1a1e;
+  /* 화면 바탕 · 흰 카드 */
+  --color-page: #ffffff;
+  /* 회색 화면 바탕(설정 등) */
+  --color-canvas: #f6f6f9;
   --color-surface: #f4f5f8;
-  --color-surface-2: #f2f2f7;
+  --color-surface-2: #ededf2;
   --color-card: #fafafc;
-  --color-line: #ececf1;
-  --color-sub: #8e8e95;
-  --color-mute: #b4b4bb;
+  --color-line: #eceef2;
+  --color-line-soft: #f0f0f4;
+  --color-track: #e4e4ea;
+  --color-sub: #8a8a96;
+  --color-mute: #a1a1aa;
+  --color-body: #48484f;
   --color-yellow: #ffe066;
   --color-yellow-soft: #fff9e0;
   --color-gold: #8a6d00;
   --color-danger: #e5484d;
-  --color-danger-soft: #fdecec;
+  --color-danger-soft: #fff1f2;
+  --color-border: #e4e5ec;
+  --color-disabled: #c7c7d1;
+  --color-placeholder: #c7c7d1;
+  --color-text-2: #3f3f46;
+  --color-text-3: #52525b;
+  --color-text-4: #71717a;
+  --color-highlight: #f2c53d;
   --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+}
+
+:root.dark {
+  --color-primary: #6367ff;
+  --color-primary-soft: #2a2850;
+  --color-primary-line: #3b3a78;
+  --color-primary-pressed: #9ea1ff;
+  --color-primary-200: #3b3a78;
+  --color-ink: #f4f4f7;
+  --color-inverse: #23222c;
+  --color-page: #1c1b24;
+  --color-canvas: #121118;
+  --color-surface: #23222c;
+  --color-surface-2: #2a2933;
+  --color-card: #23222c;
+  --color-line: #2e2d38;
+  --color-line-soft: #26252f;
+  --color-track: #3a3946;
+  --color-sub: #9a9aa8;
+  --color-mute: #8a8a98;
+  --color-body: #c4c4cc;
+  --color-yellow: #ffe066;
+  --color-yellow-soft: #3a3220;
+  --color-gold: #e8d9a8;
+  --color-danger: #e5484d;
+  --color-danger-soft: #2e2026;
+  --color-border: #3a3946;
+  --color-disabled: #55546a;
+  --color-placeholder: #55546a;
+  --color-text-2: #d4d4da;
+  --color-text-3: #c4c4cc;
+  --color-text-4: #a8a8b4;
+  --color-highlight: #f2c53d;
+}
+
+/*
+ * 폰 화면 전체(#phone-screen)를 덮는 시트·팝업이 비워 둘 상태바·홈 인디케이터 높이(앱의 safe area inset).
+ * 데스크톱 미리보기는 PhoneFrame의 상태바(59) · 홈 인디케이터(34), 모바일 브라우저는 0.
+ * 화면 본문(Screen 안)은 이미 그 사이에 놓이므로 쓰지 않는다.
+ */
+:root {
+  --safe-top: 0px;
+  --safe-bottom: 0px;
+}
+@media (min-width: 768px) {
+  :root {
+    --safe-top: 59px;
+    --safe-bottom: 34px;
+  }
+}
+
+body {
+  font-family: 'Pretendard', sans-serif;
+  color: var(--color-ink);
+}
+
+/*
+ * 앱(React Native) 기본값 흉내. components/ui/rn.tsx의 View·Pressable·Text가 쓴다.
+ * components 레이어라 className 유틸리티가 늘 이긴다.
+ * - View: 세로 flex · position relative (RN 기본)
+ * - Text: 줄바꿈(\n)을 그대로 보여 주고, 줄 높이는 글꼴 기본(normal)
+ */
+@layer components {
+  .rn-view {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    align-content: flex-start;
+  }
+  .rn-press {
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .rn-press[aria-disabled='true'] {
+    cursor: default;
+  }
+  .rn-text {
+    display: block;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    line-height: normal;
+  }
+  .rn-text .rn-text {
+    display: inline;
+  }
+  .rn-input {
+    background: transparent;
+    outline: none;
+    border: 0;
+    padding: 0;
+    line-height: normal;
+    min-width: 0;
+  }
+  .rn-input::placeholder {
+    color: var(--rn-placeholder, var(--color-placeholder));
+  }
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -106,3 +224,45 @@ body {
   .animate-splash-drift-b { animation: none; }
 }
 .animate-pop-in { animation: pop-in 0.22s ease-out; }
+
+/* 체크 표시가 쓱 그려진다(icons CheckIcon) */
+@keyframes check-draw {
+  from { stroke-dashoffset: 20; }
+  to { stroke-dashoffset: 0; }
+}
+/* 일정한 속도로 도는 로딩 원(primitives Spinner) */
+@keyframes spin-linear {
+  to { transform: rotate(360deg); }
+}
+/* 은은하게 깜박이는 로딩 자리(states Skeleton) */
+@keyframes skeleton-pulse {
+  from { opacity: 1; }
+  to { opacity: 0.5; }
+}
+/* 아래에서 8px 올라오며 나타나기(states Stagger) */
+@keyframes stagger-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* 쓰는 중 점 세 개(chatV3 TypingMessage) */
+@keyframes typing-bounce {
+  0%, 100% { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); }
+  50% { transform: translateY(-4px); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
+}
+/* 살짝 커지며 나타나기(CogniReveal, Reanimated ZoomIn) */
+@keyframes zoom-in {
+  from { opacity: 0; transform: scale(0); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* 앱은 모든 움직임에 ReduceMotion.System을 준다: 기기에서 동작 줄이기를 켜면 움직이지 않는다. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
