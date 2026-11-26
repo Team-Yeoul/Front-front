@@ -24,5 +24,21 @@ export function useMe() {
     [patch],
   );
 
-  return { userId, ...local, patch, addCogni, saveChat };
+  /** 지난 대화를 위에 고정하거나 풀기 */
+  const togglePinChat = useCallback(
+    (id: string) =>
+      patch((u) => {
+        const pinned = u.pinnedChats ?? [];
+        return { ...u, pinnedChats: pinned.includes(id) ? pinned.filter((x) => x !== id) : [id, ...pinned] };
+      }),
+    [patch],
+  );
+
+  /** 이 기기에서 지난 대화를 지운다(고정도 함께 푼다). 서버 세션 삭제는 부르는 쪽이 먼저 한다. */
+  const removeChat = useCallback(
+    (id: string) => patch((u) => ({ ...u, chats: u.chats.filter((c) => c.id !== id), pinnedChats: (u.pinnedChats ?? []).filter((x) => x !== id) })),
+    [patch],
+  );
+
+  return { userId, ...local, patch, addCogni, saveChat, togglePinChat, removeChat };
 }

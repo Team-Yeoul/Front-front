@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { ArrowUpIcon } from './primitives';
+import { ArrowUpIcon } from './icons';
 
 export function AiAvatar({ size = 28 }: { size?: number }) {
   return (

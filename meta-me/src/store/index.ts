@@ -33,6 +33,7 @@ export const useAuthStore = create<AuthStore>()(
 export const syncAuthFromStorage = () => useAuthStore.persist.rehydrate();
 
 export * from './local';
+export * from './authAttempt';
 
 interface TermsAgreement {
   service: boolean;

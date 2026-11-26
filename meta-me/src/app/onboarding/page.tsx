@@ -1,555 +1,520 @@
 'use client';
 
-import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { useGetMyAccount, useSubmitOnboarding, userApi, type OnboardingRequest } from '@/entities/user';
 import { useAuthStore } from '@/store';
 import { ApiError } from '@/shared/api';
-import { Screen } from '@/components/ui/Screen';
-import { BackButton, Button, CheckIcon, Dots, Img3D, OptionRow } from '@/components/ui/primitives';
-import { AnalyzingScreen, CogniHero, FeatureIcons } from '@/components/ui/flows';
 import { useMe } from '@/hooks/useMe';
-import { fromFirstCogni, pickOnboardingCogni, type FoundCogni } from '@/lib/onboardingCogni';
-import { ONBOARDING_QUESTIONS, type OnboardingQuestion } from './questions';
+import { fromFirstCogni, hasCogniImage, type FoundCogni } from '@/lib/onboardingCogni';
+import { DEFAULT_ALONE_TIME, ONBOARDING_QUESTIONS, type OnboardingQuestion } from '@/lib/onboardingQuestions';
+import { toLegacyAnswers } from '@/lib/onboardingLegacyAnswers';
+import { gibberishReason } from '@/lib/textQuality';
+import { useTheme } from '@/lib/theme';
+import { router } from '@/lib/router';
+import { Screen } from '@/components/ui/Screen';
+import { Button, CogniImg } from '@/components/ui/primitives';
+import { Img, Pressable, ScrollView, View, asset } from '@/components/ui/rn';
+import { Text } from '@/components/ui/Text';
+import { StaggerText } from '@/components/ui/states';
+import { TimeDial, timeLabel } from '@/components/onboarding/TimeDial';
+import {
+  GlassBack,
+  Note,
+  OptionCard,
+  OptionRow,
+  QuestionBackdrop,
+  QuestionHeader,
+  SentenceInput,
+  SoftBackdrop,
+  SpeechBubble,
+  StepSlider,
+  SunriseBackdrop,
+  TipCard,
+  UnsureToggle,
+} from '@/components/onboarding/ui';
+import { Animate, ZOOM_IN, fadeInDown } from '@/components/onboarding/motion';
+import { withSensitiveGate } from '@/components/SensitiveGate';
+import { hasSensitiveConsent } from '@/hooks/useSensitiveConsent';
 
-type Phase = 'intro' | 'question' | 'analyzing' | 'result' | 'outro';
-type Answer = string | string[] | number | undefined;
+type Phase = 'intro' | 'question' | 'sunrise' | 'analyzing' | 'result' | 'welcome';
+type Answer = string | string[] | number | [number, number] | undefined;
 
-/* ── 인트로 / 아웃트로 슬라이드 ─────────────────────────── */
+/** '잘 모르겠어요'를 고른 한 문장 */
+const UNSURE = '__unsure__';
+/** 서버는 my_one_sentence를 공백을 뺀 10자 이상만 받는다. 화면에서는 막지 않고, 짧으면 이 칸만 빼고 보낸다(선택 항목). */
+const SERVER_MIN_SENTENCE = 10;
+/** 한 문장이니 30자까지만 받는다. */
+const SENTENCE_MAX = 30;
+/** 해 뜨는 화면에서 '코그니 찾으러 가기' 버튼이 올라오기까지 기다리는 시간(ms) */
+const SUNRISE_BUTTON_MS = 1400;
+/** 분석 중 원이 다 차는 시간(ms) */
+const ANALYZE_MS = 4200;
+/** 분석 원이 100%를 찍고 다음 화면으로 넘어가기 전 잠깐 머무는 시간(ms) */
+const ANALYZE_HOLD_MS = 450;
 
-/** 이 거리(px) 이상 가로로 밀어야 넘어간다. */
-const SWIPE_MIN = 10;
+const longEnoughForServer = (text: string) => text.replace(/\s/g, '').length >= SERVER_MIN_SENTENCE;
 
-type SwipeDir = 'next' | 'prev';
-type SlideVariant = 'a' | 'b' | 'c';
+function isAnswered(q: OnboardingQuestion, a: Answer) {
+  switch (q.kind) {
+    case 'sentence':
+      return a === UNSURE || (typeof a === 'string' && a.trim().length > 0 && !gibberishReason(a));
+    case 'scale':
+    case 'timeRange':
+      // 손대지 않고 넘어가도 된다(가운데 단계 · 기본 시간대를 보낸다).
+      return true;
+    case 'multi':
+      return Array.isArray(a) && a.length > 0;
+    default:
+      return typeof a === 'string' && a.length > 0;
+  }
+}
 
-/** `spread`: 중심 진하기는 그대로 두고, 중간(45% 지점)에 남는 진하기 비율. 클수록 퍼진 부분이 진하다. */
-const blob = (w: number, h: number, x: number, y: number, rgb: string, a: number, spread = 0.3) =>
-  `radial-gradient(${w}% ${h}% at ${x}% ${y}%, rgba(${rgb},${a}) 0%, rgba(${rgb},${a * spread}) 45%, rgba(${rgb},0) 85%)`;
-const PURPLE = '160,164,255';
-const LAVENDER = '200,202,255';
-const YELLOW = '255,230,150';
-const CREAM = '255,240,195';
-
-const SLIDE_BG: Record<SlideVariant, string[]> = {
-  a: [blob(100, 48, 0, 0, PURPLE, 0.9, 0.5), blob(65, 42, 100, 22, YELLOW, 0.85, 0.5), blob(90, 52, 75, 75, LAVENDER, 0.9)],
-  b: [blob(100, 62, 60, 0, YELLOW, 0.9), blob(100, 50, 0, 90, PURPLE, 0.8), blob(80, 82, 90, 66, LAVENDER, 0.8)],
-  c: [blob(80, 62, 15, 20, YELLOW, 0.9), blob(80, 50, 100, 32, PURPLE, 0.9), blob(50, 30, 25, 70, CREAM, 0.75), blob(75, 32, 100, 90, LAVENDER, 2)],
+const optionWithDescription = (q: OnboardingQuestion, label: string) => {
+  if (q.kind !== 'single' && q.kind !== 'cards') return label;
+  const o = q.options.find((x) => x.label === label);
+  return o?.description ? `${label.replace(/[“”]/g, '')} - ${o.description}` : label.replace(/[“”]/g, '');
 };
 
-function SlideBackdrop({ variant }: { variant: SlideVariant }) {
-  return (
-    <div className="absolute inset-0 bg-[#FCFCFF]">
-      {(Object.keys(SLIDE_BG) as SlideVariant[]).map((v) => (
-        <div
-          key={v}
-          className="absolute inset-0 transition-opacity duration-500 ease-out motion-reduce:transition-none"
-          style={{ backgroundImage: SLIDE_BG[v].join(','), opacity: v === variant ? 1 : 0 }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function Slide({
-  variant,
-  children,
-  eyebrow,
-  align = 'left',
-  hint,
-  dots,
-  onNext,
-  onSkip,
-  cta,
-  swipe,
-  enterFrom,
-}: {
-  variant: SlideVariant;
-  children: ReactNode;
-  /** 제목 위의 작은 라벨. 제목 위치를 밀어내지 않도록 제목 위에 따로 띄운다. */
-  eyebrow?: string;
-  align?: 'left' | 'center';
-  hint?: string;
-  dots?: [number, number];
-  onNext: () => void;
-  onSkip?: () => void;
-  cta?: string;
-  /** 주면 탭 대신 스와이프로 넘긴다: 오른쪽→왼쪽은 next, 왼쪽→오른쪽은 prev. */
-  swipe?: { next?: () => void; prev?: () => void };
-  /** 스와이프로 들어온 방향. 그쪽에서 살짝 밀려 들어오며 나타난다. */
-  enterFrom?: SwipeDir;
-}) {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const start = useRef<{ x: number; y: number } | null>(null);
-
-  const slideIndex = dots?.[0];
-  useEffect(() => {
-    if (!enterFrom || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    // 장이 바뀔 때마다(dots 변경) 들어오는 애니메이션을 다시 건다. 배경이 이어지도록 Slide 자체는 다시 마운트하지 않는다.
-    const dx = enterFrom === 'next' ? 40 : -40;
-    contentRef.current?.animate(
-      [
-        { transform: `translateX(${dx}px)`, opacity: 0 },
-        { transform: 'translateX(0)', opacity: 1 },
-      ],
-      { duration: 280, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
-    );
-  }, [enterFrom, slideIndex]);
-
-  const onPointerDown = (e: PointerEvent) => {
-    start.current = { x: e.clientX, y: e.clientY };
+/**
+ * 서버 제출 내용. 필수 필드는 시안 질문 중 뜻이 맞는 답으로 채운다.
+ * - self_strength ← 7번 '내 장점', others_feedback ← 6번 '남한테 자주 듣는 말'
+ * - favorite_thing ← 3번 '알고 싶은 것'(', '로 이음). 기기에서 첫 코그니를 다시 고를 때도 이 규칙을 쓴다.
+ * - answers ← ⚠️ 임시: 서버에 새 질문이 등록되기 전까지 예전 질문 선택지로 바꿔 보낸다(lib/onboardingLegacyAnswers.ts).
+ */
+function buildRequest(answers: Record<string, Answer>): OnboardingRequest {
+  const byId = (id: string) => ONBOARDING_QUESTIONS.find((q) => q.id === id)!;
+  const pick = (id: string) => {
+    const a = answers[id];
+    return typeof a === 'string' && a ? optionWithDescription(byId(id), a) : '';
   };
-  const onPointerUp = (e: PointerEvent) => {
-    if (!start.current || !swipe) return;
-    const dx = e.clientX - start.current.x;
-    const dy = e.clientY - start.current.y;
-    start.current = null;
-    // 세로 스크롤이나 짧은 터치는 무시하고, 가로로 충분히 밀었을 때만 넘긴다.
-    if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy)) return;
-    if (dx < 0) swipe.next?.();
-    else swipe.prev?.();
+  const sentence = answers.my_one_sentence;
+  const curious = Array.isArray(answers.curious_about) ? (answers.curious_about as string[]) : [];
+  return {
+    ...(typeof sentence === 'string' && sentence !== UNSURE && longEnoughForServer(sentence) && { my_one_sentence: sentence.trim() }),
+    self_strength: pick('self_strength') || '아직 모르겠어요',
+    others_feedback: pick('others_feedback') || '아직 모르겠어요',
+    favorite_thing: curious.join(', ') || '아직 모르겠어요',
+    // 명세는 "1"~"8" 키별 선택지를 리터럴 타입으로 고정하지만, 값은 예전 질문의 선택지 라벨에서 만들어진다.
+    answers: toLegacyAnswers(answers) as NonNullable<OnboardingRequest['answers']>,
   };
-
-  return (
-    <Screen bleed background={<SlideBackdrop variant={variant} />}>
-      <div
-        className={`relative h-full flex flex-col ${swipe ? 'touch-pan-y select-none' : ''}`}
-        onClick={cta || swipe ? undefined : onNext}
-        onPointerDown={swipe ? onPointerDown : undefined}
-        onPointerUp={swipe ? onPointerUp : undefined}
-        onPointerCancel={() => (start.current = null)}
-      >
-        <div className="h-10 flex items-center justify-end px-6">
-          {onSkip && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onSkip();
-              }}
-              className="text-[13px] text-[#48484F]"
-            >
-              넘어가기
-            </button>
-          )}
-        </div>
-        {align === 'left' ? (
-          // 장마다 본문 길이·하단 버튼이 달라도 제목 첫 줄이 항상 같은 높이에 오도록, 화면 전체 높이 기준으로 위치를 고정한다.
-          <>
-            <div className="flex-1" />
-            <div ref={contentRef} className="absolute inset-x-0 top-[38%] px-8 flex flex-col">
-              {eyebrow && <p className="absolute bottom-full mb-6 font-mono text-[12px] tracking-[0.2em] text-[#5A5A62]">{eyebrow}</p>}
-              {children}
-            </div>
-          </>
-        ) : (
-          <div ref={contentRef} className="flex-1 flex flex-col justify-center px-10 items-center text-center">
-            {children}
-          </div>
-        )}
-        <div className="flex flex-col items-center gap-5 pb-8 px-5">
-          {hint && (
-            <p className="text-[13px] text-[#48484F] flex items-center gap-2">
-              {hint}
-              {hint.startsWith('옆으로') && <span>→</span>}
-            </p>
-          )}
-          {dots && <Dots count={dots[1]} index={dots[0]} variant="bar" />}
-          {cta && (
-            <Button variant="dark" onClick={onNext}>
-              {cta}
-            </Button>
-          )}
-        </div>
-      </div>
-    </Screen>
-  );
 }
-
-const slideTitle = 'text-[30px] font-semibold text-ink leading-[1.5] tracking-[-0.02em]';
 
 /* ── 질문 본문 ─────────────────────────────────────────── */
+
+const COUNT = ['', '하나', '두 개', '세 개', '네 개'];
 
 function QuestionBody({ q, answer, setAnswer }: { q: OnboardingQuestion; answer: Answer; setAnswer: (a: Answer) => void }) {
   switch (q.kind) {
     case 'sentence': {
-      // '잘 모르겠습니다.'로 넘긴 질문(__later__)에 돌아오면 빈 칸으로 다시 쓸 수 있다.
-      const text = typeof answer === 'string' && answer !== '__later__' ? answer : '';
+      const unsure = answer === UNSURE;
+      const text = typeof answer === 'string' && !unsure ? answer : '';
       return (
-        <div className="rounded-2xl px-4 py-3.5 border-[1.5px] bg-primary-soft/60 border-primary">
-          <p className="text-[12px] font-semibold text-primary">내 문장</p>
-          <textarea
-            value={text}
-            maxLength={80}
-            rows={2}
-            onChange={(e) => setAnswer(e.target.value)}
-            placeholder="계획은 잘 세우는데, 시작 앞에서 오래 머무는 사람."
-            className="w-full mt-1.5 bg-transparent outline-none resize-none text-[16px] font-semibold text-ink placeholder:text-mute placeholder:font-medium caret-primary"
-          />
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[12px] text-danger">{tooShortSentence(q, text) ? `공백을 빼고 ${MIN_SENTENCE_LENGTH}자 이상 써 주세요` : ''}</p>
-            <p className="font-mono text-[12px] text-mute">{text.length} / 80</p>
-          </div>
-        </div>
+        <View className="gap-8 pt-[150px]">
+          <SentenceInput value={text} onChange={setAnswer} placeholder={q.placeholder} disabled={unsure} max={SENTENCE_MAX} />
+          <UnsureToggle on={unsure} onChange={(on) => setAnswer(on ? UNSURE : '')} />
+        </View>
       );
     }
     case 'scale': {
-      const idx = typeof answer === 'number' ? answer : 2;
-      const picked = q.options[idx];
+      const idx = typeof answer === 'number' ? answer : Math.floor(q.steps.length / 2);
       return (
-        <div className="flex flex-col gap-4">
-          <div className="rounded-3xl bg-surface px-5 pt-5 pb-5">
-            <div className="relative">
-              <div className="flex justify-between items-center px-1">
-                {q.options.map((o, i) => (
-                  <button key={o.label} onClick={() => setAnswer(i)} className="w-9 h-9 flex items-center justify-center" aria-label={o.label}>
-                    {i === idx ? (
-                      <span className="w-10 h-10 rounded-full bg-primary-line/60 flex items-center justify-center">
-                        <span className="w-7 h-7 rounded-full bg-primary" />
-                      </span>
-                    ) : (
-                      <span className="w-4 h-4 rounded-full border-[1.5px] border-[#B4B4BB]" />
-                    )}
-                  </button>
-                ))}
-              </div>
-              <div className="mx-3 mt-4 h-1 rounded-full bg-[#E1E1E8]">
-                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(idx / (q.options.length - 1)) * 100}%` }} />
-              </div>
-            </div>
-            <div className="grid grid-cols-5 gap-1 mt-4">
-              {q.options.map((o, i) => (
-                <button
-                  key={o.label}
-                  onClick={() => setAnswer(i)}
-                  className={`text-[11px] leading-[1.45] text-center break-keep ${i === idx ? 'font-bold text-primary' : 'text-sub'}`}
-                >
-                  {o.label}
-                </button>
+        <View className="pt-14">
+          <Text className="text-center text-[24px] font-bold tracking-tight text-white" accessibilityLiveRegion="polite">
+            {q.steps[idx]}
+          </Text>
+          <View className="mt-12">
+            <StepSlider steps={q.steps.length} value={idx} onChange={setAnswer} label={q.title} />
+            <View className="flex-row justify-between mt-3">
+              {q.ends.map((e) => (
+                <Text key={e} className="text-[14px] text-white/62">
+                  {e}
+                </Text>
               ))}
-            </div>
-          </div>
-          <div className="rounded-3xl border border-line px-5 py-4">
-            <p className="text-[12px] font-semibold text-primary">지금 고른 답</p>
-            <p className="text-[18px] font-bold text-ink mt-1.5">{picked.label}</p>
-            <p className="text-[13px] text-sub mt-1.5 leading-relaxed">{picked.description}</p>
-          </div>
-        </div>
+            </View>
+          </View>
+          {q.tip && (
+            <View className="mt-9">
+              <TipCard {...q.tip} />
+            </View>
+          )}
+        </View>
       );
     }
     case 'multi': {
-      const list = Array.isArray(answer) ? answer : [];
+      const list = Array.isArray(answer) ? (answer as string[]) : [];
+      const full = !!q.max && list.length >= q.max;
       const toggle = (o: string) => {
         if (list.includes(o)) setAnswer(list.filter((x) => x !== o));
-        else if (!q.max || list.length < q.max) setAnswer([...list, o]);
+        else if (!full) setAnswer([...list, o]);
       };
-      // 직접 적은 답은 선택지에 없는 항목 하나로 같은 목록에 넣는다. 비우면 목록에서 뺀다.
-      const custom = list.find((x) => !q.options.includes(x)) ?? '';
-      const setCustom = (text: string) => {
-        const rest = list.filter((x) => q.options.includes(x));
-        setAnswer(text ? [...rest, text] : rest);
-      };
+      const left = q.max ? q.max - list.length : 0;
       return (
-        <div className="flex flex-col gap-2.5">
-          {q.options.map((o) =>
-            q.soft ? (
-              <button
-                key={o}
-                onClick={() => toggle(o)}
-                className={`flex items-center gap-3 rounded-2xl px-4 h-14 text-left ${list.includes(o) ? 'bg-primary-soft' : 'bg-surface'}`}
-              >
-                <span className={`w-[22px] h-[22px] rounded-[6px] flex items-center justify-center ${list.includes(o) ? 'bg-primary' : 'bg-white border-[1.5px] border-[#D5D5DC]'}`}>
-                  {list.includes(o) && <CheckIcon size={13} />}
-                </span>
-                <span className="text-[15px] text-[#48484F]">{o}</span>
-              </button>
-            ) : (
-              <OptionRow key={o} label={o} selected={list.includes(o)} onClick={() => toggle(o)} />
-            ),
+        <View className="gap-2 pt-5">
+          {q.options.map((o) => (
+            <OptionRow key={o} label={o} on={list.includes(o)} onPress={() => toggle(o)} />
+          ))}
+          {!!q.max && list.length > 0 && (
+            <View className="mt-3">
+              <Note>{left > 0 ? `${COUNT[left] ?? `${left}개`} 더 고를 수 있어요` : `최대 ${q.max}개까지 골랐어요`}</Note>
+            </View>
           )}
-          {q.custom && (
-            <input
-              value={custom}
-              maxLength={40}
-              onChange={(e) => setCustom(e.target.value)}
-              placeholder={q.custom}
-              className={`w-full rounded-2xl px-4 h-14 bg-surface border outline-none text-[15px] text-ink placeholder:text-sub caret-primary ${
-                custom ? 'border-primary font-semibold' : 'border-transparent'
-              }`}
-            />
-          )}
-        </div>
+        </View>
       );
     }
-    case 'list':
+    case 'single':
       return (
-        <div className="flex flex-col gap-2.5">
+        <View className="gap-2 pt-5">
           {q.options.map((o) => (
-            <OptionRow key={o.label} label={o.label} description={o.description} selected={answer === o.label} onClick={() => setAnswer(o.label)} />
+            <OptionRow key={o.label} label={o.label} description={o.description} on={answer === o.label} onPress={() => setAnswer(o.label)} />
           ))}
-        </div>
+        </View>
       );
-    case 'cards':
+    case 'cards': {
+      const rows = [q.options.slice(0, 2), q.options.slice(2, 4)];
       return (
-        <div className="grid grid-cols-2 gap-3">
-          {q.options.map((o, i) => {
-            const selected = answer === o.label;
-            const solid = q.accent === 'solid';
-            return (
-              <button
-                key={o.label}
-                onClick={() => setAnswer(o.label)}
-                className={`flex flex-col text-left rounded-3xl p-4 min-h-[150px] border-[1.5px] transition-colors ${
-                  selected
-                    ? solid
-                      ? 'bg-primary border-primary'
-                      : 'bg-primary-soft border-primary'
-                    : 'bg-surface border-transparent'
-                }`}
-              >
-                {q.glyphs && (
-                  <span
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-[14px] font-semibold ${
-                      selected && solid ? 'bg-yellow text-ink' : 'bg-white text-primary'
-                    }`}
-                  >
-                    {selected && solid ? <CheckIcon size={14} color="#1A1A1E" /> : q.glyphs[i] === '✓' ? '◡' : q.glyphs[i]}
-                  </span>
-                )}
-                <span className={`${q.glyphs ? 'mt-auto pt-6' : ''} text-[16px] font-bold leading-snug ${selected && solid ? 'text-white' : 'text-ink'}`}>
-                  {o.label}
-                </span>
-                {o.description && (
-                  <span className={`text-[13px] mt-1.5 leading-relaxed ${selected && solid ? 'text-white/85' : 'text-sub'}`}>{o.description}</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <View className="gap-5 pt-5">
+          <View className="gap-3" role="radiogroup" aria-label={q.title}>
+            {rows.map((row, i) => (
+              <View key={i} className="flex-row gap-3">
+                {row.map((o) => (
+                  <OptionCard key={o.label} label={o.label} description={o.description} on={answer === o.label} onPress={() => setAnswer(o.label)} />
+                ))}
+              </View>
+            ))}
+          </View>
+          {!!q.note && <Note>{q.note}</Note>}
+        </View>
+      );
+    }
+    case 'timeRange':
+      return (
+        <View className="pt-10">
+          <TimeDial value={(Array.isArray(answer) ? answer : DEFAULT_ALONE_TIME) as [number, number]} onChange={setAnswer} />
+        </View>
       );
   }
 }
 
-/** 서버는 한 문장(my_one_sentence)을 공백을 뺀 10자 이상만 받는다. 나머지 소개 문장은 1자 이상이면 된다. */
-const MIN_SENTENCE_LENGTH = 10;
-const tooShortSentence = (q: OnboardingQuestion, text: string) =>
-  q.id === 'my_one_sentence' && text.trim().length > 0 && text.replace(/\s/g, '').length < MIN_SENTENCE_LENGTH;
+/* ── 인트로 (7e) ───────────────────────────────────────── */
 
-function isAnswered(q: OnboardingQuestion, a: Answer) {
-  // 한 문장이 10자보다 짧으면 막는다. 쓰기 어렵다면 '잘 모르겠습니다.'로 넘길 수 있다.
-  if (q.kind === 'sentence') return typeof a === 'string' && a.trim().length > 0 && !tooShortSentence(q, a);
-  if (q.kind === 'multi') return Array.isArray(a) && a.some((x) => x.trim().length > 0);
-  if (q.kind === 'scale') return true;
-  return typeof a === 'string' && a.length > 0;
+const INTRO = [
+  { bubble: '안녕하세요, metame예요', title: '나를 알아가는\n첫걸음', sub: '하루 한 문장씩 쌓이면 나를 더 잘 알게 돼요', cta: '좋아요, 시작할게요' },
+  { bubble: '어떤 게 좋으세요?', title: '가볍게\n3가지만 골라주세요', sub: '마음이 가는 대로 골라도 2분이면 끝나요', cta: '다음으로' },
+  { bubble: '언제든지 다시 고를 수 있어요', title: '잘 모르겠으면\n넘어가도 괜찮아요.', sub: '정답은 없어요, 지금의 나면 충분해요', cta: '시작하기' },
+];
+
+const IMG = {
+  character: asset('v2/cogni-default.png'),
+  spark: asset('onboarding/spark.svg'),
+  smile: asset('onboarding/smile.svg'),
+  heart: asset('onboarding/heart.svg'),
+  star: asset('onboarding/star.svg'),
+  starGold: asset('onboarding/star-gold.svg'),
+  sunrise: asset('onboarding/sunrise.svg'),
+  popper: asset('onboarding/popper.svg'),
+};
+
+function Intro({ slide, onNext, onBack }: { slide: number; onNext: () => void; onBack: () => void }) {
+  const s = INTRO[slide];
+  return (
+    // 배경은 바로 이어지는 Q1과 같은 보라 그라데이션(7f)이다. 라이트·다크 모두 같은 어두운 화면이다.
+    <Screen statusFg="light" bg="#110F30" background={<QuestionBackdrop index={0} />} contentClassName="flex-grow" footer={<Button onPress={onNext}>{s.cta}</Button>}>
+      <View className="h-12 shrink-0 justify-center px-5">{slide > 0 && <GlassBack onPress={onBack} />}</View>
+      {/* 장마다 바뀌는 부분이 살짝 밀려 들어오게 한다. */}
+      <Animate key={slide} keyframes={fadeInDown(12)} duration={320} className="flex-1 items-center justify-center gap-12 px-8 pb-6">
+        <View className="items-center">
+          <SpeechBubble>{s.bubble}</SpeechBubble>
+          <View className={`w-[150px] mt-7 items-center ${slide === 2 ? 'h-6' : ''}`}>
+            {slide < 2 && <Img src={IMG.character} width={150} height={148} />}
+            <Img src={IMG.spark} width={40} height={40} style={{ position: 'absolute', right: -34, top: -6 }} />
+          </View>
+        </View>
+        {slide === 1 && (
+          <View className="flex-row items-center gap-2.5" importantForAccessibility="no-hide-descendants">
+            {(
+              [
+                [IMG.smile, 'bg-white/12 border border-white/18', '-8deg'],
+                [IMG.heart, 'bg-white/12 border border-white/18', '0deg'],
+                [IMG.star, 'bg-[#FFE066]/20 border border-[#FFE066]/30', '8deg'],
+              ] as const
+            ).map(([src, bg, rot], i) => (
+              <View key={i} className={`w-[76px] h-[76px] shrink-0 rounded-[18px] items-center justify-center ${bg}`} style={{ transform: `rotate(${rot})` }}>
+                <Img src={src} width={34} height={34} />
+              </View>
+            ))}
+          </View>
+        )}
+        <View className="items-center gap-2.5">
+          {/* 제목 줄마다, 그다음 설명이 순서대로 나타난다. */}
+          <StaggerText header text={s.title} delay={120} className="text-[24px] font-semibold leading-[35px] tracking-tight text-white text-center" />
+          <StaggerText text={s.sub} delay={120 + s.title.split('\n').length * 70} className="text-[16px] leading-[26px] text-white/70 text-center" />
+        </View>
+      </Animate>
+    </Screen>
+  );
 }
 
-/** 서버 answers로 보낼 질문별 원래 답. 척도는 순번 대신 고른 문구로 보낸다. sentenceOnly면 소개 문장 답만 고른다. */
-const rawAnswers = (answers: Record<string, Answer>, sentenceOnly = false) => {
-  const out: Record<string, string | string[] | number> = {};
-  for (const q of ONBOARDING_QUESTIONS) {
-    if (sentenceOnly && q.kind !== 'sentence') continue;
-    const a = answers[q.id];
-    if (a === undefined || a === '' || a === '__later__') continue;
-    out[q.id] = q.kind === 'scale' && typeof a === 'number' ? q.options[a].label : a;
-  }
-  return out;
-};
+/* ── 분석 중 (13h2) ────────────────────────────────────── */
 
-/**
- * 서버 answers(밸런스 게임). 설문 8개를 화면 순서대로 "1"~"8" 키로 보낸다. 서버는 8개 모두 답해야 받는다.
- * 척도는 순번 대신 고른 문구로, 여러 개 고르는 질문은 비어 있지 않은 항목만 보낸다.
- */
-const balanceAnswers = (answers: Record<string, Answer>) => {
-  const out: Record<string, string | string[]> = {};
-  ONBOARDING_QUESTIONS.filter((q) => q.kind !== 'sentence').forEach((q, i) => {
-    const a = answers[q.id];
-    if (q.kind === 'scale' && typeof a === 'number') out[i + 1] = q.options[a].label;
-    else if (Array.isArray(a)) out[i + 1] = a.map((x) => x.trim()).filter(Boolean);
-    else if (typeof a === 'string') out[i + 1] = a;
+const REVIEWS = [
+  { name: '지윤', text: '막연하게 느끼던 내 습관이 한 문장으로 정리되니까 신기했어요.' },
+  { name: '도현', text: '친구가 본 나와 내가 본 나를 비교해보고 처음으로 납득이 됐어요.' },
+  { name: '서아', text: '매일 한 줄씩 썼을 뿐인데 내 감정 흐름이 보이기 시작했어요.' },
+];
+const CARD_W = 290;
+const CARD_GAP = 16;
+
+/** 후기 카드가 옆으로 천천히 흘러간다(두 벌을 이어 붙여 끊김 없이). */
+function ReviewMarquee() {
+  return (
+    <View className="mt-9 overflow-hidden" importantForAccessibility="no-hide-descendants">
+      <Animate
+        keyframes={[{ transform: 'translateX(0)' }, { transform: `translateX(${-(CARD_W + CARD_GAP) * REVIEWS.length}px)` }]}
+        duration={14000}
+        easing="linear"
+        iterations={Infinity}
+        className="flex-row pl-6 self-start"
+        style={{ gap: CARD_GAP }}
+      >
+        {[...REVIEWS, ...REVIEWS].map((r, i) => (
+          <View key={i} className="shrink-0 rounded-[20px] bg-page border border-surface-2 px-6 py-6 items-center" style={{ width: CARD_W }}>
+            <View className="flex-row gap-1">
+              {Array.from({ length: 5 }, (_, k) => (
+                <Img key={k} src={IMG.starGold} width={20} height={20} />
+              ))}
+            </View>
+            <Text className="mt-2.5 text-[16px] font-bold text-ink">{r.name}</Text>
+            <Text className="mt-2 text-[16px] leading-6 text-text-3 text-center">{r.text}</Text>
+          </View>
+        ))}
+      </Animate>
+    </View>
+  );
+}
+
+function Analyzing({ onDone }: { onDone: () => void }) {
+  // 원은 소수 진행률로 끊김 없이 그리고, 숫자만 정수로 보여 준다.
+  const [progress, setProgress] = useState(0);
+  const pct = Math.round(progress * 100);
+  const done = useRef(false);
+  const finish = () => {
+    if (done.current) return;
+    done.current = true;
+    onDone();
+  };
+  // 타이머 안에서 부를 최신 finish (렌더 중에 ref를 읽지 않도록 effect에서 갱신한다)
+  const finishRef = useRef(finish);
+  useEffect(() => {
+    finishRef.current = finish;
   });
-  return out;
-};
 
-const labelOf = (a: Answer, q?: OnboardingQuestion) => {
-  if (Array.isArray(a)) return a.join(', ');
-  if (typeof a === 'number' && q?.kind === 'scale') return q.options[a].label;
-  if (typeof a === 'string' && a !== '__later__') return a;
-  return '';
-};
+  // 원이 0 → 100%로 차오른 뒤 잠깐 머물렀다가 다음 화면으로 넘어간다.
+  // 처음과 끝이 부드럽게 이어지도록 sine ease-in-out으로 채운다(시작이 튀거나 끝에서 멈칫하지 않게).
+  useEffect(() => {
+    const start = Date.now();
+    let raf = 0;
+    let hold: ReturnType<typeof setTimeout> | undefined;
+    const tick = () => {
+      const t = Math.min(1, (Date.now() - start) / ANALYZE_MS);
+      setProgress(0.5 - Math.cos(Math.PI * t) / 2);
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else hold = setTimeout(() => finishRef.current(), ANALYZE_HOLD_MS);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(hold);
+    };
+  }, []);
 
-/* ── 페이지 ────────────────────────────────────────────── */
+  const { bg } = useTheme();
+  const R = 96;
+  const C = 2 * Math.PI * R;
+  return (
+    <Screen background={<SoftBackdrop />} bg="#F5F6FF">
+      <View className="px-5 pt-0.5 items-start">
+        <GlassBack onPress={finish} label="닫기" light close />
+      </View>
+      <View className="w-[220px] h-[220px] shrink-0 self-center mt-7">
+        <svg width={220} height={220} viewBox="0 0 220 220" aria-hidden>
+          <circle cx={110} cy={110} r={R} fill="none" stroke={bg('#F4F5F8')} strokeWidth={14} />
+          <circle
+            cx={110}
+            cy={110}
+            r={R}
+            fill="none"
+            stroke="#6367FF"
+            strokeWidth={14}
+            strokeLinecap="round"
+            // 0%일 때 둥근 끝이 점으로 보이지 않게 숨긴다.
+            strokeOpacity={progress > 0.005 ? 1 : 0}
+            strokeDasharray={`${progress * C} ${C}`}
+            transform="rotate(-90 110 110)"
+          />
+        </svg>
+        <View className="absolute inset-0 items-center justify-center" accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: pct }}>
+          <Text className="text-[24px] font-bold tracking-tight tabular-nums text-ink">{pct}%</Text>
+        </View>
+      </View>
+      <Text className="mt-11 text-center text-[24px] font-bold leading-[34px] tracking-tight text-ink">{'내 답에 꼭 맞는\n첫 코그니를 찾고 있어요'}</Text>
+      <Text className="mt-2.5 text-center text-[16px] text-text-4">답변 {ONBOARDING_QUESTIONS.length}개로 기록 습관 · 감정 패턴 · 성향을 읽는 중</Text>
+      <ReviewMarquee />
+    </Screen>
+  );
+}
 
-export default function OnboardingPage() {
-  const router = useRouter();
+/* ── 해 뜨는 화면 (13h1) ───────────────────────────────── */
+
+const RISE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+
+function Sunrise({ displayName, onGo }: { displayName?: string; onGo: () => void }) {
+  // 해가 다 뜨고 나면 '코그니 찾으러 가기' 버튼이 아래에서 올라온다. 나타나기 전에는 누를 수 없다.
+  const [sunUp, setSunUp] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSunUp(true), SUNRISE_BUTTON_MS);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <Screen
+      statusFg="light"
+      bg="#4A3A8C"
+      background={<SunriseBackdrop />}
+      footer={
+        <View
+          pointerEvents={sunUp ? 'auto' : 'none'}
+          style={{
+            opacity: sunUp ? 1 : 0,
+            transform: `translateY(${sunUp ? 0 : 24}px)`,
+            transition: `opacity 600ms ${RISE}, transform 600ms ${RISE}`,
+          }}
+        >
+          <Button onPress={onGo} disabled={!sunUp}>
+            코그니 찾으러 가기
+          </Button>
+        </View>
+      }
+    >
+      <View className="items-center pt-[147px]">
+        <Animate
+          keyframes={[
+            { opacity: 0, transform: 'translateY(90px) scale(0.85)' },
+            { opacity: 1, transform: 'translateY(0) scale(1)' },
+          ]}
+          duration={1100}
+          easing={RISE}
+        >
+          <Img src={IMG.sunrise} width={240} height={240} />
+        </Animate>
+        <Text className="mt-7 text-[24px] font-bold tracking-tight text-white">다 됐어요</Text>
+        <Text className="mt-3 text-[16px] leading-[26px] text-white/92 text-center">{`이제 ${displayName ? `${displayName}님` : '내'} 안의 첫 코그니를\n찾아볼게요`}</Text>
+      </View>
+    </Screen>
+  );
+}
+
+/* ── 화면 ──────────────────────────────────────────────── */
+
+function OnboardingScreen() {
   const submitOnboarding = useSubmitOnboarding();
   const [phase, setPhase] = useState<Phase>('intro');
   const [slide, setSlide] = useState(0);
-  const [slideDir, setSlideDir] = useState<SwipeDir>();
   const [qIndex, setQIndex] = useState(0);
-  // 척도 질문은 화면이 가운데 값(2)을 선택된 것처럼 그리므로, 건드리지 않고 넘어가도 보이는 값이 저장되게 미리 채운다.
-  const [answers, setAnswers] = useState<Record<string, Answer>>(() =>
-    Object.fromEntries(ONBOARDING_QUESTIONS.filter((x) => x.kind === 'scale').map((x) => [x.id, 2])),
-  );
-  // 소개 문장 중 '잘 모르겠습니다.'를 누른 질문. 설문 첫 장에서 뒤로 가면 여기로 돌아간다.
-  const [skippedFrom, setSkippedFrom] = useState<number>();
-  const [accuracy, setAccuracy] = useState(12);
+  const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const me = useMe();
+  const theme = useTheme();
   // 표시 이름: 가입 때 입력한 닉네임 → 서버 계정 이름(username) → 이메일 앞부분
   const token = useAuthStore((s) => s.accessToken);
   const { data: account } = useGetMyAccount(!!token && !me.nickname);
-  const displayName = me.nickname || account?.user.username || account?.user.email?.split('@')[0];
+  const displayName = me.nickname || account?.user?.username || account?.user?.email?.split('@')[0];
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const q = ONBOARDING_QUESTIONS[qIndex];
   const total = ONBOARDING_QUESTIONS.length;
   const isLast = qIndex === total - 1;
-  const isSentence = q.kind === 'sentence';
-  // 진행 표시는 묶음(소개 문장 / 설문)마다 따로 센다.
-  const section = ONBOARDING_QUESTIONS.filter((x) => (x.kind === 'sentence') === isSentence);
-  const sectionIndex = section.indexOf(q);
-  // 설문의 첫 질문 위치. 소개 문장은 모두 이보다 앞에 있다.
-  const surveyStart = ONBOARDING_QUESTIONS.findIndex((x) => x.kind !== 'sentence');
 
   const [submitted, setSubmitted] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   // 서버가 배정한 첫 코그니. 제출 응답이 분석 화면보다 늦을 수 있어 발견할 때 이 약속을 기다린다.
   const serverCogni = useRef<Promise<FoundCogni | undefined>>(undefined);
 
-  // 진행 중인 제출. 분석 화면에서 보낸 제출이 끝나기 전에 '여정 시작하기'를 누르면 새로 보내지 않고 이걸 기다린다.
-  // 겹쳐 보내면 서버가 둘 다 저장하려다 뒤의 것이 400(INVALID_REQUEST)으로 실패해, 저장됐는데도 실패로 보였다.
+  // 진행 중인 제출. 끝나기 전에 다시 부르면 새로 보내지 않고 이걸 기다린다(겹쳐 보내면 뒤의 것이 400으로 실패한다).
   const pendingSubmit = useRef<Promise<boolean>>(undefined);
   const submit = () => {
     pendingSubmit.current ??= send().then((ok) => {
-      // 실패하면 다음에 다시 보낼 수 있게 비운다.
       if (!ok) pendingSubmit.current = undefined;
       return ok;
     });
     return pendingSubmit.current;
   };
+
   const send = async () => {
-    const byId = (id: string) => labelOf(answers[id], ONBOARDING_QUESTIONS.find((x) => x.id === id)) || '아직 모르겠어요';
-    const sentence = labelOf(answers.my_one_sentence);
-    if (sentence) me.patch((u) => ({ ...u, mySentence: sentence }));
-    let body: OnboardingRequest | undefined;
+    const sentence = answers.my_one_sentence;
+    if (typeof sentence === 'string' && sentence !== UNSURE && sentence.trim()) me.patch((u) => ({ ...u, mySentence: sentence.trim() }));
+    const body = buildRequest(answers);
     try {
-      // 소개 질문 4개는 API 필드와 id가 같아 그대로 보내고, 설문을 거쳤을 때만 설문 답을 answers로 함께 보낸다.
-      // 소개 문장만으로 끝낸 경우(마지막 화면이 소개 문장)엔 미리 채운 척도 값 등이 섞이지 않게 answers를 보내지 않는다.
-      body = {
-        // 한 문장은 선택 항목이다. 직접 썼다면 질문 화면에서 공백을 뺀 10자 이상만 통과시킨다.
-        ...(sentence && { my_one_sentence: sentence }),
-        self_strength: byId('self_strength'),
-        others_feedback: byId('others_feedback'),
-        favorite_thing: byId('favorite_thing'),
-        ...(!isSentence && { answers: balanceAnswers(answers) }),
-      };
       const request = submitOnboarding.mutateAsync(body);
       serverCogni.current = request.then((r) => (r.first_cogni ? fromFirstCogni(r.first_cogni) : undefined)).catch(() => undefined);
-      const res = await request;
-      if (typeof res.accuracy_percent === 'number') setAccuracy(Math.round(res.accuracy_percent));
+      await request;
       setSubmitted(true);
+      setSubmitError('');
       return true;
     } catch (err) {
       // 이미 제출된 계정(409)은 성공으로 본다. 그 외 실패는 마칠 때 한 번 더 시도한다.
-      const already = err instanceof ApiError && err.code === 'ONBOARDING_ALREADY_SUBMITTED';
-      if (already) setSubmitted(true);
-      // 원인을 재현하기 어려운 실패(예: 400 검증 실패)를 콘솔에서 바로 확인할 수 있게 서버 응답과 보낸 내용을 남긴다.
-      else
-        console.error(
-          '[onboarding] 제출 실패',
-          err instanceof ApiError ? { status: err.status, code: err.code, message: err.message } : err,
-          body,
-        );
-      return already;
+      if (err instanceof ApiError && err.code === 'ONBOARDING_ALREADY_SUBMITTED') {
+        setSubmitted(true);
+        return true;
+      }
+      // 답에는 개인적인 내용이 들어 있어 로그에는 상태·코드만 남긴다.
+      console.error(`[onboarding] 제출 실패: ${err instanceof ApiError ? `${err.status} ${err.code}` : 'network'}`);
+      // 서버가 이유를 알려 주면(예: "1번 질문에 답해 주세요.") 상태·코드와 함께 보여 준다.
+      // 서버 오류(5xx)·네트워크 오류도 배포 빌드에서 원인을 알 수 있게 상태·코드를 보여 준다.
+      setSubmitError(
+        err instanceof ApiError ? (err.status < 500 ? `${err.message} (${err.status} ${err.code})` : `${err.status} ${err.code}`) : 'network',
+      );
+      return false;
     }
   };
 
-  // 첫 코그니를 도감(기기 저장)에 넣는다. 메인·마이페이지 캐릭터도 이걸 쓴다.
-  // 서버가 배정한 코그니를 쓴다. 홈·도감은 서버 first_cogni를 보여주므로, 여기서 임시 코그니를 고르면 서로 달라진다.
-  // 그래서 AI 배정이 끝날 때까지 넉넉히 기다리고, 제출 응답에 없으면(이미 제출된 계정 등) 서버 결과를 한 번 더 묻는다.
-  // 그래도 없을 때만 답으로 임시 코그니를 고른다.
+  // 첫 코그니: 서버 배정을 넉넉히 기다리고, 없으면 결과를 한 번 더 묻고, 그래도 없으면 답으로 임시 코그니를 고른다.
   const [found, setFound] = useState<FoundCogni>();
-  // 분석 화면은 끝날 때와 닫을 때 모두 부르므로, 서버 응답을 기다리는 사이 두 번 들어오지 않게 막는다.
   const discovering = useRef(false);
   const discover = async () => {
     if (discovering.current) return;
     discovering.current = true;
-    const within = <T,>(p: Promise<T> | undefined, ms: number) =>
-      Promise.race([p, new Promise<undefined>((resolve) => setTimeout(resolve, ms))]);
+    const within = <T,>(p: Promise<T> | undefined, ms: number) => Promise.race([p, new Promise<undefined>((resolve) => setTimeout(resolve, ms))]);
     const fromResult = () =>
       userApi
         .getOnboardingResult()
         .then((r) => (r.first_cogni ? fromFirstCogni(r.first_cogni) : undefined))
         .catch(() => undefined);
-    const picked =
-      (await within(serverCogni.current, 20000)) ?? (await within(fromResult(), 5000)) ?? pickOnboardingCogni(answers);
+    const fromServer = await within(serverCogni.current, 20000);
+    // 기다리는 사이 민감정보 처리 동의를 철회했으면 결과를 더 묻지도, 남기지도 않는다(화면은 동의 화면으로 바뀌어 있다).
+    if (!hasSensitiveConsent()) return;
+    const picked = fromServer ?? (await within(fromResult(), 5000));
+    if (!hasSensitiveConsent()) return;
+    // 서버가 첫 코그니를 주지 못했으면(제출 실패·지연) 예시 코그니를 지어내지 않고 첫 코그니 화면을 건너뛴다.
+    // 환영 화면이 제출을 다시 시도하고, 배정된 코그니는 나중에 도감·홈에서 서버 값으로 보인다.
+    // 그림 없는 몬스터가 배정됐으면(서버가 고치기 전에 배정된 계정) 기본 그림으로 보여 주지 않고 건너뛴다.
+    if (!picked || !hasCogniImage(picked.cogni.image)) {
+      setPhase('welcome');
+      return;
+    }
     me.addCogni({ ...picked.cogni, foundAt: new Date().toISOString() });
     setFound(picked);
     setPhase('result');
   };
 
-  // 소개 문장을 끝까지 쓰면 설문 없이 바로 분석으로 넘어간다. 설문은 '잘 모르겠습니다.'를 누른 경우에만 거친다.
-  const next = () => {
-    if (!isLast && qIndex !== surveyStart - 1) {
-      setQIndex(qIndex + 1);
-      return;
-    }
-    submit();
-    setPhase('analyzing');
-  };
-
   /* 인트로 */
   if (phase === 'intro') {
-    const go = () => (slide < 2 ? setSlide(slide + 1) : (setPhase('question'), setSlide(0)));
-    const skip = () => (setPhase('question'), setSlide(0));
-    const swipeTo = (to: number) => {
-      setSlideDir(to > slide ? 'next' : 'prev');
-      setSlide(to);
-    };
-    // 마지막 장은 '첫 질문 보기' 버튼으로만 시작하고, 스와이프로는 앞 장으로만 돌아간다.
-    const swipe = {
-      next: slide < 2 ? () => swipeTo(slide + 1) : undefined,
-      prev: slide > 0 ? () => swipeTo(slide - 1) : undefined,
-    };
-    if (slide === 0)
-      return (
-        <Slide variant="a" eyebrow="METAME" dots={[0, 3]} hint="옆으로 밀어서 계속" onNext={go} swipe={swipe} enterFrom={slideDir}>
-          <h1 className={slideTitle}>
-            안녕하세요.
-            <br />
-            처음부터 무거운 질문은
-            <br />
-            하지 않을게요.
-          </h1>
-        </Slide>
-      );
-    if (slide === 1)
-      return (
-        <Slide variant="b" dots={[1, 3]} hint="옆으로 밀어서 계속" onNext={go} onSkip={skip} swipe={swipe} enterFrom={slideDir}>
-          <h1 className={slideTitle}>
-            앞으로 당신을 더 잘 이해해서
-            <br />
-            도와드릴 수 있도록,
-            <br />
-            가볍게 3가지만 골라주세요.
-          </h1>
-          <span className="self-start mt-6 h-8 px-4 rounded-full bg-white text-[13px] font-semibold text-primary inline-flex items-center">
-            약 1분 · 문장 {surveyStart}개
-          </span>
-        </Slide>
-      );
     return (
-      <Slide variant="c" dots={[2, 3]} onNext={go} onSkip={skip} cta="첫 질문 보기" swipe={swipe} enterFrom={slideDir}>
-        <h1 className={slideTitle}>
-          잘 모르겠으면
-          <br />
-          “아직 모르겠어요”를
-          <br />
-          골라도 괜찮아요.
-        </h1>
-        <span className="self-start mt-6 h-8 px-4 rounded-full bg-yellow text-[13px] font-semibold text-ink inline-flex items-center">
-          아직 모르겠어요
-        </span>
-      </Slide>
+      <Intro
+        slide={slide}
+        onNext={() => (slide < INTRO.length - 1 ? setSlide(slide + 1) : setPhase('question'))}
+        onBack={() => setSlide(Math.max(0, slide - 1))}
+      />
     );
   }
 
@@ -557,120 +522,91 @@ export default function OnboardingPage() {
   if (phase === 'question') {
     const answer = answers[q.id];
     const setAnswer = (a: Answer) => setAnswers((prev) => ({ ...prev, [q.id]: a }));
-    // 첫 질문에서 뒤로 가면 인트로 마지막 장('첫 질문 보기')으로, 설문 첫 장에서는 건너뛴 소개 문장으로 돌아간다.
+    const go = (i: number) => {
+      setQIndex(i);
+      scrollRef.current?.scrollTo({ top: 0 });
+    };
     const back = () => {
       if (qIndex === 0) {
         setPhase('intro');
-        setSlide(2);
-      } else setQIndex(qIndex === surveyStart ? (skippedFrom ?? qIndex - 1) : qIndex - 1);
+        setSlide(INTRO.length - 1);
+      } else go(qIndex - 1);
     };
-    // 소개 문장을 모르겠다고 하면 남은 소개 문장 대신 설문으로 넘어간다.
-    const skipToSurvey = () => {
-      setAnswer('__later__');
-      setSkippedFrom(qIndex);
-      setQIndex(surveyStart);
-    };
+    // 답 저장은 '코그니 찾으러 가기'를 눌러 분석을 시작할 때 보낸다.
+    const next = () => (isLast ? setPhase('sunrise') : go(qIndex + 1));
     return (
       <Screen
+        statusFg="light"
+        bg="#110F30"
+        background={<QuestionBackdrop index={qIndex} />}
+        scroll={false}
         footer={
-          isLast ? (
-            <Button onClick={next} disabled={!isAnswered(q, answer)}>
-              답변 마치기
-            </Button>
-          ) : (
-            <div className="flex flex-col items-center gap-1">
-              <Button onClick={next} disabled={!isAnswered(q, answer)}>
-                다음 ({sectionIndex + 1}/{section.length})
-              </Button>
-              {/* 설문은 서버가 8개 모두 답해야 받으므로 넘기기 버튼을 두지 않는다. */}
-              {isSentence && (
-                <button onClick={skipToSurvey} className="h-11 px-4 text-[15px] font-medium text-ink">
-                  잘 모르겠습니다.
-                </button>
-              )}
-            </div>
-          )
+          <Button onPress={next} disabled={!isAnswered(q, answer)}>
+            {isLast ? '답변 마치기' : '다음'}
+          </Button>
         }
       >
-        {/* 머리·아이콘·질문은 고정하고, 선택지 칸 안에서만 스크롤한다. */}
-        <div className="px-5 h-full flex flex-col">
-          <div className="shrink-0 flex items-center justify-between h-14">
-            <BackButton onClick={back} />
-            <span className="font-mono text-[13px] text-mute">
-              {sectionIndex + 1} / {section.length}
-            </span>
-          </div>
-          <div className="shrink-0 flex items-center gap-2 mt-2 pl-[15px]">
-            {section.map((x, i) => (
-              <span key={x.id} className={`rounded-full ${i === sectionIndex ? 'w-2 h-2 bg-primary' : 'w-1.5 h-1.5 bg-[#D4D4DC]'}`} />
-            ))}
-          </div>
-          <div className={`shrink-0 flex justify-center ${isSentence ? 'mt-20 mb-12' : 'mt-[120px] mb-12'}`}>
-            <Img3D name={q.icon} size={100} />
-          </div>
-          <div className="shrink-0 mt-2">
-            <h1 className="text-[20px] font-bold text-ink leading-[1.5] whitespace-pre-line">{q.title}</h1>
-            {'caption' in q && q.caption && <p className="text-[13px] text-sub mt-1.5">{q.caption}</p>}
-          </div>
-          {/* 선택 테두리가 잘리지 않도록 좌우에 1px 여유를 둔다. 질문이 바뀌면 key로 스크롤을 맨 위로 되돌린다. */}
-          <div key={q.id} className="flex-1 min-h-0 overflow-y-auto no-scrollbar mt-4 -mx-1 px-1 pt-px pb-4">
+        <ScrollView ref={scrollRef} className="flex-1 min-h-0" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <QuestionHeader index={qIndex} total={total} badge={q.badge} title={q.title} caption={'caption' in q ? q.caption : undefined} onBack={back} />
+          <View key={q.id} className="px-6 pb-6">
             <QuestionBody q={q} answer={answer} setAnswer={setAnswer} />
-          </div>
-        </div>
+          </View>
+        </ScrollView>
       </Screen>
     );
   }
 
-  /* 분석 중 */
-  if (phase === 'analyzing') {
+  /* 질문을 다 마침 — 해가 뜬다 (13h1) */
+  if (phase === 'sunrise') {
     return (
-      <AnalyzingScreen
-        title={
-          <>
-            내 답에 꼭 맞는
-            <br />첫 코그니를 찾고 있어요
-          </>
-        }
-        steps={['내 기록 습관 분석 중', '내 감정 패턴 분석 중', '내 성향 분석 중']}
-        onDone={discover}
-        onClose={discover}
+      <Sunrise
+        displayName={displayName}
+        onGo={() => {
+          // 여기서 답을 저장하기 시작하고, 분석 화면이 도는 동안 서버(AI)가 첫 코그니를 정한다.
+          void submit();
+          setPhase('analyzing');
+        }}
       />
     );
   }
 
-  /* 첫 코그니 결과 */
+  /* 분석 중 (13h2) */
+  if (phase === 'analyzing') return <Analyzing onDone={discover} />;
+
+  /* 첫 코그니 (13i) */
   if (phase === 'result' && found) {
     const { cogni, label } = found;
-    const [adjective, ...rest] = cogni.name.split(' ');
-    const icons = [FeatureIcons.target, FeatureIcons.clock, FeatureIcons.bolt];
     return (
-      <CogniHero
-        eyebrow={displayName ? `${displayName}님의 첫 코그니는` : '나의 첫 코그니는'}
-        name={
-          // 한 단어 이름이면 빈 줄이 생기지 않게 줄바꿈을 넣지 않는다.
-          rest.length ? (
-            <>
-              {adjective}
-              <br />
-              {rest.join(' ')}
-            </>
-          ) : (
-            adjective
-          )
-        }
-        imageSrc={cogni.image}
-        category={label}
-        features={cogni.features.map((text, i) => ({ icon: icons[i % icons.length], text }))}
-        counterLabel={`온보딩 답 ${Object.keys(rawAnswers(answers, isSentence)).length}개에서 발견`}
-        counter="01 / 24"
-        primaryLabel="여정 시작하기"
-        onPrimary={() => setPhase('outro')}
-      />
+      <Screen bg="#FFFFFF" background={<SoftBackdrop base={theme.bg('#FFFFFF')} />} footer={<Button onPress={() => setPhase('welcome')}>여정 시작하기</Button>}>
+        <View className="h-11 shrink-0 items-center justify-center">
+          <Text className="text-[16px] font-semibold text-ink">첫 코그니</Text>
+        </View>
+        <View className="items-center px-8 pt-10">
+          <View className="px-3.5 py-1.5 rounded-full bg-page">
+            <Text className="tabular-nums text-[12px] font-semibold text-primary-pressed">No.01 첫 코그니</Text>
+          </View>
+          <Text className="mt-7 text-[20px] font-medium text-ink text-center">{displayName ? `${displayName}님` : '나'} 안에서 발견된 첫 코그니</Text>
+          <Animate keyframes={ZOOM_IN} duration={240} className="mt-9 h-[220px] shrink-0">
+            <CogniImg src={cogni.image} size={220} />
+          </Animate>
+          <View className="mt-9 flex-row items-center gap-2 px-4 py-2 rounded-full bg-page/80">
+            <svg width={10} height={10} viewBox="0 0 24 24" aria-hidden>
+              <path fill={theme.fg('#8A8A96')} d="M7 3.5v17l13-8.5L7 3.5Z" />
+            </svg>
+            <Text className="text-[12px] font-medium text-text-3">{label}</Text>
+          </View>
+          <Text className="mt-[18px] text-[24px] font-bold tracking-tight text-ink text-center">{cogni.name}</Text>
+          <Text className="mt-3 text-[16px] leading-[26px] text-text-3 text-center">{cogni.features.slice(0, 2).join('\n')}</Text>
+        </View>
+      </Screen>
     );
   }
 
-  /* 아웃트로 */
-  // 서버 제출이 끝까지 실패하면 완료로 기록하지 않는다. 완료로 기록하면 다시 제출할 기회가 사라진다.
+  /* 환영 (7d4) — 서버 제출이 끝까지 실패하면 다시 시도하거나, 저장 없이 시작할 수 있다. */
+  const enter = () => {
+    me.patch((u) => ({ ...u, onboardedAt: new Date().toISOString() }));
+    router.replace('/main');
+  };
   const finish = async () => {
     if (finishing) return;
     setFinishing(true);
@@ -679,51 +615,56 @@ export default function OnboardingPage() {
     if (!ok) {
       setFinishing(false);
       setFinishError(true);
-      setSlide(2);
       return;
     }
-    me.patch((u) => ({ ...u, onboardedAt: new Date().toISOString() }));
-    router.push('/main');
+    // 제출이 늦거나 실패해 답으로 고른 임시 코그니를 보여 줬다면, 서버가 배정한 코그니로 바꿔 둔다.
+    // 다시 보냈든 처음 제출이 늦게 끝났든 서버 결과가 있으면 맞추고, 없을 때만 임시 코그니를 그대로 둔다.
+    if (found) {
+      const server = await serverCogni.current;
+      if (server && server.cogni.id !== found.cogni.id) {
+        me.patch((u) => ({
+          ...u,
+          cognis: u.cognis.map((c) => (c.source === 'onboarding' && c.id === found.cogni.id ? { ...server.cogni, source: 'onboarding', foundAt: c.foundAt } : c)),
+        }));
+      }
+    }
+    enter();
   };
-  if (slide === 0)
-    return (
-      <Slide variant="a" dots={[0, 3]} hint="화면을 탭해서 계속" align="center" onNext={() => setSlide(1)}>
-        <h1 className="text-[22px] font-bold text-ink leading-[1.65]">
-          그 문장은 오늘부터 바뀝니다.
-          <br />
-          당신을 더 잘 이해할 수 있도록 도와줄게요
-        </h1>
-      </Slide>
-    );
-  if (slide === 1)
-    return (
-      <Slide variant="b" dots={[1, 3]} hint="화면을 탭해서 계속" align="center" onNext={() => setSlide(2)} onSkip={finish}>
-        <h1 className="text-[36px] font-bold text-ink tracking-tight">Day 0</h1>
-        <p className="text-[15px] text-[#48484F] mt-3">당신이 스스로 쓴 첫 문장이 저장됐어요</p>
-      </Slide>
-    );
   return (
-    <Slide variant="c" align="center" onNext={finish} onSkip={finish}>
-      <p className="font-mono text-[12px] tracking-[0.25em] text-[#5A5A62]">YOUR JOURNEY BEGINS</p>
-      <h1 className="text-[52px] font-bold text-ink tracking-tight mt-2">Day 1</h1>
-      <p className="text-[16px] text-ink leading-[1.7] mt-2">
-        오늘부터 쌓이는 기록이
-        <br />
-        당신의 한 문장을 정확하게 만듭니다
-      </p>
-      {submitted && (
-        <span className="mt-6 h-9 px-4 rounded-full bg-white text-[13px] font-semibold text-primary inline-flex items-center">
-          정확도 {accuracy}%에서 출발합니다
-        </span>
-      )}
-      {finishing && <p className="mt-4 text-[13px] text-sub">저장하는 중...</p>}
-      {finishError && !finishing && (
-        <p className="mt-4 text-[13px] text-danger">
-          답변을 저장하지 못했어요.
-          <br />
-          화면을 탭해서 다시 시도해 주세요.
-        </p>
-      )}
-    </Slide>
+    <Screen
+      contentClassName="flex-grow"
+      footer={
+        <View>
+          <Button onPress={finish} loading={finishing}>
+            {finishError ? '다시 시도하기' : '시작하기'}
+          </Button>
+          {/* 서버가 답을 받지 못해도(예: 서버에 새 질문이 아직 없어 400) 앱은 쓸 수 있게 한다. 답은 이 기기에 남는다. */}
+          {finishError && !finishing && (
+            <Pressable onPress={enter} accessibilityRole="button" className="h-11 mt-1 items-center justify-center">
+              <Text className="text-[14px] font-semibold text-sub">저장하지 않고 시작하기</Text>
+            </Pressable>
+          )}
+        </View>
+      }
+    >
+      <View className="flex-1 items-center justify-center px-8 pb-10">
+        <Animate keyframes={ZOOM_IN} duration={240}>
+          <Img src={IMG.popper} width={72} height={96} />
+        </Animate>
+        <Text className="mt-6 text-[24px] font-bold tracking-tight text-ink">환영해요!</Text>
+        <Text className="mt-3 text-[16px] leading-6 text-sub text-center">{`${displayName ? `${displayName}님, ` : ''}메타미에 오신 걸 환영해요\n오늘부터 한 문장씩 기록해 볼까요?`}</Text>
+        {finishError && (
+          <Text className="mt-4 text-[12px] leading-[20px] text-danger text-center">
+            {`답변을 저장하지 못했어요. 다시 시도해 주세요.${submitError ? `\n(${submitError})` : ''}`}
+          </Text>
+        )}
+      </View>
+    </Screen>
   );
 }
+
+// timeLabel은 서버에 새 질문이 등록되면 '혼자 있는 시간' 답 문구를 만들 때 다시 쓴다.
+void timeLabel;
+
+// 민감정보 처리 동의를 철회했거나 동의 기록이 없으면 화면 대신 동의 화면을 보여 준다.
+export default withSensitiveGate(OnboardingScreen);

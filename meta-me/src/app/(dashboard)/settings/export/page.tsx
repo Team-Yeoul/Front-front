@@ -1,122 +1,140 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { Fragment, useMemo, useState } from 'react';
+import { StatusView } from '@/components/ui/states';
 import { useAuthStore } from '@/store';
 import { useMe } from '@/hooks/useMe';
 import { useExportRecords } from '@/hooks/useExportRecords';
-import { downloadExportHtml, groupByMonth, summarize, toEntries } from '@/lib/recordExport';
+import { groupByMonth, shareExportHtml, summarize, toEntries, type ExportEntry } from '@/lib/recordExport';
 import { Screen } from '@/components/ui/Screen';
 import { Button, TopBar } from '@/components/ui/primitives';
+import { ScrollView, View } from '@/components/ui/rn';
+import { Text } from '@/components/ui/Text';
 
 function Stat({ value, label }: { value: number; label: string }) {
   return (
-    <div className="rounded-2xl bg-card border border-line px-4 py-3.5">
-      <p className="text-[22px] font-bold text-ink">{value}</p>
-      <p className="text-[12px] text-sub">{label}</p>
-    </div>
+    <View className="flex-1 rounded-2xl bg-card border border-line px-4 py-3.5">
+      <Text className="text-[18px] font-semibold tabular-nums text-ink">{value}</Text>
+      <Text className="text-[12px] text-sub">{label}</Text>
+    </View>
   );
 }
 
-export default function ExportRecordsPage() {
-  const router = useRouter();
-  // 설정으로 새 항목을 push하면 설정의 뒤로가기(router.back)가 다시 이 페이지로 돌아오므로, 기록을 되돌린다.
-  const back = () => (window.history.length > 1 ? router.back() : router.replace('/settings'));
+function Chip({ children }: { children: string }) {
+  return (
+    <View className="h-6 px-2.5 rounded-full bg-primary-soft items-center justify-center">
+      <Text className="text-[12px] font-semibold text-primary">{children}</Text>
+    </View>
+  );
+}
+
+function EntryCard({ e }: { e: ExportEntry }) {
+  return (
+    <View className="mx-5 rounded-2xl bg-card border border-line px-4 py-4">
+      <Text className="tabular-nums text-[12px] text-sub">
+        {e.date} ({e.weekday})
+      </Text>
+      {!!e.question && <Text className="text-[16px] font-bold text-ink mt-1.5">Q. {e.question}</Text>}
+      {!!e.answer && <Text className="text-[14px] text-ink leading-[24px] mt-1.5">{e.answer}</Text>}
+      {!!e.scene && (
+        <>
+          <Text className="text-[12px] font-semibold text-primary mt-3">기억나는 장면</Text>
+          <Text className="text-[14px] text-body leading-[24px] mt-0.5">{e.scene}</Text>
+        </>
+      )}
+      {!!e.myselfMoment && (
+        <>
+          <Text className="text-[12px] font-semibold text-primary mt-3">나다운 순간</Text>
+          <Text className="text-[14px] text-body leading-[24px] mt-0.5">{e.myselfMoment}</Text>
+        </>
+      )}
+      {e.tags.length > 0 && (
+        <View className="flex-row flex-wrap gap-1.5 mt-3">
+          {e.tags.map((t) => (
+            <Chip key={t}>{t}</Chip>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+export default function ExportRecordsScreen() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const me = useMe();
   const { data, isError, refetch, isFetching } = useExportRecords(!!accessToken);
 
   const entries = useMemo(() => toEntries(data ?? []), [data]);
   const summary = useMemo(() => summarize(entries), [entries]);
-  const months = useMemo(() => groupByMonth(entries), [entries]);
+  // 달별로 묶어 보여 준다(앱은 SectionList로 보이는 것만 그린다. 웹은 한 번에 그린다).
+  const sections = useMemo(() => groupByMonth(entries).map(([month, data]) => ({ month, data })), [entries]);
 
+  // 웹은 HTML 파일을 내려받고, 앱은 같은 이름의 HTML 파일을 만들어 공유 시트로 넘긴다(lib/recordExport 참고).
+  // 파일을 못 만들면 버튼 위에 안내한다.
+  const [saveError, setSaveError] = useState('');
+  const save = () => {
+    setSaveError('');
+    shareExportHtml(entries, me.nickname).catch(() => setSaveError('파일을 저장하지 못했어요. 다시 시도해 주세요.'));
+  };
   const footer =
     entries.length > 0 ? (
-      <Button onClick={() => downloadExportHtml(entries, me.nickname)}>파일로 저장하기</Button>
+      <>
+        {saveError ? <Text className="text-[12px] text-danger text-center mb-2">{saveError}</Text> : null}
+        <Button onPress={save}>파일로 저장하기</Button>
+      </>
     ) : undefined;
 
-  return (
-    <Screen footer={footer}>
-      <TopBar title="기록 내보내기" onBack={back} />
-      <div className="px-5 pb-8">
-        {!data && !isError && <p className="text-center text-[14px] text-sub mt-24">기록을 모으는 중...</p>}
-        {isError && (
-          <div className="text-center mt-24">
-            <p className="text-[14px] text-sub">기록을 불러오지 못했어요.</p>
-            <button onClick={() => refetch()} disabled={isFetching} className="mt-3 text-[14px] font-semibold text-primary">
-              다시 시도
-            </button>
-          </div>
-        )}
-        {data && entries.length === 0 && (
-          <p className="text-center text-[15px] font-semibold text-ink mt-24">아직 내보낼 기록이 없어요</p>
-        )}
-
-        {entries.length > 0 && (
-          <>
-            <p className="font-mono text-[13px] text-sub mt-1">
-              {summary.from} – {summary.to}
-            </p>
-            <div className="grid grid-cols-3 gap-2 mt-3">
-              <Stat value={summary.total} label="전체 기록" />
-              <Stat value={summary.months} label="기록한 달" />
-              <Stat value={summary.myselfMoments} label="나다운 순간" />
-            </div>
-            {summary.topTags.length > 0 && (
-              <div className="rounded-2xl bg-card border border-line px-4 py-3.5 mt-2">
-                <p className="text-[12px] font-semibold text-sub">자주 느낀 감정</p>
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {summary.topTags.map((t) => (
-                    <span key={t.tag} className="h-6 px-2.5 rounded-full bg-primary-soft text-[12px] font-semibold text-primary inline-flex items-center">
-                      {t.tag} {t.count}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {months.map(([month, items]) => (
-              <section key={month} className="mt-6">
-                <p className="font-mono text-[13px] text-sub mb-2.5">
-                  {month} · {items.length}개
-                </p>
-                <div className="flex flex-col gap-3">
-                  {items.map((e) => (
-                    <article key={e.id} className="rounded-2xl bg-card border border-line px-4 py-4">
-                      <p className="font-mono text-[12px] text-sub">
-                        {e.date} ({e.weekday})
-                      </p>
-                      {e.question && <p className="text-[15px] font-bold text-ink mt-1.5">Q. {e.question}</p>}
-                      {e.answer && <p className="text-[14px] text-ink leading-[1.7] mt-1.5 whitespace-pre-line">{e.answer}</p>}
-                      {e.scene && (
-                        <>
-                          <p className="text-[12px] font-semibold text-primary mt-3">기억나는 장면</p>
-                          <p className="text-[14px] text-[#48484F] leading-[1.7] mt-0.5 whitespace-pre-line">{e.scene}</p>
-                        </>
-                      )}
-                      {e.myselfMoment && (
-                        <>
-                          <p className="text-[12px] font-semibold text-primary mt-3">나다운 순간</p>
-                          <p className="text-[14px] text-[#48484F] leading-[1.7] mt-0.5 whitespace-pre-line">{e.myselfMoment}</p>
-                        </>
-                      )}
-                      {e.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-3">
-                          {e.tags.map((t) => (
-                            <span key={t} className="h-6 px-2.5 rounded-full bg-primary-soft text-[12px] font-semibold text-primary inline-flex items-center">
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              </section>
+  const header = (
+    <View className="px-5">
+      <Text className="tabular-nums text-[12px] text-sub mt-1">
+        {summary.from} – {summary.to}
+      </Text>
+      <View className="flex-row gap-2 mt-3">
+        <Stat value={summary.total} label="전체 기록" />
+        <Stat value={summary.months} label="기록한 달" />
+        <Stat value={summary.myselfMoments} label="나다운 순간" />
+      </View>
+      {summary.topTags.length > 0 && (
+        <View className="rounded-2xl bg-card border border-line px-4 py-3.5 mt-2">
+          <Text className="text-[12px] font-semibold text-sub">자주 느낀 감정</Text>
+          <View className="flex-row flex-wrap gap-1.5 mt-2">
+            {summary.topTags.map((t) => (
+              <Chip key={t.tag}>{`${t.tag} ${t.count}`}</Chip>
             ))}
-          </>
-        )}
-      </div>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+
+  return (
+    <Screen footer={footer} scroll={false}>
+      {/* 이 화면을 주소로 바로 연 경우처럼 뒤로 갈 곳이 없으면 설정으로 간다. */}
+      <TopBar title="기록 내보내기" backHref="/settings" />
+      {entries.length > 0 ? (
+        <ScrollView className="flex-1 min-h-0" contentContainerClassName="pb-8">
+          {header}
+          {sections.map((section) => (
+            <Fragment key={section.month}>
+              <Text className="tabular-nums text-[12px] text-sub mt-6 mb-2.5 px-5">
+                {section.month} · {section.data.length}개
+              </Text>
+              {section.data.map((item, i) => (
+                <Fragment key={item.id}>
+                  {i > 0 && <View className="h-3" />}
+                  <EntryCard e={item} />
+                </Fragment>
+              ))}
+            </Fragment>
+          ))}
+        </ScrollView>
+      ) : (
+        <View className="px-5 pb-8">
+          {!data && !isError && <Text className="text-center text-[14px] text-sub mt-24">기록을 모으는 중...</Text>}
+          {isError && <StatusView kind="error" title="기록을 불러오지 못했어요" onRetry={() => refetch()} retrying={isFetching} className="pt-24" />}
+          {data && entries.length === 0 && <Text className="text-center text-[16px] font-semibold text-ink mt-24">아직 내보낼 기록이 없어요</Text>}
+        </View>
+      )}
     </Screen>
   );
 }

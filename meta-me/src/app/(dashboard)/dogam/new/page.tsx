@@ -1,44 +1,63 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { router } from '@/lib/router';
+import { View } from '@/components/ui/rn';
+import { useAuthStore } from '@/store';
+import { useListMyMonsters } from '@/entities/collection';
 import { Screen } from '@/components/ui/Screen';
-import { Button, ChevronLeft, CogniImg } from '@/components/ui/primitives';
-import { useCollection } from '@/hooks/useCollection';
+import { Button, TextButton, TopBar, goBack } from '@/components/ui/primitives';
+import { StatusView } from '@/components/ui/states';
+import { Text } from '@/components/ui/Text';
+import { CogniReveal } from '@/components/ui/CogniReveal';
+import { latestIndex, useCollection } from '@/hooks/useCollection';
+import { useMe } from '@/hooks/useMe';
+import { withSensitiveGate } from '@/components/SensitiveGate';
 
-/** 첫 코그니 발견 (도감 저장 직후). */
-export default function NewCogniPage() {
-  const router = useRouter();
-  const cogni = useCollection()[0];
-  if (!cogni) return null;
+/** 코그니 발견 (5b2): 도감에 막 들어온 코그니 */
+function NewCogniScreen() {
+  const { nickname } = useMe();
+  const collection = useCollection();
+  const index = latestIndex(collection);
+  const cogni = collection[index];
+  // 도감을 아직 못 받았거나 모은 코그니가 없어도 화면과 뒤로가기는 남겨 둔다.
+  const token = useAuthStore((s) => s.accessToken);
+  const { isPending, isError, refetch, isFetching } = useListMyMonsters({ size: 100 }, !!token);
+  if (!cogni) {
+    return (
+      <Screen>
+        <TopBar backHref="/main" />
+        {isError ? (
+          <StatusView kind="error" title="코그니를 불러오지 못했어요" onRetry={() => refetch()} retrying={isFetching} />
+        ) : (
+          <View className="items-center px-8 py-24">
+            <Text className="text-[16px] font-semibold text-ink text-center">{isPending ? '코그니를 불러오는 중이에요' : '아직 만난 코그니가 없어요'}</Text>
+            {!isPending && <Text className="text-[14px] text-sub text-center mt-1.5">기록을 객관화하면 코그니를 만날 수 있어요</Text>}
+          </View>
+        )}
+      </Screen>
+    );
+  }
   return (
-    <Screen
+    <CogniReveal
+      title="코그니 발견"
+      no={index + 1}
+      eyebrow={`${nickname ? `${nickname}님` : '나'} 안에서 발견된 코그니`}
+      image={cogni.image}
+      category={cogni.category}
+      name={cogni.name}
+      desc={cogni.desc}
+      onBack={() => goBack('/main')}
       footer={
         <>
-          <Button variant="dark" onClick={() => router.push(`/dogam/${encodeURIComponent(cogni.id)}/moments`)}>
-            잡은 순간 확인하기
-          </Button>
-          <p className="text-center text-[13px] text-sub mt-3 mb-1">도감에 저장했어요</p>
+          <Button onPress={() => router.push({ pathname: '/dogam/[id]/moments', params: { id: cogni.id } })}>잡은 순간 확인하기</Button>
+          <TextButton className="mt-1" onPress={() => router.push('/dogam')}>
+            도감에서 확인하기
+          </TextButton>
         </>
       }
-    >
-      <div className="relative flex items-center justify-center h-14 px-5">
-        <button onClick={() => router.back()} className="absolute left-5" aria-label="뒤로가기">
-          <ChevronLeft size={20} />
-        </button>
-        <span className="text-[15px] font-semibold text-ink">코그니 발견</span>
-      </div>
-      <div className="flex flex-col items-center pt-[70px]">
-        <span className="h-8 px-4 rounded-full bg-primary-soft font-mono text-[13px] font-bold text-primary inline-flex items-center">No.01 첫 코그니</span>
-        <p className="text-[20px] text-ink mt-8">당신 안에서 발견된 첫 코그니</p>
-        <div className="mt-14">
-          <CogniImg src={cogni.image} size={200} />
-        </div>
-        <span className="mt-14 h-9 px-4 rounded-full bg-surface-2 text-[13px] text-[#48484F] inline-flex items-center gap-2">
-          <span className="text-[10px]">▶</span> {cogni.category}
-        </span>
-        <h1 className="text-[28px] font-bold text-ink mt-4">{cogni.name}</h1>
-        <p className="text-[14px] text-[#48484F] text-center leading-[1.7] mt-2">{cogni.desc}</p>
-      </div>
-    </Screen>
+    />
   );
 }
+
+// 민감정보 처리 동의를 철회했거나 동의 기록이 없으면 화면 대신 동의 화면을 보여 준다.
+export default withSensitiveGate(NewCogniScreen);

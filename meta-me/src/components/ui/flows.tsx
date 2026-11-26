@@ -1,11 +1,56 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, CheckIcon, CloseIcon, CogniImg, DownloadIcon, Img3D, TextButton, TopBar, type Asset3D } from './primitives';
-import { GradientBg, Sheet } from './overlays';
 import { Screen } from './Screen';
+import { Button, CogniImg, Img3D, TextButton, TopBar, type Asset3D } from './primitives';
+import { CheckIcon, ChevronLeft, ChevronRight, CloseIcon, DownloadIcon } from './icons';
+import { Sheet } from './overlays';
+import { Glow, fade, type GlowLayer } from './Glow';
+import { Text } from './Text';
+import { Pressable, View } from './rn';
+import { useTheme } from '@/lib/theme';
+import { useSaveViewImage } from '@/hooks/useSaveViewImage';
+
+/* ── 반투명 흰 카드 (bg-page/85 + backdrop-blur) ───────── */
+function Frosted({ className = '', children }: { className?: string; children: ReactNode }) {
+  return <View className={`overflow-hidden bg-page/85 backdrop-blur-[15px] ${className}`}>{children}</View>;
+}
+
+/* ── 빛 번짐 배경 (웹 GradientBg와 같은 색·위치) ──────────── */
+
+const GRADIENT_BG: Record<'a' | 'b' | 'c', GlowLayer[]> = {
+  a: [fade(60, 40, 15, 5, '160,164,255', 0.75), fade(55, 35, 95, 18, '255,226,140', 0.85), fade(70, 40, 70, 65, '190,193,255', 0.6)],
+  b: [fade(55, 35, 5, 25, '150,155,255', 0.75), fade(50, 30, 90, 5, '255,226,140', 0.85), fade(60, 35, 85, 65, '190,193,255', 0.65)],
+  c: [
+    fade(60, 45, 5, 10, '255,226,140', 0.9),
+    fade(50, 35, 100, 28, '150,155,255', 0.7),
+    fade(60, 40, 40, 75, '255,236,170', 0.6),
+    fade(60, 30, 90, 100, '190,193,255', 0.6),
+  ],
+};
+
+/** 다크에서는 어두운 바탕 위에 빛 번짐이 너무 밝지 않게 진하기를 낮춘다. */
+const dimLayers = (layers: GlowLayer[]) => layers.map((l) => ({ ...l, stops: l.stops.map(([p, a]) => [p, a * 0.35] as [number, number]) }));
+
+export function GradientBg({ variant = 'a' }: { variant?: 'a' | 'b' | 'c' }) {
+  const { isDark, bg } = useTheme();
+  return <Glow layers={isDark ? dimLayers(GRADIENT_BG[variant]) : GRADIENT_BG[variant]} bg={bg('#FBFBFF')} />;
+}
 
 /* ── 분석 중 화면 (온보딩 · 객관화 공통) ─────────────────── */
+
+const R = 70;
+const C = 2 * Math.PI * R;
+
+/** 지금 진행 중인 단계 옆에서 도는 고리. */
+function Spinner() {
+  return (
+    <View
+      className="w-[30px] h-[30px] rounded-full border-[3px] border-[#E6E6EE] dark:border-track border-t-primary border-r-primary"
+      style={{ animation: 'spin-linear 900ms linear infinite' }}
+    />
+  );
+}
 
 export function AnalyzingScreen({
   title,
@@ -14,7 +59,7 @@ export function AnalyzingScreen({
   onClose,
   stepMs = 1100,
 }: {
-  title: ReactNode;
+  title: string;
   steps: string[];
   onDone: () => void;
   onClose?: () => void;
@@ -36,56 +81,61 @@ export function AnalyzingScreen({
     return () => clearTimeout(t);
   }, [done, steps.length, stepMs]);
 
-  const progress = Math.min(1, (done + 0.6) / steps.length);
-  const R = 70;
-  const C = 2 * Math.PI * R;
+  // 처음 그릴 때는 0에서 시작해 다음 프레임부터 늘어나게 한다(앱 withTiming).
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setStarted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const progress = started ? Math.min(1, (done + 0.6) / steps.length) : 0;
+  const { isDark } = useTheme();
 
   return (
     <Screen>
-      <div className="flex justify-end px-5 h-14 items-center">
+      <View className="flex-row justify-end px-5 h-14 items-center">
         {onClose && (
-          <button onClick={onClose} aria-label="닫기">
+          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="닫기">
             <CloseIcon size={24} />
-          </button>
+          </Pressable>
         )}
-      </div>
-      <div className="flex flex-col items-center pt-[100px]">
-        <div className="relative w-[150px] h-[150px] flex items-center justify-center">
-          <svg width="150" height="150" viewBox="0 0 150 150" className="absolute inset-0 -rotate-90">
-            <circle cx="75" cy="75" r={R} fill="none" stroke="#E6E6EE" strokeWidth="4" />
+      </View>
+      <View className="items-center pt-[100px]">
+        <View className="w-[150px] h-[150px] items-center justify-center">
+          <svg width={150} height={150} viewBox="0 0 150 150" className="absolute" style={{ transform: 'rotate(-90deg)' }}>
+            <circle cx={75} cy={75} r={R} fill="none" stroke={isDark ? '#3A3946' : '#E6E6EE'} strokeWidth={4} />
             <circle
-              cx="75"
-              cy="75"
+              cx={75}
+              cy={75}
               r={R}
               fill="none"
               stroke="#6367FF"
-              strokeWidth="4"
+              strokeWidth={4}
               strokeLinecap="round"
               strokeDasharray={`${progress * C} ${C}`}
-              className="transition-all duration-700"
+              style={{ transition: 'stroke-dasharray 700ms ease-in-out' }}
             />
           </svg>
           <Img3D name="star" size={100} />
-        </div>
-        <p className="text-[16px] text-[#48484F] mt-12">잠시만 기다려주세요...</p>
-        <h1 className="text-[22px] font-bold text-ink text-center leading-[1.45] mt-2">{title}</h1>
-        <ul className="mt-12 flex flex-col gap-5">
+        </View>
+        <Text className="text-[16px] text-body mt-12">잠시만 기다려주세요...</Text>
+        <Text className="text-[24px] font-bold text-ink text-center leading-[32px] mt-2">{title}</Text>
+        <View className="mt-12 gap-5">
           {steps.map((s, i) => (
-            <li key={s} className="flex items-center gap-3">
+            <View key={s} className="flex-row items-center gap-3">
               {i < done ? (
-                <span className="w-[30px] h-[30px] rounded-full bg-primary flex items-center justify-center">
+                <View className="w-[30px] h-[30px] rounded-full bg-primary items-center justify-center">
                   <CheckIcon size={15} />
-                </span>
+                </View>
               ) : i === done ? (
-                <span className="w-[30px] h-[30px] rounded-full border-[3px] border-[#E6E6EE] border-t-primary border-r-primary animate-spin" />
+                <Spinner />
               ) : (
-                <span className="w-[30px] h-[30px] rounded-full border-[3px] border-[#E6E6EE]" />
+                <View className="w-[30px] h-[30px] rounded-full border-[3px] border-[#E6E6EE] dark:border-track" />
               )}
-              <span className={`text-[17px] ${i <= done ? 'text-ink' : 'text-mute'}`}>{s}</span>
-            </li>
+              <Text className={`text-[16px] ${i <= done ? 'text-ink' : 'text-mute'}`}>{s}</Text>
+            </View>
           ))}
-        </ul>
-      </div>
+        </View>
+      </View>
     </Screen>
   );
 }
@@ -100,7 +150,7 @@ export interface CogniFeature {
 export function CogniHero({
   eyebrow,
   name,
-  character = 'mascot-glasses',
+  character = 'cogni-default',
   imageSrc,
   category,
   features,
@@ -116,7 +166,7 @@ export function CogniHero({
   overlay,
 }: {
   eyebrow?: string;
-  name?: ReactNode;
+  name?: string;
   character?: Asset3D;
   /** 로컬 에셋 경로 또는 서버 icon_url. 있으면 character보다 우선한다. */
   imageSrc?: string;
@@ -127,127 +177,139 @@ export function CogniHero({
   primaryLabel: string;
   primaryVariant?: 'dark' | 'primary';
   onPrimary: () => void;
-  onSave?: () => void;
+  /** 이미지 저장 버튼. 기본은 이름·캐릭터·특징 카드를 PNG로 찍어 사진첩에 저장한다. false면 버튼을 숨긴다. */
+  onSave?: (() => void) | false;
   askFriend?: () => void;
   onBack?: () => void;
   topRight?: ReactNode;
   overlay?: ReactNode;
 }) {
+  const { ref: snapshotRef, capturing, saving, save } = useSaveViewImage();
+  const handleSave = onSave === false ? undefined : (onSave ?? save);
   return (
-    <Screen bleed background={<GradientBg variant="a" />} overlay={overlay}>
-      <div className="flex flex-col min-h-full">
-        <div className="flex items-center justify-between px-5 h-14">
+    <Screen background={<GradientBg variant="a" />} bg="#FBFBFF" contentClassName="flex-grow" overlay={overlay}>
+      <View className="flex-1">
+        <View className="flex-row items-center justify-between px-5 h-14">
           {/* onBack을 안 주면 뒤로가기 버튼을 숨긴다(자리는 남겨 제목 위치 유지). */}
           {onBack ? (
-            <button
-              onClick={onBack}
-              className="w-10 h-10 rounded-full bg-white/80 flex items-center justify-center"
-              aria-label="뒤로가기"
+            <Pressable
+              onPress={onBack}
+              accessibilityRole="button"
+              accessibilityLabel="뒤로가기"
+              className="w-10 h-10 rounded-full bg-page/80 items-center justify-center"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M15 5l-7 7 7 7" stroke="#1A1A1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
+              <ChevronLeft />
+            </Pressable>
           ) : (
-            <span className="w-10 h-10" />
+            <View className="w-10 h-10" />
           )}
           {topRight}
-        </div>
-        {/* 이름과 캐릭터를 한 덩어리로 남는 공간 가운데에 둔다. 캐릭터만 가운데 두면 이름과 사이가 크게 벌어진다. */}
-        <div className="flex-1 flex flex-col justify-center pb-6 min-h-[230px]">
-          {(eyebrow || name) && (
-            <div className="text-center">
-              {eyebrow && <p className="text-[15px] text-[#48484F]">{eyebrow}</p>}
-              {name && <h1 className="text-[26px] font-bold text-ink leading-[1.35] mt-1.5">{name}</h1>}
-            </div>
-          )}
-          <div className="flex flex-col items-center mt-12">
-            {imageSrc ? <CogniImg src={imageSrc} size={180} /> : <Img3D name={character} size={character === 'cogni-headphone' ? 190 : 180} />}
-            <span className="mt-3 h-7 px-3 rounded-full bg-white/90 text-[12px] font-semibold text-primary inline-flex items-center">
-              {category}
-            </span>
-          </div>
-        </div>
-        <div className="px-4 pb-4 flex flex-col gap-2.5">
-          <div className="bg-white/85 backdrop-blur rounded-3xl px-4 py-4 flex flex-col gap-3.5">
-            {features.map((f) => (
-              <div key={f.text} className="flex items-center gap-3">
-                <span className="w-7 h-7 rounded-lg bg-primary-soft flex items-center justify-center shrink-0">{f.icon}</span>
-                <span className="text-[15px] text-ink">{f.text}</span>
-              </div>
-            ))}
-          </div>
-          <div className="bg-white/85 backdrop-blur rounded-2xl px-5 h-12 flex items-center justify-between">
-            <span className="text-[14px] text-[#48484F]">{counterLabel}</span>
-            <span className="font-mono text-[15px] font-bold text-primary">{counter}</span>
-          </div>
-          <div className="flex gap-2.5">
-            {/* 저장 기능이 연결된 화면에서만 버튼을 보여준다. */}
-            {onSave && (
-              <button
-                onClick={onSave}
-                className="flex-1 h-[63px] rounded-2xl bg-white flex items-center justify-center gap-2 text-[16px] font-semibold text-ink"
-              >
-                <DownloadIcon /> 이미지 저장
-              </button>
+        </View>
+        {/* 이미지 저장 때 찍는 영역(이름·캐릭터·특징·카운터). 화면 배경은 이 영역 밖에 있어 찍는 동안만 같은 배경을 깔아 준다. */}
+        <View ref={snapshotRef} className="flex-1">
+          {capturing && <GradientBg variant="a" />}
+          {/* 이름과 캐릭터를 한 덩어리로 남는 공간 가운데에 둔다. */}
+          <View className="flex-1 justify-center pb-6 min-h-[230px]">
+            {(eyebrow || name) && (
+              <View className="items-center">
+                {!!eyebrow && <Text className="text-[16px] text-body">{eyebrow}</Text>}
+                {!!name && <Text className="text-[24px] font-bold text-ink leading-[35px] mt-1.5 text-center">{name}</Text>}
+              </View>
             )}
-            <Button variant={primaryVariant} className="flex-1" onClick={onPrimary}>
+            <View className="items-center mt-12">
+              {imageSrc ? <CogniImg src={imageSrc} size={180} /> : <Img3D name={character} size={character === 'cogni-headphone' ? 190 : 180} />}
+              <View className="mt-3 h-7 px-3 rounded-full bg-page/90 justify-center">
+                <Text className="text-[12px] font-semibold text-primary">{category}</Text>
+              </View>
+            </View>
+          </View>
+          <View className="px-4 pb-2.5 gap-2.5">
+            <Frosted className="rounded-3xl px-4 py-4 gap-3.5">
+              {features.map((f) => (
+                <View key={f.text} className="flex-row items-center gap-3">
+                  <View className="w-7 h-7 rounded-lg bg-primary-soft items-center justify-center">{f.icon}</View>
+                  <Text className="flex-1 text-[16px] text-ink">{f.text}</Text>
+                </View>
+              ))}
+            </Frosted>
+            <Frosted className="rounded-2xl px-5 h-12 flex-row items-center justify-between">
+              <Text className="text-[14px] text-body">{counterLabel}</Text>
+              <Text className="tabular-nums text-[16px] font-bold text-primary">{counter}</Text>
+            </Frosted>
+          </View>
+        </View>
+        <View className="px-4 pb-4 gap-2.5">
+          <View className="flex-row gap-2.5">
+            {handleSave && (
+              <Pressable
+                onPress={handleSave}
+                disabled={saving}
+                accessibilityRole="button"
+                accessibilityState={{ busy: saving }}
+                className={`flex-1 h-[63px] rounded-2xl bg-page flex-row items-center justify-center gap-2 active:opacity-80 ${saving ? 'opacity-60' : ''}`}
+              >
+                <DownloadIcon />
+                <Text className="text-[16px] font-semibold text-ink">이미지 저장</Text>
+              </Pressable>
+            )}
+            <Button variant={primaryVariant} className="flex-1" onPress={onPrimary}>
               {primaryLabel}
             </Button>
-          </div>
+          </View>
           {askFriend && (
-            <button onClick={askFriend} className="h-10 text-[14px] font-semibold text-primary flex items-center justify-center gap-1">
-              친구는 나를 어떻게 볼까? 물어보기
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M9 5l7 7-7 7" stroke="#6367FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
+            <Pressable onPress={askFriend} accessibilityRole="button" className="h-10 flex-row items-center justify-center gap-1">
+              <Text className="text-[14px] font-semibold text-primary">친구는 나를 어떻게 볼까? 물어보기</Text>
+              <ChevronRight size={14} color="#6367FF" />
+            </Pressable>
           )}
-        </div>
-      </div>
+        </View>
+      </View>
     </Screen>
   );
 }
 
-/** Small line icons used in cogni feature lists. */
+/** 코그니 특징 목록에 쓰는 작은 선 아이콘. */
+const ICON = { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', className: 'shrink-0' } as const;
+const STROKE = { stroke: '#6367FF', strokeWidth: 2 } as const;
+
 export const FeatureIcons = {
   target: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="8" stroke="#6367FF" strokeWidth="2" />
-      <circle cx="12" cy="12" r="3.5" stroke="#6367FF" strokeWidth="2" />
+    <svg {...ICON}>
+      <circle cx={12} cy={12} r={8} {...STROKE} />
+      <circle cx={12} cy={12} r={3.5} {...STROKE} />
     </svg>
   ),
   clock: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="8" stroke="#6367FF" strokeWidth="2" />
-      <path d="M12 8v4l2.5 2" stroke="#6367FF" strokeWidth="2" strokeLinecap="round" />
+    <svg {...ICON}>
+      <circle cx={12} cy={12} r={8} {...STROKE} />
+      <path d="M12 8v4l2.5 2" {...STROKE} strokeLinecap="round" />
     </svg>
   ),
   bolt: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-      <path d="M13 3 5 13.5h6L10 21l8-10.5h-6L13 3Z" stroke="#6367FF" strokeWidth="2" strokeLinejoin="round" />
+    <svg {...ICON}>
+      <path d="M13 3 5 13.5h6L10 21l8-10.5h-6L13 3Z" {...STROKE} strokeLinejoin="round" />
     </svg>
   ),
   search: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-      <circle cx="11" cy="11" r="6" stroke="#6367FF" strokeWidth="2" />
-      <path d="M16 16l3.5 3.5" stroke="#6367FF" strokeWidth="2" strokeLinecap="round" />
+    <svg {...ICON}>
+      <circle cx={11} cy={11} r={6} {...STROKE} />
+      <path d="M16 16l3.5 3.5" {...STROKE} strokeLinecap="round" />
     </svg>
   ),
   cloud: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-      <path d="M7 18h10a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 7 9.5 4.25 4.25 0 0 0 7 18Z" stroke="#6367FF" strokeWidth="2" strokeLinejoin="round" />
+    <svg {...ICON}>
+      <path d="M7 18h10a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 7 9.5 4.25 4.25 0 0 0 7 18Z" {...STROKE} strokeLinejoin="round" />
     </svg>
   ),
   eye: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" stroke="#6367FF" strokeWidth="2" />
-      <circle cx="12" cy="12" r="2.5" stroke="#6367FF" strokeWidth="2" />
+    <svg {...ICON}>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" {...STROKE} />
+      <circle cx={12} cy={12} r={2.5} {...STROKE} />
     </svg>
   ),
   sparkle: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-      <path d="M12 3v5M12 16v5M3 12h5M16 12h5" stroke="#6367FF" strokeWidth="2" strokeLinecap="round" />
+    <svg {...ICON}>
+      <path d="M12 3v5M12 16v5M3 12h5M16 12h5" {...STROKE} strokeLinecap="round" />
     </svg>
   ),
 };
@@ -267,44 +329,42 @@ export function AskFriendSheet({
 }) {
   return (
     <Sheet open={open} onClose={onClose}>
-      <div className="px-5 pt-4 pb-4">
-        <h2 className="text-[20px] font-bold text-ink leading-[1.45]">
-          친구는 나를 어떤 유형으로
-          <br />
-          볼지 물어보세요
-        </h2>
-        <p className="text-[14px] text-sub mt-2">총 9가지 유형이 있어요.</p>
-        <div className="flex items-center gap-3 my-5">
-          <span className="flex-1 h-px bg-line" />
-          <span className="h-6 px-3 rounded-full bg-surface-2 text-[12px] text-sub inline-flex items-center">비교</span>
-          <span className="flex-1 h-px bg-line" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="text-center">
-            <div className="relative h-[120px] rounded-2xl bg-surface-2 flex items-center justify-center">
-              <span className="text-[30px] font-bold text-primary">m</span>
-              <span className="absolute right-3 bottom-3 h-6 px-2 rounded-full bg-primary text-white text-[11px] font-semibold inline-flex items-center">
-                나
-              </span>
-            </div>
-            <p className="text-[15px] font-semibold text-ink mt-3">{myType}</p>
-            <p className="text-[12px] text-mute mt-1">내가 고른 나</p>
-          </div>
-          <div className="text-center">
-            <div className="h-[120px] rounded-2xl bg-yellow-soft flex items-center justify-center">
-              <span className="text-[30px] font-bold text-[#E5B92E]">?</span>
-            </div>
-            <p className="text-[15px] font-semibold text-ink mt-3">아직 비어 있음</p>
-            <p className="text-[12px] text-mute mt-1">친구가 고른 나</p>
-          </div>
-        </div>
-        <Button variant="dark" className="mt-6" onClick={onAsk}>
+      <View className="px-5 pt-4 pb-4">
+        <Text className="text-[20px] font-bold text-ink leading-[29px]">{'친구는 나를 어떤 유형으로\n볼지 물어보세요'}</Text>
+        <Text className="text-[14px] text-sub mt-2">총 9가지 유형이 있어요.</Text>
+        <View className="flex-row items-center gap-3 my-5">
+          <View className="flex-1 h-px bg-line" />
+          <View className="h-6 px-3 rounded-full bg-surface-2 justify-center">
+            <Text className="text-[12px] text-sub">비교</Text>
+          </View>
+          <View className="flex-1 h-px bg-line" />
+        </View>
+        <View className="flex-row gap-3">
+          <View className="flex-1 items-center">
+            <View className="w-full h-[120px] rounded-2xl bg-surface-2 items-center justify-center">
+              <Text className="text-[24px] font-bold text-primary">m</Text>
+              <View className="absolute right-3 bottom-3 h-6 px-2 rounded-full bg-primary justify-center">
+                <Text className="text-[10px] font-semibold text-white">나</Text>
+              </View>
+            </View>
+            <Text className="text-[16px] font-semibold text-ink mt-3 text-center">{myType}</Text>
+            <Text className="text-[12px] text-mute mt-1">내가 고른 나</Text>
+          </View>
+          <View className="flex-1 items-center">
+            <View className="w-full h-[120px] rounded-2xl bg-yellow-soft items-center justify-center">
+              <Text className="text-[24px] font-bold text-[#E5B92E]">?</Text>
+            </View>
+            <Text className="text-[16px] font-semibold text-ink mt-3">아직 비어 있음</Text>
+            <Text className="text-[12px] text-mute mt-1">친구가 고른 나</Text>
+          </View>
+        </View>
+        <Button variant="dark" className="mt-6" onPress={onAsk}>
           친구에게 물어보기
         </Button>
-        <TextButton className="mt-1" onClick={onClose}>
+        <TextButton className="mt-1" onPress={onClose}>
           다음에
         </TextButton>
-      </div>
+      </View>
     </Sheet>
   );
 }
@@ -313,11 +373,15 @@ export function AskFriendSheet({
 
 export function PageHeading({ eyebrow, title, sub }: { eyebrow?: string; title: ReactNode; sub?: ReactNode }) {
   return (
-    <div className="px-5">
-      {eyebrow && <p className="font-mono text-[12px] tracking-[0.12em] text-sub uppercase">{eyebrow}</p>}
-      <h1 className={`text-[24px] font-bold text-ink leading-snug ${eyebrow ? 'mt-1.5' : ''}`}>{title}</h1>
-      {sub && <p className="text-[14px] text-sub mt-1.5 leading-relaxed">{sub}</p>}
-    </div>
+    <View className="px-5">
+      {!!eyebrow && <Text className="tabular-nums text-[12px] tracking-[1.4px] text-sub uppercase">{eyebrow}</Text>}
+      {typeof title === 'string' ? (
+        <Text className={`text-[24px] font-bold text-ink leading-[33px] ${eyebrow ? 'mt-1.5' : ''}`}>{title}</Text>
+      ) : (
+        <View className={eyebrow ? 'mt-1.5' : ''}>{title}</View>
+      )}
+      {typeof sub === 'string' ? <Text className="text-[14px] text-sub mt-1.5 leading-[23px]">{sub}</Text> : sub ? <View className="mt-1.5">{sub}</View> : null}
+    </View>
   );
 }
 

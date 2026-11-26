@@ -1,3 +1,4 @@
+import { toDateKey } from '@/lib/date';
 import type { SavedChat } from '@/store';
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
@@ -6,7 +7,7 @@ const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 export function dayGroup(iso: string) {
   const d = new Date(iso);
   const today = new Date();
-  const key = (x: Date) => x.toLocaleDateString('sv-SE');
+  const key = toDateKey;
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
   if (key(d) === key(today)) return '오늘';

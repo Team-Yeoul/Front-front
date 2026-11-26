@@ -2,7 +2,9 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { useStatusBarStore } from '@/store';
+import { DEFAULT_STATUS_BAR_THEME, useStatusBarStore } from '@/store';
+import { useTheme } from '@/lib/theme';
+import { BottomNav } from './BottomNav';
 
 /**
  * 화면 전환: 상태바와 콘텐츠에 같은 페이드를 동시에 걸어 둘이 한 화면처럼 바뀌게 한다.
@@ -11,7 +13,13 @@ import { useStatusBarStore } from '@/store';
 const ROUTE_FADE = { from: 0.7, ms: 180 };
 
 export function PhoneFrame({ children }: { children: React.ReactNode }) {
-  const theme = useStatusBarStore((s) => s.theme);
+  const stored = useStatusBarStore((s) => s.theme);
+  const { isDark } = useTheme();
+  // 상태바 색을 정하지 않은 화면(Screen을 쓰지 않는 화면)은 테마 바탕색을 따른다.
+  const theme =
+    stored === DEFAULT_STATUS_BAR_THEME
+      ? { bg: 'var(--color-page)', fg: isDark ? ('light' as const) : ('dark' as const), indicator: isDark ? ('light' as const) : ('dark' as const) }
+      : stored;
   const pathname = usePathname();
   const statusRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -37,7 +45,12 @@ export function PhoneFrame({ children }: { children: React.ReactNode }) {
 
       {/* 스크린 영역 */}
       {/* 스플래시처럼 상태바·홈 인디케이터 뒤까지 꽉 채워야 하는 화면은 #phone-screen에 포털로 그린다. */}
-      <div id="phone-screen" className="relative h-full flex flex-col overflow-hidden bg-white md:rounded-[44px] [transform:translateZ(0)]">
+      {/* 바탕은 지금 화면 색(Screen이 상태바 스토어로 알려 준다)이라 홈 인디케이터 뒤도 화면과 이어진다. */}
+      <div
+        id="phone-screen"
+        className="relative h-full flex flex-col overflow-hidden bg-page md:rounded-[44px] [transform:translateZ(0)]"
+        style={{ backgroundColor: theme.bg === 'transparent' ? undefined : theme.bg }}
+      >
 
         {/* 다이나믹 아일랜드 - 데스크톱 전용 */}
         <div className="hidden md:block absolute top-[14px] left-1/2 -translate-x-1/2 w-[126px] h-[37px] bg-black rounded-full z-20" />
@@ -71,8 +84,10 @@ export function PhoneFrame({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* 페이지 콘텐츠 */}
-        <div ref={contentRef} className="flex-1 overflow-y-auto">
-          {children}
+        {/* 탭 화면의 떠 있는 탭바(BottomNav)는 이 영역 아래쪽에 붙는다. */}
+        <div ref={contentRef} className="relative flex-1 min-h-0">
+          <div className="h-full overflow-y-auto">{children}</div>
+          <BottomNav />
         </div>
 
         {/* 홈 인디케이터 - 데스크톱 전용 */}
